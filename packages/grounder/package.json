@@ -1,0 +1,38 @@
+{
+  "name": "grounder",
+  "version": "0.0.1",
+  "description": "Connect git projects to Obsidian dev vaults for AI agent memory",
+  "type": "module",
+  "bin": {
+    "grounder": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "pretest": "pnpm run build",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "obsidian",
+    "cursor",
+    "mcp",
+    "ai",
+    "cli"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

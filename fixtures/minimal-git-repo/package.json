@@ -1,0 +1,6 @@
+{
+  "name": "minimal-app",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Fixture repo for Grounder integration tests"
+}

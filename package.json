@@ -1,0 +1,11 @@
+{
+  "name": "grounder-monorepo",
+  "private": true,
+  "description": "Monorepo for the Grounder CLI",
+  "scripts": {
+    "build": "pnpm --filter grounder build",
+    "test": "pnpm -r test",
+    "grounder": "node packages/grounder/dist/cli.js"
+  },
+  "license": "MIT"
+}
