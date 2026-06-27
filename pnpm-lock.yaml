@@ -8,6 +8,12 @@ importers:
 
   .: {}
 
+  fixtures/dev:
+    dependencies:
+      grounder:
+        specifier: workspace:*
+        version: link:../../packages/grounder
+
   packages/grounder:
     devDependencies:
       '@types/node':

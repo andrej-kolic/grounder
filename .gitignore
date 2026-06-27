@@ -5,3 +5,6 @@ coverage/
 .DS_Store
 .env
 .env.*
+.pnpm-store/
+fixtures/dev/.git/
+fixtures/dev/.grounder.json

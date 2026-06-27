@@ -5,7 +5,8 @@ Grounder is a Node CLI (`packages/grounder`) that wires git projects to personal
 ## Layout
 
 - `packages/grounder/` — publishable package; all implementation lives here
-- `fixtures/` — fake consumer repos for integration tests (not npm packages)
+- `fixtures/minimal-git-repo/` — stable test fixture (automated tests)
+- `fixtures/dev/` — local CLI sandbox (`pnpm fixture:setup`)
 - `.ai/plans/` — product and implementation plans
 
 ## Commands
@@ -15,6 +16,7 @@ pnpm install          # from repo root
 pnpm build            # compile packages/grounder
 pnpm test             # unit + CLI smoke tests
 pnpm grounder --version
+pnpm fixture:setup    # init nested git in fixtures/dev/
 ```
 
 Run tests after every change. Keep dependencies minimal.

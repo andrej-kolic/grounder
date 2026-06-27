@@ -1,16 +1,18 @@
 # Plan: Grounder Phase 1 — Minimal project–vault connector
 
-**Status:** Ready for implementation  
+**Status:** Complete  
 **Repo:** `/Users/andrejkolic/dev/rey/grounder`  
 **Created:** 2026-06-26  
-**Updated:** 2026-06-26 (CLI-first writes; drop MCP/rule/skill; **`grounder-` command prefix**)  
+**Updated:** 2026-06-26 (implemented; monorepo dev fixture; acceptance criteria met)  
 **Scope:** Minimal connection + `grounder note` + `/grounder-note` trigger (Cursor)  
 **Supersedes for v1:** `.ai/plans/grounder-init-cli.md` (full plan remains reference for later phases)
 
 ## How to run (new chat)
 
+Phase 1 is **complete**. For follow-up work, start from `.ai/plans/grounder-init-cli.md` (Phase 2+).
+
 ```text
-Implement Grounder Phase 1 per .ai/plans/grounder-phase-1-minimal-connector.md.
+Continue Grounder from Phase 2 per .ai/plans/grounder-init-cli.md.
 ```
 
 ---
@@ -102,7 +104,7 @@ Vault is a normal directory. No Obsidian API in Phase 1.
 | Create dirs | `node:fs/promises` → `mkdir(path, { recursive: true })` |
 | Write note | `writeFile(path, body, "utf8")` |
 | Avoid overwrite | `access` / `stat`; if slug exists, append `-HHmm` |
-| Frontmatter | Optional string prefix in body — still plain `writeFile` |
+| Frontmatter | Optional string prefix in body — still plain `writeFile` (**not implemented**; raw body only) |
 
 No npm dependencies for I/O. Obsidian app does not need to be running.
 
@@ -130,7 +132,7 @@ No npm dependencies for I/O. Obsidian app does not need to be running.
 | `--force` | init commands | Overwrite existing generated files |
 | `--id <id>` | `init` | Override detected project id |
 | `--vault <path>` | `init` | Override home vault root for this run |
-| `--title <slug>` | `note` | Note filename slug (default: timestamp-based) |
+| `--title <slug>` | `note` | Note filename slug (default: slugified text; timestamp if slug empty) |
 
 ### `grounder vault init [path]`
 
@@ -210,7 +212,7 @@ Proceed? [Y/n]
 1. Read home + repo config
 2. Resolve `notesDir` via `paths.ts`
 3. `mkdir(notesDir, { recursive: true })`
-4. Pick slug (`--title` or timestamp)
+4. Pick slug (`--title` or slugified text; timestamp fallback)
 5. If file exists → append `-HHmm` to slug
 6. `writeFile(notesDir/{slug}.md, text)`
 7. Print written path to stdout
@@ -312,6 +314,10 @@ packages/grounder/
 │   ├── config.ts              # read/write home + repo config
 │   ├── detect.ts              # git root, project id
 │   ├── paths.ts               # convention: projectDir, notesDir
+│   ├── util/
+│   │   ├── slug.ts            # sanitize id, slugify text, collision suffix
+│   │   ├── prompt.ts          # [Y/n] confirm
+│   │   └── parse-args.ts      # flag parsing
 │   ├── vault/
 │   │   └── write-note.ts      # mkdir + writeFile + slug dedup
 │   ├── commands/
@@ -325,6 +331,8 @@ packages/grounder/
 │   └── cursor/
 │       └── grounder-note.md
 └── test/
+    ├── helpers.ts             # temp HOME/vault/repo for tests
+    ├── cli.test.ts
     ├── config.test.ts
     ├── detect.test.ts
     ├── paths.test.ts
@@ -332,7 +340,28 @@ packages/grounder/
     ├── vault-init.test.ts
     ├── init.test.ts
     └── note.test.ts
+
+fixtures/
+├── minimal-git-repo/          # stable test fixture (package.json for detect tests)
+└── dev/                       # local CLI sandbox (workspace dep on grounder)
+
+scripts/
+└── fixture-setup.mjs          # pnpm fixture:setup — nested git in fixtures/dev
 ```
+
+---
+
+## Monorepo dev sandbox (post-Phase 1)
+
+Added for dogfooding inside the monorepo (not required for npm consumers):
+
+| Piece | Purpose |
+| --- | --- |
+| `fixtures/dev/` | Nested git repo; `grounder` via `workspace:*` dep; run `init`/`note` from here |
+| `pnpm fixture:setup` | `git init` in `fixtures/dev/` (idempotent) |
+| `.gitignore` | `fixtures/dev/.git/`, `fixtures/dev/.grounder.json` |
+
+Validated: `/grounder-note` → agent runs `pnpm grounder note` from `fixtures/dev` → note in vault.
 
 ---
 
@@ -340,65 +369,77 @@ packages/grounder/
 
 ### Step 1 — Config + paths
 
-- [ ] `readHomeConfig()` / `writeHomeConfig()` → `~/.grounder/config.json`
-- [ ] `readRepoConfig()` / `writeRepoConfig()` → `.grounder.json`
-- [ ] `resolveNotesDir(home, repo)` → absolute path
-- [ ] `GROUNDER_VAULT` env override
-- [ ] Tests with temp HOME and temp repo
+- [x] `readHomeConfig()` / `writeHomeConfig()` → `~/.grounder/config.json`
+- [x] `readRepoConfig()` / `writeRepoConfig()` → `.grounder.json`
+- [x] `resolveNotesDir(home, repo)` → absolute path
+- [x] `GROUNDER_VAULT` env override
+- [x] Tests with temp HOME and temp repo (`GROUNDER_HOME` in tests)
 
 ### Step 2 — Detect
 
-- [ ] `findGitRoot(cwd)`
-- [ ] `detectProjectId(cwd, override?)` with priority chain + sanitize
-- [ ] Tests with `fixtures/minimal-git-repo/`
+- [x] `findGitRoot(cwd)`
+- [x] `detectProjectId(cwd, override?)` with priority chain + sanitize
+- [x] Tests with `fixtures/minimal-git-repo/`
 
 ### Step 3 — Vault write
 
-- [ ] `writeNote(notesDir, text, { title? })` — mkdir, slug, dedup, writeFile
-- [ ] Tests: writes file, dedup suffix on collision
+- [x] `writeNote(notesDir, text, { title? })` — mkdir, slug, dedup, writeFile
+- [x] Tests: writes file, dedup suffix on collision
 
 ### Step 4 — `vault init`
 
-- [ ] Parse `[path]`, `--yes`, `--force`
-- [ ] Write home config
-- [ ] Create `10-Projects/` in vault if missing
-- [ ] Install `grounder-note.md` command template
-- [ ] Confirm prompt + `--yes` skip
-- [ ] Tests: temp HOME, assert files created, re-run idempotent
+- [x] Parse `[path]`, `--yes`, `--force`
+- [x] Write home config
+- [x] Create `10-Projects/` in vault if missing
+- [x] Install `grounder-note.md` command template
+- [x] Confirm prompt + `--yes` skip
+- [x] Tests: temp HOME, assert files created, re-run idempotent
 
 ### Step 5 — `init`
 
-- [ ] Require home config or `--vault`
-- [ ] Detect git root + project id
-- [ ] Write `.grounder.json`
-- [ ] Create vault `notes/` dir
-- [ ] Confirm prompt + flags
-- [ ] Tests: init twice → no duplicate dirs; `--force` overwrites marker
+- [x] Require home config or `--vault`
+- [x] Detect git root + project id
+- [x] Write `.grounder.json`
+- [x] Create vault `notes/` dir
+- [x] Confirm prompt + flags
+- [x] Tests: init twice → no duplicate dirs; `--force` overwrites marker
 
 ### Step 6 — `note` + `path notes`
 
-- [ ] `grounder note <text>` with `--title` flag
-- [ ] `grounder path notes` prints resolved dir
-- [ ] Fail clearly when not linked
-- [ ] Tests: end-to-end with temp vault
+- [x] `grounder note <text>` with `--title` flag
+- [x] `grounder path notes` prints resolved dir
+- [x] Fail clearly when not linked
+- [x] Tests: end-to-end with temp vault
 
 ### Step 7 — Polish
 
-- [ ] Update CLI help text
-- [ ] README quickstart: `vault init` → `init` → `/grounder-note` or `grounder note`
-- [ ] Run `pnpm test`
+- [x] Update CLI help text
+- [x] README quickstart: `vault init` → `init` → `/grounder-note` or `grounder note`
+- [x] Run `pnpm test` (27 tests passing)
 
 ---
 
 ## Acceptance criteria
 
-1. Fresh machine: `vault init` + `init` in a test repo produces home config, repo marker, and `notes/` folder.
-2. Re-run `init` is safe — no errors, no clobber unless `--force`.
-3. `.grounder.json` contains only `version` + `projectId` (no redundant paths).
-4. `grounder note "foo"` writes `10-Projects/{id}/notes/*.md` and prints path.
-5. `/grounder-note foo` (via agent) invokes CLI; file appears in vault.
-6. `--yes` runs init non-interactively (scriptable).
-7. Slug collision appends `-HHmm`; existing note not overwritten.
+1. [x] Fresh machine: `vault init` + `init` in a test repo produces home config, repo marker, and `notes/` folder.
+2. [x] Re-run `init` is safe — no errors, no clobber unless `--force`.
+3. [x] `.grounder.json` contains only `version` + `projectId` (no redundant paths).
+4. [x] `grounder note "foo"` writes `10-Projects/{id}/notes/*.md` and prints path.
+5. [x] `/grounder-note foo` (via agent) invokes CLI; file appears in vault.
+6. [x] `--yes` runs init non-interactively (scriptable).
+7. [x] Slug collision appends `-HHmm`; existing note not overwritten.
+
+---
+
+## Shipped vs deferred (implementation notes)
+
+| Planned | Shipped | Notes |
+| --- | --- | --- |
+| All CLI commands | Yes | `vault init`, `init`, `note`, `path notes` |
+| `/grounder-note` template | Yes | Installed to `~/.cursor/commands/grounder-note.md` |
+| Note frontmatter | No | Raw body only; add in Phase 2 or as polish |
+| `status`, `doctor` | No | Explicitly out of scope |
+| Monorepo dev fixture | Yes (extra) | `fixtures/dev/` + `pnpm fixture:setup` — not in original plan |
 
 ---
 
@@ -415,6 +456,7 @@ packages/grounder/
 | `status`, `doctor` | Operational tooling |
 | Templates | daily-log, handoff, etc. |
 | `/grounder-note` Mode B | agent output as note body |
+| Note frontmatter (created, project, tags) | Raw body only in Phase 1 |
 | Custom path overrides | `paths` block in repo config |
 | Monorepo / multi-package | one bridge per repo root for now |
 

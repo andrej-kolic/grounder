@@ -5,7 +5,8 @@
   "scripts": {
     "build": "pnpm --filter grounder build",
     "test": "pnpm -r test",
-    "grounder": "node packages/grounder/dist/cli.js"
+    "grounder": "node packages/grounder/dist/cli.js",
+    "fixture:setup": "node scripts/fixture-setup.mjs"
   },
   "license": "MIT"
 }

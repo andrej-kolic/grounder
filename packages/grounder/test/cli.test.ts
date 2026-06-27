@@ -21,11 +21,13 @@ describe("grounder cli", () => {
     const result = run(["--help"]);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("grounder vault init");
+    expect(result.stdout).toContain("grounder note");
+    expect(result.stdout).not.toContain("grounder status");
   });
 
-  it("exits non-zero for unimplemented init", () => {
-    const result = run(["init"]);
+  it("requires text for note command", () => {
+    const result = run(["note"]);
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("not implemented yet");
+    expect(result.stderr).toContain("Usage: grounder note");
   });
 });
