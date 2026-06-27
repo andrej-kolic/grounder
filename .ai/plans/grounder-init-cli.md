@@ -3,8 +3,8 @@
 **Status:** Draft — ready for implementation  
 **Repo:** `/Users/andrejkolic/dev/rey/grounder`  
 **Created:** 2026-06-25  
-**Updated:** 2026-06-25 (decisions 13–20 — slash UX, x-note modes, MCP I/O)  
-**Reference:** Manual prototype validated 2026-06-25 (turborepo + grounder registered; `/x-*` commands live)
+**Updated:** 2026-06-26 (decisions 13–20; slash UX; MCP I/O; **`grounder-` command prefix**)  
+**Reference:** Manual prototype validated 2026-06-25 (turborepo + grounder registered; prototype used legacy `x-` prefix — Grounder ships `grounder-`)
 
 ## How to run (new chat)
 
@@ -49,7 +49,7 @@ npx grounder init
 npx grounder vault init ~/Documents/obsidian/dev
 ```
 
-After both: open project in Cursor, type `/` → pick `/x-task` to start, `/x-task-handoff` to end.
+After both: open project in Cursor, type `/` → pick `/grounder-task` to start, `/grounder-task-handoff` to end.
 
 ---
 
@@ -61,7 +61,7 @@ Connecting a repo to Obsidian for AI agents currently requires many manual steps
 2. `projects.json` registry
 3. Per-project bridge note + `logs/`, `notes/`, `plans/`, `decisions/`
 4. User-level Cursor MCP (`@bitbonsai/mcpvault`)
-5. Six Cursor slash commands (`/x-task`, …)
+5. Six Cursor slash commands (`/grounder-task`, …)
 6. User rule (command → folder router)
 7. User skill (procedure: MCP, templates, paths)
 8. Optional shell helper for daily logs
@@ -83,29 +83,41 @@ Already working on this machine — **treat as spec, not suggestion**:
 | Templates | `templates/{daily-log,session-handoff,plan,decision}.md` |
 | Project bridge | `10-Projects/<id>/_project.md` |
 | User MCP | `~/.cursor/mcp.json` → `obsidian-dev` |
-| Slash commands | `~/.cursor/commands/x-{task,task-continue,task-handoff,note,plan,decision}.md` |
-| User rule | `~/.cursor/rules/obsidian-dev-memory.mdc` (router) |
-| User skill | `~/.cursor/skills/obsidian-dev-vault/SKILL.md` (procedure) |
+| Slash commands | `~/.cursor/commands/grounder-{task,task-continue,task-handoff,note,plan,decision}.md` |
+| User rule | `~/.cursor/rules/grounder-vault.mdc` (router) |
+| User skill | `~/.cursor/skills/grounder-vault/SKILL.md` (procedure) |
 | Daily log script | `00-AI/bin/new-daily-log.sh` |
 
 ### Cursor UX (three layers)
 
 | Layer | Role |
 | --- | --- |
-| **Commands** | User picks `/x-*` from `/` menu → triggers action |
+| **Commands** | User picks `/grounder-*` from `/` menu → triggers action |
 | **Rule** | Maps each command to exactly one vault folder |
 | **Skill** | Shared how-to: resolve project, MCP tools, templates |
 
 | Command | Writes to |
 | --- | --- |
-| `/x-task` | read only (bridge, log, AGENTS.md) |
-| `/x-task-continue` | read only (prioritize handoff) |
-| `/x-task-handoff` | `logs/YYYY-MM-DD.md` |
-| `/x-note` | `notes/` — Mode A: `/x-note text` verbatim; Mode B: `task /x-note` agent output |
-| `/x-plan` | `plans/` |
-| `/x-decision` | `decisions/` |
+| `/grounder-task` | read only (bridge, log, AGENTS.md) |
+| `/grounder-task-continue` | read only (prioritize handoff) |
+| `/grounder-task-handoff` | `logs/YYYY-MM-DD.md` |
+| `/grounder-note` | `notes/` — Mode A: `/grounder-note text` verbatim; Mode B: `task /grounder-note` agent output |
+| `/grounder-plan` | `plans/` |
+| `/grounder-decision` | `decisions/` |
 
 Registered projects: `turborepo-react-starter`, `grounder`.
+
+### Cursor naming
+
+| Artifact | Pattern | Example |
+| --- | --- | --- |
+| Slash commands | `grounder-<action>.md` → `/grounder-<action>` | `/grounder-note`, `/grounder-task` |
+| Rule | `grounder-vault.mdc` | Router table for all `/grounder-*` commands |
+| Skill | `grounder-vault/SKILL.md` | Shared procedure (resolve project, MCP, templates) |
+
+MCP server name stays **`obsidian-dev`** (transport layer; unchanged).
+
+Legacy manual prototype used `x-` prefix — Grounder ships `grounder-`.
 
 ---
 
@@ -153,9 +165,9 @@ Future (out of v1): `grounder log`, `grounder handoff` (CLI wrappers for templat
 **User-level (merge, not overwrite):**
 
 - `~/.cursor/mcp.json` — add `obsidian-dev` server (detect `npx` via `which npx`)
-- `~/.cursor/commands/x-*.md` — six slash commands (skip existing unless `--force`)
-- `~/.cursor/rules/obsidian-dev-memory.mdc` — router table (skip unless `--force`)
-- `~/.cursor/skills/obsidian-dev-vault/SKILL.md` — procedure doc (skip unless `--force`)
+- `~/.cursor/commands/grounder-*.md` — six slash commands (skip existing unless `--force`)
+- `~/.cursor/rules/grounder-vault.mdc` — router table (skip unless `--force`)
+- `~/.cursor/skills/grounder-vault/SKILL.md` — procedure doc (skip unless `--force`)
 
 **Config persistence:** `~/.grounder/config.json`
 
@@ -164,9 +176,9 @@ Future (out of v1): `grounder log`, `grounder handoff` (CLI wrappers for templat
   "vaultRoot": "/Users/you/Documents/obsidian/dev",
   "mcpServerName": "obsidian-dev",
   "mcpPackage": "@bitbonsai/mcpvault@0.11.0",
-  "cursorRuleName": "obsidian-dev-memory",
-  "cursorSkillName": "obsidian-dev-vault",
-  "cursorCommands": ["x-task", "x-task-continue", "x-task-handoff", "x-note", "x-plan", "x-decision"]
+  "cursorRuleName": "grounder-vault",
+  "cursorSkillName": "grounder-vault",
+  "cursorCommands": ["grounder-task", "grounder-task-continue", "grounder-task-handoff", "grounder-note", "grounder-plan", "grounder-decision"]
 }
 ```
 
@@ -241,7 +253,7 @@ Generated fields:
 - `recall` — from README first heading, package description, or project id
 - Tables: repo docs (`AGENTS.md`, `docs/` if present, `.ai/plans/` if present)
 - Vault folder purposes (static)
-- Cursor commands table (`/x-task`, …) — link to `00-AI/agent-workflow.md`
+- Cursor commands table (`/grounder-task`, …) — link to `00-AI/agent-workflow.md`
 
 **Do not** embed full README or AGENTS.md — link paths only.
 
@@ -290,15 +302,15 @@ Or enter vault path now: _
 | 8 | TypeScript or plain Node ESM — pick one in Phase 1; prefer **Node 18+**, minimal deps |
 | 9 | Templates use `{{date:YYYY-MM-DD}}` placeholders — agents substitute (Templater optional) |
 | 10 | Cursor UX = **commands** (trigger) + **rule** (router) + **skill** (procedure) — all installed by `vault init` |
-| 11 | Slash command prefix **`x-`** — namespaces Obsidian commands from repo commands (e.g. `x-review`) |
+| 11 | Slash command prefix **`grounder-`** — product namespace; separates vault commands from repo commands (e.g. `/grounder-note` vs `/review`) |
 | 12 | Vault I/O: **MCP first** (`obsidian-dev`); direct filesystem **fallback only** when MCP unavailable |
-| 13 | **No loose text triggers** — vault actions only via `/x-*` slash commands (not free-text "handoff", "save note", etc.) |
-| 14 | **`/x-note` dual mode:** Mode A `/x-note <text>` → verbatim body; Mode B `<task> /x-note` → agent runs task, note body = output only |
+| 13 | **No loose text triggers** — vault actions only via `/grounder-*` slash commands (not free-text "handoff", "save note", etc.) |
+| 14 | **`/grounder-note` dual mode:** Mode A `/grounder-note <text>` → verbatim body; Mode B `<task> /grounder-note` → agent runs task, note body = output only |
 | 15 | **Never overwrite vault files** — new note/plan/decision always; if slug exists append `-HHmm` suffix |
 | 16 | **Strict folder separation** — each command writes to one folder only; no mixing (e.g. session summary → `logs/`, not `notes/`) |
 | 17 | Cursor artifacts are **user-global** (`~/.cursor/commands`, `rules`, `skills`) — not project `.cursor/` (vault is personal) |
-| 18 | User rule **`alwaysApply: true`** — router active even when user types `/x-*` manually without command picker |
-| 19 | Chat reply vs vault write are **separate** — agent must not dump chat summaries into vault unless Mode B `/x-note` or explicit write command |
+| 18 | User rule **`alwaysApply: true`** — router active even when user types `/grounder-*` manually without command picker |
+| 19 | Chat reply vs vault write are **separate** — agent must not dump chat summaries into vault unless Mode B `/grounder-note` or explicit write command |
 | 20 | `doctor` checks MCP server listed, `npx` path absolute, and warns when agents would fall back to filesystem (sandbox approval risk) |
 
 ### Decision log (2026-06-25)
@@ -306,10 +318,16 @@ Or enter vault path now: _
 | # | Change | Why |
 | --- | --- | --- |
 | 13 | Dropped natural-language session triggers | User confusion; ambiguous routing |
-| 14 | `/x-note` verbatim vs agent modes | Same command, two intents — prefix vs suffix detection |
+| 14 | `/grounder-note` verbatim vs agent modes | Same command, two intents — prefix vs suffix detection |
 | 15 | No overwrite | Protect user-edited notes; test run clobbered `test-note-1.md` |
 | 12, 20 | MCP first | Direct Write to vault outside repo workspace triggered Cursor approval + slow path |
 | 16 | Enforced in rule + commands | Agent merged "summarize" + "note" into one bloated file |
+
+### Decision log (2026-06-26)
+
+| # | Change | Why |
+| --- | --- | --- |
+| 21 | Renamed slash prefix **`x-` → `grounder-`**; rule/skill → **`grounder-vault`** | Product-branded namespace; `x-` was generic |
 
 ## Non-goals (v1)
 
@@ -330,7 +348,7 @@ Or enter vault path now: _
 │  docs/          │ ◀──── bridge note ──────│  _project.md, logs/  │
 └─────────────────┘                         └──────────────────────┘
          │                                            ▲
-         │  /x-task, /x-task-handoff, …               │
+         │  /grounder-task, /grounder-task-handoff, …               │
          ▼                                            │
 ┌─────────────────┐    rule + skill + MCP             │
 │  Cursor Agent   │ ──────────────────────────────────┘
@@ -356,7 +374,7 @@ grounder/
 ├── templates/
 │   ├── vault/            # 00-AI, templates, 90-Inbox
 │   ├── bridge/           # _project.md
-│   └── cursor/           # x-*.md commands (incl. x-note dual-mode), rule.mdc, SKILL.md (MCP-first I/O)
+│   └── cursor/           # grounder-*.md commands (incl. grounder-note dual-mode), grounder-vault.mdc, SKILL.md (MCP-first I/O)
 └── test/
 ```
 
@@ -375,9 +393,9 @@ grounder/
 - [ ] `~/.grounder/config.json` read/write
 - [ ] Copy vault templates from `templates/vault/**`
 - [ ] Merge `~/.cursor/mcp.json` (preserve existing servers)
-- [ ] Install `~/.cursor/commands/x-*.md` (six files)
-- [ ] Write `~/.cursor/rules/obsidian-dev-memory.mdc` if missing
-- [ ] Write `~/.cursor/skills/obsidian-dev-vault/SKILL.md` if missing
+- [ ] Install `~/.cursor/commands/grounder-*.md` (six files)
+- [ ] Write `~/.cursor/rules/grounder-vault.mdc` if missing
+- [ ] Write `~/.cursor/skills/grounder-vault/SKILL.md` if missing
 - [ ] Tests: temp HOME, assert files created
 
 ### Phase 2 — `init` (core)
@@ -398,7 +416,7 @@ grounder/
 
 ### Phase 4 — Polish + publish
 
-- [ ] README: quickstart (`vault init` → `init` → `/x-task` … `/x-task-handoff`)
+- [ ] README: quickstart (`vault init` → `init` → `/grounder-task` … `/grounder-task-handoff`)
 - [ ] `npx grounder@latest` smoke test on clean temp project
 - [ ] npm publish (or private registry)
 
@@ -408,9 +426,9 @@ grounder/
 
 1. Fresh machine: `vault init` + `init` in turborepo clone reproduces manual setup (modulo user-specific paths).
 2. Re-run `init` is safe — no duplicate projects, no log deletion.
-3. Cursor `/x-task` + rule finds project via `projects.json` when workspace is registered repo.
-4. `/x-task-handoff` writes only to `logs/`; `/x-note` only to `notes/` (router enforced).
-5. `/x-note` Mode A saves verbatim text; Mode B saves agent output only (no instruction echo).
+3. Cursor `/grounder-task` + rule finds project via `projects.json` when workspace is registered repo.
+4. `/grounder-task-handoff` writes only to `logs/`; `/grounder-note` only to `notes/` (router enforced).
+5. `/grounder-note` Mode A saves verbatim text; Mode B saves agent output only (no instruction echo).
 6. Vault writes use MCP when `obsidian-dev` connected; filesystem fallback documented in skill.
 7. `.grounder.json` in repo documents connection for teammates (they run `init` with their vault path).
 8. `doctor` reports actionable fixes when MCP, commands, or vault missing.
@@ -426,7 +444,7 @@ grounder/
 | Overwriting edited bridge | Default skip if `_project.md` exists; `--force` flag |
 | Agent uses Write tool instead of MCP | Skill + commands require MCP first; doctor warns |
 | `npx` not on Cursor PATH | Doctor warns; write absolute path from `which npx` |
-| `/x-note` mode ambiguity | Command template: leading `/x-note` = verbatim; trailing `/x-note` = agent mode; ask once if unclear |
+| `/grounder-note` mode ambiguity | Command template: leading `/grounder-note` = verbatim; trailing `/grounder-note` = agent mode; ask once if unclear |
 
 ---
 
