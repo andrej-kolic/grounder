@@ -2,15 +2,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { writeFile } from "node:fs/promises";
 import { afterEach, describe, expect, it } from "vitest";
-import { detectProjectId, findGitRoot } from "../src/detect.js";
-import { createTempEnv } from "./helpers.js";
+import { detectProjectId } from "../../src/connector/project-id.js";
+import { createTempEnv } from "../helpers.js";
 
 const fixtureRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  "../../../fixtures/minimal-git-repo",
+  "../../../../fixtures/minimal-git-repo",
 );
 
-describe("detect", () => {
+describe("connector/project-id", () => {
   let cleanup: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
@@ -18,23 +18,6 @@ describe("detect", () => {
       await cleanup();
       cleanup = undefined;
     }
-  });
-
-  it("finds git root in temp repo", async () => {
-    const env = await createTempEnv({ packageName: "fixture-app" });
-    cleanup = env.cleanup;
-
-    const nested = path.join(env.repo, "src", "nested");
-    await import("node:fs/promises").then(({ mkdir }) => mkdir(nested, { recursive: true }));
-
-    expect(await findGitRoot(nested)).toBe(env.repo);
-  });
-
-  it("returns null outside git repo", async () => {
-    const env = await createTempEnv({ initGit: false });
-    cleanup = env.cleanup;
-
-    expect(await findGitRoot(env.repo)).toBeNull();
   });
 
   it("detects project id from package.json", async () => {

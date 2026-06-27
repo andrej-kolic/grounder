@@ -1,13 +1,7 @@
-export function sanitizeId(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/-{2,}/g, "-");
-}
+import { sanitizeProjectId } from "./project-id.js";
 
 export function slugifyText(text: string): string {
-  return sanitizeId(text.trim().slice(0, 80));
+  return sanitizeProjectId(text.trim().slice(0, 80));
 }
 
 export function timestampSlug(date = new Date()): string {

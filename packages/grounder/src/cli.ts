@@ -3,10 +3,10 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { runInit } from "./commands/init.js";
 import { runNote } from "./commands/note.js";
-import { runPathNotes } from "./commands/path.js";
-import { runVaultInit } from "./commands/vault-init.js";
+import { runPathNotes } from "./commands/path/notes.js";
+import { runRepoInit } from "./commands/repo/init.js";
+import { runVaultInit } from "./commands/vault/init.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(
@@ -68,7 +68,7 @@ async function main(): Promise<void> {
   }
 
   if (command === "init") {
-    process.exit(await runInit(rest));
+    process.exit(await runRepoInit(rest));
   }
 
   if (command === "note") {

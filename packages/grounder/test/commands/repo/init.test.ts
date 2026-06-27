@@ -1,11 +1,11 @@
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { readRepoConfig, writeHomeConfig } from "../src/config.js";
-import { runInitWithOptions } from "../src/commands/init.js";
-import { createTempEnv } from "./helpers.js";
+import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
+import { writeHomeConfig } from "../../../src/connector/home.js";
+import { readRepoConfig } from "../../../src/connector/repo.js";
+import { createTempEnv } from "../../helpers.js";
 
-describe("init", () => {
+describe("commands/repo/init", () => {
   let cleanup: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
@@ -26,7 +26,7 @@ describe("init", () => {
     const env = await setupLinkedEnv();
     cleanup = env.cleanup;
 
-    const code = await runInitWithOptions({
+    const code = await runRepoInitWithOptions({
       cwd: env.repo,
       yes: true,
       homeDir: env.home,
@@ -42,8 +42,8 @@ describe("init", () => {
     const env = await setupLinkedEnv();
     cleanup = env.cleanup;
 
-    await runInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
-    const code = await runInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const code = await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     expect(code).toBe(0);
     expect(await readRepoConfig(env.repo)).toEqual({ version: 1, projectId: "my-app" });
@@ -53,8 +53,8 @@ describe("init", () => {
     const env = await setupLinkedEnv("old-name");
     cleanup = env.cleanup;
 
-    await runInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
-    const code = await runInitWithOptions({
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const code = await runRepoInitWithOptions({
       cwd: env.repo,
       yes: true,
       force: true,
@@ -71,7 +71,7 @@ describe("init", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    const code = await runInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const code = await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     expect(code).toBe(1);
   });
 });

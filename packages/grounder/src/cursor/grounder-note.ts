@@ -1,14 +1,14 @@
 import { copyFile, mkdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { fileExists } from "../config.js";
+import { resolveHomeDir } from "../connector/home.js";
+import { fileExists } from "../util/fs.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const templatePath = path.join(pkgRoot, "templates", "cursor", "grounder-note.md");
 
 export function cursorCommandsDir(homeDir?: string): string {
-  const base = homeDir ?? process.env.GROUNDER_HOME ?? process.env.HOME ?? "";
-  return path.join(base, ".cursor", "commands");
+  return path.join(resolveHomeDir(homeDir), ".cursor", "commands");
 }
 
 export function grounderNoteCommandPath(homeDir?: string): string {

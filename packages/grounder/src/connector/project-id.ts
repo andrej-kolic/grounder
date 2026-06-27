@@ -1,37 +1,12 @@
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { sanitizeId } from "./util/slug.js";
+import { sanitizeProjectId } from "../util/project-id.js";
 
 export type ProjectIdSource = "flag" | "package.json" | "git-remote" | "basename";
 
 export interface DetectedProjectId {
   id: string;
   source: ProjectIdSource;
-}
-
-async function isGitRoot(dir: string): Promise<boolean> {
-  try {
-    await access(path.join(dir, ".git"));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function findGitRoot(startDir: string): Promise<string | null> {
-  let current = path.resolve(startDir);
-
-  while (true) {
-    if (await isGitRoot(current)) {
-      return current;
-    }
-
-    const parent = path.dirname(current);
-    if (parent === current) {
-      return null;
-    }
-    current = parent;
-  }
 }
 
 async function readPackageName(repoRoot: string): Promise<string | null> {
@@ -87,7 +62,7 @@ export async function detectProjectId(
   override?: string,
 ): Promise<DetectedProjectId> {
   if (override) {
-    const id = sanitizeId(override);
+    const id = sanitizeProjectId(override);
     if (!id) {
       throw new Error(`Invalid project id: ${override}`);
     }
@@ -96,7 +71,7 @@ export async function detectProjectId(
 
   const packageName = await readPackageName(repoRoot);
   if (packageName) {
-    const id = sanitizeId(packageName);
+    const id = sanitizeProjectId(packageName);
     if (id) {
       return { id, source: "package.json" };
     }
@@ -104,14 +79,14 @@ export async function detectProjectId(
 
   const remoteSlug = await readGitRemoteSlug(repoRoot);
   if (remoteSlug) {
-    const id = sanitizeId(remoteSlug);
+    const id = sanitizeProjectId(remoteSlug);
     if (id) {
       return { id, source: "git-remote" };
     }
   }
 
   const basename = path.basename(repoRoot);
-  const id = sanitizeId(basename);
+  const id = sanitizeProjectId(basename);
   if (!id) {
     throw new Error("Could not detect a valid project id");
   }

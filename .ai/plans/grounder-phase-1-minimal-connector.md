@@ -311,42 +311,44 @@ Persist chosen id in `.grounder.json` so renames/detection drift don't break the
 packages/grounder/
 ├── src/
 │   ├── cli.ts
-│   ├── config.ts              # read/write home + repo config
-│   ├── detect.ts              # git root, project id
-│   ├── paths.ts               # convention: projectDir, notesDir
-│   ├── util/
-│   │   ├── slug.ts            # sanitize id, slugify text, collision suffix
-│   │   ├── prompt.ts          # [Y/n] confirm
-│   │   └── parse-args.ts      # flag parsing
+│   ├── connector/
+│   │   ├── home.ts            # ~/.grounder/config.json
+│   │   ├── repo.ts            # .grounder.json marker
+│   │   ├── vault.ts           # resolveVaultRoot, resolveNotesDir
+│   │   ├── git.ts             # findGitRoot
+│   │   └── project-id.ts      # detectProjectId
 │   ├── vault/
-│   │   └── write-note.ts      # mkdir + writeFile + slug dedup
+│   │   ├── layout.ts          # pure 10-Projects/… paths
+│   │   └── write-note.ts
 │   ├── commands/
-│   │   ├── vault-init.ts
-│   │   ├── init.ts
+│   │   ├── vault/init.ts      # grounder vault init
+│   │   ├── repo/init.ts       # grounder init
 │   │   ├── note.ts
-│   │   └── path.ts
-│   └── cursor/
-│       └── install-command.ts # copy grounder-note.md to ~/.cursor/commands/
+│   │   └── path/notes.ts
+│   ├── cursor/
+│   │   └── grounder-note.ts
+│   └── util/
+│       ├── fs.ts
+│       ├── project-id.ts
+│       ├── note-slug.ts
+│       ├── prompt.ts
+│       └── parse-args.ts
 ├── templates/
 │   └── cursor/
 │       └── grounder-note.md
-└── test/
-    ├── helpers.ts             # temp HOME/vault/repo for tests
-    ├── cli.test.ts
-    ├── config.test.ts
-    ├── detect.test.ts
-    ├── paths.test.ts
-    ├── write-note.test.ts
-    ├── vault-init.test.ts
-    ├── init.test.ts
-    └── note.test.ts
+└── test/                      # mirrors src/
+    ├── connector/
+    ├── vault/
+    ├── commands/
+    ├── helpers.ts
+    └── cli.test.ts
 
 fixtures/
-├── minimal-git-repo/          # stable test fixture (package.json for detect tests)
-└── dev/                       # local CLI sandbox (workspace dep on grounder)
+├── minimal-git-repo/
+└── dev/
 
 scripts/
-└── fixture-setup.mjs          # pnpm fixture:setup — nested git in fixtures/dev
+└── fixture-setup.mjs
 ```
 
 ---

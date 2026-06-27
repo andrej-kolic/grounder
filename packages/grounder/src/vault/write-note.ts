@@ -1,19 +1,11 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { slugifyText, timeSuffix, timestampSlug } from "../util/slug.js";
+import { fileExists } from "../util/fs.js";
+import { slugifyText, timeSuffix, timestampSlug } from "../util/note-slug.js";
 
 export interface WriteNoteOptions {
   title?: string;
   now?: Date;
-}
-
-async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function baseSlug(text: string, title: string | undefined, now: Date): string {

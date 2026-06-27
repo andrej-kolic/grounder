@@ -1,10 +1,10 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { writeNote } from "../src/vault/write-note.js";
-import { createTempEnv } from "./helpers.js";
+import { writeNote } from "../../src/vault/write-note.js";
+import { createTempEnv } from "../helpers.js";
 
-describe("writeNote", () => {
+describe("vault/write-note", () => {
   let cleanup: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
