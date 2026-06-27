@@ -1,33 +1,20 @@
 # Plan: Grounder — `npx grounder init` for Obsidian + AI agent connection
 
-**Status:** Draft — ready for implementation  
+**Status:** Phase 1 shipped — see `.ai/plans/grounder-phase-1-minimal-connector.md`  
 **Repo:** `/Users/andrejkolic/dev/rey/grounder`  
 **Created:** 2026-06-25  
-**Updated:** 2026-06-26 (decisions 13–20; slash UX; MCP I/O; **`grounder-` command prefix**)  
+**Updated:** 2026-06-27 (Phase 1 complete; package layout refactored — this doc is Phase 2+ roadmap)  
 **Reference:** Manual prototype validated 2026-06-25 (turborepo + grounder registered; prototype used legacy `x-` prefix — Grounder ships `grounder-`)
+
+> **Current code layout:** `AGENTS.md` and Phase 1 plan package layout section. Phase 1 intentionally omitted MCP, rules, skills, bridge, registry — do not assume this doc's full package tree exists yet.
 
 ## How to run (new chat)
 
-Attach or `@`-mention this file.
-
-**Minimal prompt:**
+Phase 1 is done. For new work, read Phase 1 plan + this doc, then implement the next slice you need.
 
 ```text
-Implement the Grounder plan in .ai/plans/grounder-init-cli.md. Execute phase-by-phase.
-```
-
-**Full agent instructions:**
-
-```text
-Implement this plan in /Users/andrejkolic/dev/rey/grounder.
-
-- Node CLI, publishable npm package `grounder`, bin `grounder`.
-- Primary UX: `npx grounder init` run from any git project root.
-- Codify the manual Obsidian+Cursor workflow from this plan's reference section — do not invent a different vault layout.
-- Idempotent: re-run init must not clobber user-edited bridge notes or logs.
-- No secrets in generated files. Repo marker only — vault stays personal.
-- Add tests for file generation and JSON merge logic.
-- After each phase: run tests; keep package minimal (no heavy deps).
+Continue Grounder from Phase 2 per .ai/plans/grounder-init-cli.md.
+Current architecture: AGENTS.md
 ```
 
 ---
@@ -355,28 +342,44 @@ Or enter vault path now: _
 └─────────────────┘
 ```
 
-**Package layout (target):**
+**Package layout (shipped + Phase 2 targets):**
 
 ```text
-grounder/
-├── package.json          # bin: grounder
+packages/grounder/
 ├── src/
-│   ├── cli.ts            # commander or minimal argv parser
-│   ├── commands/
-│   │   ├── vault-init.ts
-│   │   ├── init.ts
-│   │   ├── status.ts
-│   │   └── doctor.ts
-│   ├── config.ts         # ~/.grounder/config.json
-│   ├── detect.ts         # project id, repo root, agents.md paths
-│   ├── vault/            # write templates, merge projects.json
-│   └── cursor/           # merge mcp.json, write commands, rule, skill
+│   ├── cli.ts
+│   ├── connector/              # shipped Phase 1
+│   │   ├── home.ts               # ~/.grounder/config.json
+│   │   ├── repo.ts               # .grounder.json
+│   │   ├── vault.ts              # resolveVaultRoot, resolveNotesDir
+│   │   ├── git.ts
+│   │   └── project-id.ts
+│   ├── vault/                    # shipped Phase 1
+│   │   ├── layout.ts             # pure 10-Projects/… paths
+│   │   └── write-note.ts
+│   ├── commands/                 # shipped Phase 1 (mirrors CLI)
+│   │   ├── vault/init.ts
+│   │   ├── repo/init.ts
+│   │   ├── note.ts
+│   │   ├── path/notes.ts
+│   │   ├── status.ts             # Phase 2+
+│   │   └── doctor.ts             # Phase 2+
+│   ├── cursor/
+│   │   └── grounder-note.ts      # shipped; more commands Phase 2+
+│   └── util/
+│       ├── fs.ts
+│       ├── project-id.ts
+│       ├── note-slug.ts
+│       ├── parse-args.ts
+│       └── prompt.ts
 ├── templates/
-│   ├── vault/            # 00-AI, templates, 90-Inbox
-│   ├── bridge/           # _project.md
-│   └── cursor/           # grounder-*.md commands (incl. grounder-note dual-mode), grounder-vault.mdc, SKILL.md (MCP-first I/O)
-└── test/
+│   ├── cursor/grounder-note.md   # shipped
+│   ├── vault/                    # Phase 2+ (00-AI, templates, 90-Inbox)
+│   └── bridge/                   # Phase 2+ (_project.md)
+└── test/                         # mirrors src/
 ```
+
+Phase 2 additions slot into `connector/` (registry), `vault/` (bridge, logs paths), `cursor/` (rules, skills, more commands) — extend existing modules rather than reintroducing generic `config.ts` / `detect.ts`.
 
 ---
 

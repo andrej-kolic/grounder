@@ -3,7 +3,7 @@
 **Status:** Complete  
 **Repo:** `/Users/andrejkolic/dev/rey/grounder`  
 **Created:** 2026-06-26  
-**Updated:** 2026-06-26 (implemented; monorepo dev fixture; acceptance criteria met)  
+**Updated:** 2026-06-27 (architecture refactor: `connector/`, `vault/layout.ts`, commands mirror CLI)  
 **Scope:** Minimal connection + `grounder note` + `/grounder-note` trigger (Cursor)  
 **Supersedes for v1:** `.ai/plans/grounder-init-cli.md` (full plan remains reference for later phases)
 
@@ -64,7 +64,7 @@ Two stores, split by concern:
 }
 ```
 
-No redundant paths in repo file. Paths derived by convention in CLI code (`paths.ts`).
+No redundant paths in repo file. Paths derived by convention in `vault/layout.ts`, composed via `connector/vault.ts`.
 
 ### Resolution (CLI only)
 
@@ -210,7 +210,7 @@ Proceed? [Y/n]
 **Does:**
 
 1. Read home + repo config
-2. Resolve `notesDir` via `paths.ts`
+2. Resolve `notesDir` via `connector/vault.ts` (uses `vault/layout.ts`)
 3. `mkdir(notesDir, { recursive: true })`
 4. Pick slug (`--title` or slugified text; timestamp fallback)
 5. If file exists → append `-HHmm` to slug
@@ -353,6 +353,27 @@ scripts/
 
 ---
 
+## Module architecture (shipped)
+
+```text
+connector/          # repo ↔ vault wiring
+  home.ts             # ~/.grounder/config.json store
+  repo.ts             # .grounder.json marker store
+  vault.ts            # resolveVaultRoot, resolveNotesDir (config + env aware)
+  git.ts              # findGitRoot
+  project-id.ts       # detectProjectId
+vault/
+  layout.ts           # pure 10-Projects/… path segments (no config imports)
+  write-note.ts       # note file I/O
+commands/             # mirrors CLI: vault/init, repo/init, note, path/notes
+cursor/grounder-note.ts
+util/                 # fs, project-id, note-slug, parse-args, prompt
+```
+
+Naming: `resolve*` = config/env aware; plain names in `vault/layout.ts` = pure paths.
+
+---
+
 ## Monorepo dev sandbox (post-Phase 1)
 
 Added for dogfooding inside the monorepo (not required for npm consumers):
@@ -371,16 +392,17 @@ Validated: `/grounder-note` → agent runs `pnpm grounder note` from `fixtures/d
 
 ### Step 1 — Config + paths
 
-- [x] `readHomeConfig()` / `writeHomeConfig()` → `~/.grounder/config.json`
-- [x] `readRepoConfig()` / `writeRepoConfig()` → `.grounder.json`
-- [x] `resolveNotesDir(home, repo)` → absolute path
+- [x] `connector/home.ts` — `readHomeConfig()` / `writeHomeConfig()`
+- [x] `connector/repo.ts` — `readRepoConfig()` / `writeRepoConfig()`
+- [x] `connector/vault.ts` — `resolveNotesDir(home, repo)`
+- [x] `vault/layout.ts` — pure path conventions
 - [x] `GROUNDER_VAULT` env override
-- [x] Tests with temp HOME and temp repo (`GROUNDER_HOME` in tests)
+- [x] Tests with temp HOME (`GROUNDER_HOME`)
 
 ### Step 2 — Detect
 
-- [x] `findGitRoot(cwd)`
-- [x] `detectProjectId(cwd, override?)` with priority chain + sanitize
+- [x] `connector/git.ts` — `findGitRoot(cwd)`
+- [x] `connector/project-id.ts` — `detectProjectId(cwd, override?)`
 - [x] Tests with `fixtures/minimal-git-repo/`
 
 ### Step 3 — Vault write
@@ -390,16 +412,16 @@ Validated: `/grounder-note` → agent runs `pnpm grounder note` from `fixtures/d
 
 ### Step 4 — `vault init`
 
-- [x] Parse `[path]`, `--yes`, `--force`
+- [x] `commands/vault/init.ts` — parse `[path]`, `--yes`, `--force`
 - [x] Write home config
 - [x] Create `10-Projects/` in vault if missing
-- [x] Install `grounder-note.md` command template
+- [x] `cursor/grounder-note.ts` — install slash command template
 - [x] Confirm prompt + `--yes` skip
 - [x] Tests: temp HOME, assert files created, re-run idempotent
 
 ### Step 5 — `init`
 
-- [x] Require home config or `--vault`
+- [x] `commands/repo/init.ts` — require home config or `--vault`
 - [x] Detect git root + project id
 - [x] Write `.grounder.json`
 - [x] Create vault `notes/` dir
