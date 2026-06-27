@@ -32,7 +32,7 @@ Init flags:
   --vault <path> Override home vault root for this run (grounder init)
 
 Note flags:
-  --title <slug> Note filename slug (default: slugified text)
+  --title <slug> Short slug in filename (default: slugified first line)
 
 Quickstart:
   grounder vault init ~/Documents/obsidian/dev

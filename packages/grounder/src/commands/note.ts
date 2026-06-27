@@ -10,6 +10,7 @@ export interface NoteOptions {
   text: string;
   title?: string;
   homeDir?: string;
+  now?: Date;
 }
 
 export async function runNote(argv: string[]): Promise<number> {
@@ -52,6 +53,7 @@ export async function runNoteWithOptions(options: NoteOptions): Promise<number> 
     const notesDir = resolveNotesDir(home, repo);
     const writtenPath = await writeNote(notesDir, options.text, {
       title: options.title,
+      now: options.now,
     });
 
     process.stdout.write(`Wrote ${writtenPath}\n`);

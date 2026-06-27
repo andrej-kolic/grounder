@@ -14,36 +14,58 @@ describe("vault/write-note", () => {
     }
   });
 
-  it("writes a note file with slugified text", async () => {
+  const fixedTime = new Date("2026-06-26T14:30:00");
+
+  it("writes a note file with timestamp and short slug", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
     const notesDir = path.join(env.vault, "notes");
 
-    const writtenPath = await writeNote(notesDir, "Investigate auth middleware");
-    expect(writtenPath).toBe(path.join(notesDir, "investigate-auth-middleware.md"));
+    const writtenPath = await writeNote(notesDir, "Investigate auth middleware", {
+      now: fixedTime,
+    });
+    expect(writtenPath).toBe(
+      path.join(notesDir, "2026-06-26-1430-investigate-auth-mid.md"),
+    );
     expect(await readFile(writtenPath, "utf8")).toBe("Investigate auth middleware");
   });
 
-  it("uses --title slug when provided", async () => {
+  it("uses --title for the slug part", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
     const notesDir = path.join(env.vault, "notes");
 
-    const writtenPath = await writeNote(notesDir, "body", { title: "Custom Title" });
-    expect(writtenPath).toBe(path.join(notesDir, "custom-title.md"));
+    const writtenPath = await writeNote(notesDir, "body", {
+      title: "Custom Title",
+      now: fixedTime,
+    });
+    expect(writtenPath).toBe(path.join(notesDir, "2026-06-26-1430-custom-title.md"));
   });
 
-  it("appends time suffix on slug collision", async () => {
+  it("truncates long text to a short slug", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
     const notesDir = path.join(env.vault, "notes");
-    const fixedTime = new Date("2026-06-26T14:30:00");
+    const text =
+      "very long, very long, very long, very long, very long, very long, very long, very long, very long, very long, very long, very long, very long, POST";
+
+    const writtenPath = await writeNote(notesDir, text, { now: fixedTime });
+    expect(writtenPath).toBe(
+      path.join(notesDir, "2026-06-26-1430-very-long-very-long.md"),
+    );
+    expect(await readFile(writtenPath, "utf8")).toBe(text);
+  });
+
+  it("uses second precision on slug collision", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const notesDir = path.join(env.vault, "notes");
 
     const first = await writeNote(notesDir, "first", { title: "dup", now: fixedTime });
     const second = await writeNote(notesDir, "second", { title: "dup", now: fixedTime });
 
-    expect(first).toBe(path.join(notesDir, "dup.md"));
-    expect(second).toBe(path.join(notesDir, "dup-1430.md"));
+    expect(first).toBe(path.join(notesDir, "2026-06-26-1430-dup.md"));
+    expect(second).toBe(path.join(notesDir, "2026-06-26-143000-dup.md"));
     expect(await readFile(second, "utf8")).toBe("second");
   });
 });

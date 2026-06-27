@@ -34,10 +34,12 @@ describe("commands/note", () => {
     await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
     await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
+    const fixedTime = new Date("2026-06-26T14:30:00");
     const code = await runNoteWithOptions({
       cwd: env.repo,
       text: "Investigate auth middleware",
       homeDir: env.home,
+      now: fixedTime,
     });
 
     expect(code).toBe(0);
@@ -46,7 +48,7 @@ describe("commands/note", () => {
       "10-Projects",
       "my-app",
       "notes",
-      "investigate-auth-middleware.md",
+      "2026-06-26-1430-investigate-auth-mid.md",
     );
     expect(await readFile(notePath, "utf8")).toBe("Investigate auth middleware");
   });
@@ -61,7 +63,7 @@ describe("commands/note", () => {
     const result = runCli(["note", "hello world"], withGroundedHome(env.home), env.repo);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Wrote ");
-    expect(result.stdout).toContain("hello-world.md");
+    expect(result.stdout).toMatch(/\d{4}-\d{2}-\d{2}-\d{4}-hello-world\.md/);
   });
 
   it("path notes prints resolved directory", async () => {

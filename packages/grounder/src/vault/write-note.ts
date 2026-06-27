@@ -1,20 +1,37 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileExists } from "../util/fs.js";
-import { slugifyText, timeSuffix, timestampSlug } from "../util/note-slug.js";
+import { noteBasename, noteBasenameWithSecondPrecision } from "../util/note-slug.js";
 
 export interface WriteNoteOptions {
   title?: string;
   now?: Date;
 }
 
-function baseSlug(text: string, title: string | undefined, now: Date): string {
-  if (title) {
-    return slugifyText(title);
+async function resolveNotePath(
+  notesDir: string,
+  text: string,
+  options: WriteNoteOptions,
+): Promise<string> {
+  const now = options.now ?? new Date();
+  const slugOptions = { title: options.title, now };
+  let basename = noteBasename(text, slugOptions);
+  let filePath = path.join(notesDir, `${basename}.md`);
+
+  if (await fileExists(filePath)) {
+    basename = noteBasenameWithSecondPrecision(text, slugOptions);
+    filePath = path.join(notesDir, `${basename}.md`);
   }
 
-  const fromText = slugifyText(text);
-  return fromText || timestampSlug(now);
+  if (await fileExists(filePath)) {
+    let n = 2;
+    while (await fileExists(path.join(notesDir, `${basename}-${n}.md`))) {
+      n += 1;
+    }
+    filePath = path.join(notesDir, `${basename}-${n}.md`);
+  }
+
+  return filePath;
 }
 
 export async function writeNote(
@@ -25,14 +42,7 @@ export async function writeNote(
   const now = options.now ?? new Date();
   await mkdir(notesDir, { recursive: true });
 
-  let slug = baseSlug(text, options.title, now);
-  let filePath = path.join(notesDir, `${slug}.md`);
-
-  if (await fileExists(filePath)) {
-    slug = `${slug}-${timeSuffix(now)}`;
-    filePath = path.join(notesDir, `${slug}.md`);
-  }
-
+  const filePath = await resolveNotePath(notesDir, text, options);
   await writeFile(filePath, text, "utf8");
   return filePath;
 }
