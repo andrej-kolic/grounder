@@ -1,24 +1,8 @@
 # Grounder
 
-Connect git projects to a personal Obsidian vault so AI agents (Cursor, Claude Code, etc.) get persistent memory without committing personal docs to the repo.
+Monorepo for the [Grounder](https://www.npmjs.com/package/grounder) CLI — connect git projects to a personal Obsidian vault so AI agents get persistent memory without committing personal docs to the repo.
 
-## Quickstart
-
-```bash
-# Once per machine — set vault location + install /grounder-note in Cursor
-grounder vault init ~/Documents/obsidian/dev
-
-# Once per repo — link project id to vault notes folder
-cd your-git-project
-grounder init
-
-# Write a note (or use /grounder-note in Cursor)
-grounder note "Investigate auth middleware"
-```
-
-Notes land in `<vault>/10-Projects/{projectId}/notes/`. Machine-specific vault paths live in `~/.grounder/config.json`; each repo stores only `.grounder.json` with `{ "version": 1, "projectId": "..." }`.
-
-Override vault root for a session: `GROUNDER_VAULT=/path/to/vault`.
+**Install and use:** see [packages/grounder/README.md](packages/grounder/README.md).
 
 ## Monorepo layout
 
