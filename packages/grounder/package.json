@@ -11,7 +11,7 @@
     "templates"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "pretest": "pnpm run build",
     "test": "vitest run",
     "prepublishOnly": "pnpm run build"
