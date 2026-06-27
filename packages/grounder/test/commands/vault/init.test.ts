@@ -31,7 +31,10 @@ describe("commands/vault/init", () => {
       vaultRoot: env.vault,
     });
     await access(path.join(env.vault, "10-Projects"));
-    expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain("grounder note");
+    expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain("npx grounder note");
+    expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain(
+      "approve shell permissions",
+    );
   });
 
   it("is idempotent on re-run", async () => {

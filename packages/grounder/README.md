@@ -85,7 +85,7 @@ Written by `grounder init`. The project id is detected from the git remote or di
 
 ## Cursor
 
-`grounder vault init` installs a `/grounder-note` slash command in `~/.cursor/commands/`. Use it in Cursor chat to write notes to the vault for the linked repo.
+`grounder vault init` installs a `/grounder-note` slash command in `~/.cursor/commands/`. It tells the agent to run `npx grounder note "…"` from the repo root (no global install required). Re-run `grounder vault init <path> --force` to refresh an existing install.
 
 ## Development
 

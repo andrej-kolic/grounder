@@ -250,7 +250,7 @@ One artifact — a thin slash command:
 ```markdown
 Save a note to the Obsidian vault for this project.
 
-Run: `grounder note "<user text>"` with the text after `/grounder-note`.
+Run: `npx grounder note "<user text>"` with the text after `/grounder-note`.
 Do not compute vault paths or write files yourself — the CLI handles it.
 Report the CLI output path to the user.
 ```
@@ -384,7 +384,7 @@ Added for dogfooding inside the monorepo (not required for npm consumers):
 | `pnpm fixture:setup` | `git init` in `fixtures/dev/` (idempotent) |
 | `.gitignore` | `fixtures/dev/.git/`, `fixtures/dev/.grounder.json` |
 
-Validated: `/grounder-note` → agent runs `pnpm grounder note` from `fixtures/dev` → note in vault.
+Validated: `/grounder-note` → agent runs `npx grounder note` from `fixtures/dev` → note in vault.
 
 ---
 
