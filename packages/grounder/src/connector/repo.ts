@@ -13,6 +13,30 @@ export function repoConfigPath(repoRoot: string): string {
   return path.join(repoRoot, REPO_MARKER_FILE);
 }
 
+export async function findLinkedRepoRoot(
+  cwd: string,
+  gitRoot: string | null = null,
+): Promise<string | null> {
+  let current = path.resolve(cwd);
+  const stopAtGitRoot = gitRoot ? path.resolve(gitRoot) : null;
+
+  while (true) {
+    if (await fileExists(repoConfigPath(current))) {
+      return current;
+    }
+    if (stopAtGitRoot && current === stopAtGitRoot) {
+      break;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      break;
+    }
+    current = parent;
+  }
+
+  return null;
+}
+
 export async function readRepoConfig(repoRoot: string): Promise<RepoConfig | null> {
   const configPath = repoConfigPath(repoRoot);
   if (!(await fileExists(configPath))) {

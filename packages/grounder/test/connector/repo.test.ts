@@ -1,6 +1,9 @@
 import path from "node:path";
+import { execSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
+import { mkdir, writeFile } from "node:fs/promises";
 import {
+  findLinkedRepoRoot,
   readRepoConfig,
   repoConfigPath,
   writeRepoConfig,
@@ -15,6 +18,36 @@ describe("connector/repo", () => {
       await cleanup();
       cleanup = undefined;
     }
+  });
+
+  it("finds linked folder walking up from cwd", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    const packageDir = path.join(env.repo, "packages", "child-app");
+    await mkdir(packageDir, { recursive: true });
+    await writeRepoConfig(packageDir, { version: 1, projectId: "child-app" });
+
+    const nested = path.join(packageDir, "src", "nested");
+    await mkdir(nested, { recursive: true });
+
+    expect(await findLinkedRepoRoot(nested, null)).toBe(packageDir);
+  });
+
+  it("stops walk at git root without crossing into parent folders", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    execSync("git init", { cwd: env.repo, stdio: "ignore" });
+    await writeRepoConfig(path.dirname(env.repo), {
+      version: 1,
+      projectId: "outside",
+    });
+
+    const nested = path.join(env.repo, "src");
+    await mkdir(nested, { recursive: true });
+
+    expect(await findLinkedRepoRoot(nested, env.repo)).toBeNull();
   });
 
   it("reads and writes repo config", async () => {

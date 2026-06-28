@@ -38,15 +38,10 @@ export async function runRepoInitWithOptions(
   options: RepoInitOptions = {},
 ): Promise<number> {
   return withHomeDir(options.homeDir, async () => {
-    const cwd = options.cwd ?? process.cwd();
+    const cwd = path.resolve(options.cwd ?? process.cwd());
     const yes = options.yes ?? false;
     const force = options.force ?? false;
-
     const gitRoot = await findGitRoot(cwd);
-    if (!gitRoot) {
-      process.stderr.write("Not inside a git repository.\n");
-      return 1;
-    }
 
     let home = await readHomeConfig();
     if (!home && !options.vault) {
@@ -59,21 +54,24 @@ export async function runRepoInitWithOptions(
     }
 
     const vaultRoot = resolveVaultRoot(home!, options.vault);
-    const detected = await detectProjectId(gitRoot, options.id);
-    const existingRepo = await readRepoConfig(gitRoot);
+    const detected = await detectProjectId(cwd, options.id, gitRoot);
+    const existingRepo = await readRepoConfig(cwd);
     const notesDir = resolveNotesDir(
       home!,
       { version: 1, projectId: detected.id },
       options.vault,
     );
 
-    process.stdout.write(`✓ Git repo: ${gitRoot}\n`);
+    process.stdout.write(`✓ Folder:   ${cwd}\n`);
+    if (gitRoot) {
+      process.stdout.write(`✓ Git repo: ${gitRoot}\n`);
+    }
     process.stdout.write(`✓ Vault:    ${vaultRoot}\n`);
     process.stdout.write(
       `✓ Project:  ${detected.id} (${formatProjectIdSource(detected.source)})\n\n`,
     );
     process.stdout.write("Will create:\n");
-    process.stdout.write(`  repo   ${repoConfigPath(gitRoot)}\n`);
+    process.stdout.write(`  link   ${repoConfigPath(cwd)}\n`);
     process.stdout.write(`  vault  ${path.relative(vaultRoot, notesDir)}/\n\n`);
 
     if (!yes) {
@@ -92,12 +90,12 @@ export async function runRepoInitWithOptions(
       }
 
       process.stderr.write(
-        `Repo already linked as ${existingRepo.projectId}. Use --force to overwrite.\n`,
+        `Folder already linked as ${existingRepo.projectId}. Use --force to overwrite.\n`,
       );
       return 1;
     }
 
-    await writeRepoConfig(gitRoot, { version: 1, projectId: detected.id });
+    await writeRepoConfig(cwd, { version: 1, projectId: detected.id });
     await mkdir(notesDir, { recursive: true });
 
     process.stdout.write("✓ Wrote .grounder.json\n");

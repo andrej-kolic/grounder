@@ -1,6 +1,6 @@
 # AGENTS.md — Grounder repo
 
-Grounder is a Node CLI (`packages/grounder`) that wires git projects to personal Obsidian dev vaults for AI agent memory.
+Grounder is a Node CLI (`packages/grounder`) that wires project folders to personal Obsidian dev vaults for AI agent memory.
 
 ## Layout
 
@@ -14,7 +14,7 @@ Grounder is a Node CLI (`packages/grounder`) that wires git projects to personal
 ```text
 connector/          # repo ↔ vault wiring (config stores + resolution)
   home.ts             # ~/.grounder/config.json
-  repo.ts             # .grounder.json marker
+  repo.ts             # .grounder.json marker, findLinkedRepoRoot
   vault.ts            # resolveVaultRoot, resolveNotesDir (config-aware)
   git.ts              # findGitRoot
   project-id.ts       # detectProjectId
@@ -40,7 +40,7 @@ pnpm install          # from repo root
 pnpm build            # compile packages/grounder
 pnpm test             # unit + CLI smoke tests
 pnpm grounder --version
-pnpm fixture:setup    # init nested git in fixtures/dev/
+pnpm fixture:setup    # print dev fixture next steps
 ```
 
 Run tests after every change. Keep dependencies minimal.

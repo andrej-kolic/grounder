@@ -1,6 +1,6 @@
 # Grounder
 
-Monorepo for the [Grounder](https://www.npmjs.com/package/grounder) CLI — connect git projects to a personal Obsidian vault so AI agents get persistent memory without committing personal docs to the repo.
+Monorepo for the [Grounder](https://www.npmjs.com/package/grounder) CLI — connect project folders to a personal Obsidian vault so AI agents get persistent memory without committing personal docs to the repo.
 
 **Install and use:** see [packages/grounder/README.md](packages/grounder/README.md).
 
@@ -24,7 +24,7 @@ pnpm grounder --version    # run local CLI (build first)
 
 ### Try the CLI locally
 
-Use `fixtures/dev/` as a nested git repo sandbox (not the test fixture):
+Use `fixtures/dev/` as a workspace sandbox (not the test fixture):
 
 ```bash
 pnpm fixture:setup

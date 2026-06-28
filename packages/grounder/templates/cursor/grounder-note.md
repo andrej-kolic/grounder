@@ -1,6 +1,6 @@
 Save a note to the Obsidian vault for this project.
 
-Run from the workspace root (where `.grounder.json` lives):
+Run from the linked project folder or any subdirectory beneath it:
 
   npx grounder note "<user text>"
 

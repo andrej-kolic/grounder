@@ -3,7 +3,7 @@
 **Status:** Complete  
 **Repo:** `/Users/andrejkolic/dev/rey/grounder`  
 **Created:** 2026-06-26  
-**Updated:** 2026-06-27 (architecture refactor: `connector/`, `vault/layout.ts`, commands mirror CLI)  
+**Updated:** 2026-06-27 (link resolution: cwd init + walk-up for `.grounder.json`)  
 **Scope:** Minimal connection + `grounder note` + `/grounder-note` trigger (Cursor)  
 **Supersedes for v1:** `.ai/plans/grounder-init-cli.md` (full plan remains reference for later phases)
 
@@ -19,7 +19,7 @@ Continue Grounder from Phase 2 per .ai/plans/grounder-init-cli.md.
 
 ## Goal
 
-Connect a git repo to a personal Obsidian vault so a **Cursor agent** can save a note to the vault via the **Grounder CLI**.
+Connect a project folder to a personal Obsidian vault so a **Cursor agent** can save a note to the vault via the **Grounder CLI**.
 
 **In scope:** connector config, init commands, `grounder note`, thin `/grounder-note` slash command.  
 **Out of scope:** MCP, bridge note, logs/handoffs, other slash commands, vault registry, rules/skills, `status`, `doctor`.
@@ -45,7 +45,7 @@ Two stores, split by concern:
 | Store | Path | Holds | Committed? |
 | --- | --- | --- | --- |
 | **Home** | `~/.grounder/config.json` | `vaultRoot` (machine-local) | No |
-| **Repo** | `.grounder.json` | `projectId` only | Yes |
+| **Repo** | `.grounder.json` | `projectId` only | Optional (per folder) |
 
 ### Home config
 
@@ -115,9 +115,9 @@ No npm dependencies for I/O. Obsidian app does not need to be running.
 | Command | Where | Purpose |
 | --- | --- | --- |
 | `grounder vault init [path]` | anywhere | Once per machine/vault: home config, vault scaffold, `/grounder-note` command |
-| `grounder init` | repo root | Once per repo: repo marker + vault `notes/` folder |
-| `grounder note <text>` | repo root | Write note to vault (CLI owns path resolution + I/O) |
-| `grounder path notes` | repo root | Print resolved notes dir (debug) |
+| `grounder init` | project folder | Once per linked folder: write `.grounder.json` in cwd + vault `notes/` folder |
+| `grounder note <text>` | linked tree | Write note to vault (walk up for `.grounder.json`) |
+| `grounder path notes` | linked tree | Print resolved notes dir (debug) |
 
 ### UX pattern: hybrid (init commands only)
 
@@ -174,14 +174,15 @@ No vault configured. Run: grounder vault init <path>
 
 **Detects:**
 
-- Git repo root (fail if not in git repo)
-- Project id (priority): `--id` → `package.json` name → git remote slug → repo basename
+- Project id in **cwd** (priority): `--id` → `package.json` name in cwd → git remote slug (if cwd is inside a git repo) → folder basename
 - Sanitize id: lowercase, `[a-z0-9-]` only
 
 **Writes:**
 
-- `.grounder.json` in repo root
+- `.grounder.json` in **cwd** (not inferred from git root or `package.json` parents)
 - `10-Projects/{projectId}/notes/` in vault (`mkdir` recursive)
+
+**Git:** optional. When present, shown in the plan output and used as an upper bound when later commands walk up for `.grounder.json`. Not required to run `init`.
 
 **Does not write:** `.cursor/` in repo, vault registry, bridge note, logs/plans/decisions.
 
@@ -192,12 +193,13 @@ No vault configured. Run: grounder vault init <path>
 ```text
 $ grounder init
 
+✓ Folder:   /Users/you/dev/my-app
 ✓ Git repo: /Users/you/dev/my-app
 ✓ Vault:    ~/Documents/obsidian/dev
 ✓ Project:  my-app (from package.json)
 
 Will create:
-  repo   .grounder.json
+  link   .grounder.json
   vault  10-Projects/my-app/notes/
 
 Proceed? [Y/n]
@@ -205,11 +207,12 @@ Proceed? [Y/n]
 
 ### `grounder note <text>`
 
-**Requires:** linked repo (`.grounder.json` + home config).
+**Requires:** a linked folder (`.grounder.json` found walking up from cwd, stopping at git root when inside a git repo) + home config.
 
 **Does:**
 
-1. Read home + repo config
+1. Walk up from cwd for nearest `.grounder.json` (stop at git root if present)
+2. Read home + link config
 2. Resolve `notesDir` via `connector/vault.ts` (uses `vault/layout.ts`)
 3. `mkdir(notesDir, { recursive: true })`
 4. Pick slug (`--title` or slugified text; timestamp fallback)
@@ -275,11 +278,13 @@ Agent does **not** read `~/.grounder/config.json`, compute paths, or call MCP.
 Priority:
 
 1. `--id` CLI flag
-2. `name` from `package.json`
-3. Git remote slug (last path segment, strip `.git`)
-4. Basename of repo root
+2. `name` from `package.json` in the folder being linked (cwd at `init`)
+3. Git remote slug when cwd is inside a git repo (last path segment, strip `.git`)
+4. Basename of the linked folder
 
 Persist chosen id in `.grounder.json` so renames/detection drift don't break the link.
+
+**Link resolution:** `init` writes `.grounder.json` in cwd. `note` / `path notes` walk up from cwd for the nearest marker, stopping at the git root when inside a git repo (otherwise filesystem root).
 
 ---
 
@@ -287,7 +292,7 @@ Persist chosen id in `.grounder.json` so renames/detection drift don't break the
 
 ```text
 ┌─────────────────┐   .grounder.json      ┌──────────────────────────┐
-│  Git repo       │   { projectId }       │  Obsidian vault          │
+│  Project folder │   { projectId }       │  Obsidian vault          │
 │  (workspace)    │ ─────────────────────▶│  10-Projects/{id}/notes/ │
 └─────────────────┘                       └──────────────────────────┘
          │                                            ▲
@@ -380,9 +385,9 @@ Added for dogfooding inside the monorepo (not required for npm consumers):
 
 | Piece | Purpose |
 | --- | --- |
-| `fixtures/dev/` | Nested git repo; `grounder` via `workspace:*` dep; run `init`/`note` from here |
-| `pnpm fixture:setup` | `git init` in `fixtures/dev/` (idempotent) |
-| `.gitignore` | `fixtures/dev/.git/`, `fixtures/dev/.grounder.json` |
+| `fixtures/dev/` | Workspace package; `grounder` via `workspace:*`; `init` writes `.grounder.json` here |
+| `pnpm fixture:setup` | Print dev fixture next steps |
+| `.gitignore` | `fixtures/dev/.grounder.json` |
 
 Validated: `/grounder-note` → agent runs `npx grounder note` from `fixtures/dev` → note in vault.
 
@@ -402,7 +407,8 @@ Validated: `/grounder-note` → agent runs `npx grounder note` from `fixtures/de
 ### Step 2 — Detect
 
 - [x] `connector/git.ts` — `findGitRoot(cwd)`
-- [x] `connector/project-id.ts` — `detectProjectId(cwd, override?)`
+- [x] `connector/project-id.ts` — `detectProjectId(linkRoot, override?, gitRoot?)`
+- [x] `connector/repo.ts` — `findLinkedRepoRoot(cwd, gitRoot?)`
 - [x] Tests with `fixtures/minimal-git-repo/`
 
 ### Step 3 — Vault write

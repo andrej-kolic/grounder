@@ -58,8 +58,9 @@ async function readGitRemoteSlug(repoRoot: string): Promise<string | null> {
 }
 
 export async function detectProjectId(
-  repoRoot: string,
+  linkRoot: string,
   override?: string,
+  gitRoot?: string | null,
 ): Promise<DetectedProjectId> {
   if (override) {
     const id = sanitizeProjectId(override);
@@ -69,7 +70,7 @@ export async function detectProjectId(
     return { id, source: "flag" };
   }
 
-  const packageName = await readPackageName(repoRoot);
+  const packageName = await readPackageName(linkRoot);
   if (packageName) {
     const id = sanitizeProjectId(packageName);
     if (id) {
@@ -77,15 +78,18 @@ export async function detectProjectId(
     }
   }
 
-  const remoteSlug = await readGitRemoteSlug(repoRoot);
-  if (remoteSlug) {
-    const id = sanitizeProjectId(remoteSlug);
-    if (id) {
-      return { id, source: "git-remote" };
+  if (gitRoot !== null) {
+    const remoteRoot = gitRoot ?? linkRoot;
+    const remoteSlug = await readGitRemoteSlug(remoteRoot);
+    if (remoteSlug) {
+      const id = sanitizeProjectId(remoteSlug);
+      if (id) {
+        return { id, source: "git-remote" };
+      }
     }
   }
 
-  const basename = path.basename(repoRoot);
+  const basename = path.basename(linkRoot);
   const id = sanitizeProjectId(basename);
   if (!id) {
     throw new Error("Could not detect a valid project id");
@@ -103,6 +107,6 @@ export function formatProjectIdSource(source: ProjectIdSource): string {
     case "git-remote":
       return "from git remote";
     case "basename":
-      return "from repo name";
+      return "from folder name";
   }
 }

@@ -1,6 +1,6 @@
 import { readHomeConfig, withHomeDir } from "../connector/home.js";
 import { findGitRoot } from "../connector/git.js";
-import { readRepoConfig } from "../connector/repo.js";
+import { findLinkedRepoRoot, readRepoConfig } from "../connector/repo.js";
 import { resolveNotesDir } from "../connector/vault.js";
 import { writeNote } from "../vault/write-note.js";
 import { flagString, parseArgs } from "../util/parse-args.js";
@@ -33,20 +33,21 @@ export async function runNoteWithOptions(options: NoteOptions): Promise<number> 
     const cwd = options.cwd ?? process.cwd();
     const gitRoot = await findGitRoot(cwd);
 
-    if (!gitRoot) {
-      process.stderr.write("Not inside a git repository.\n");
-      return 1;
-    }
-
     const home = await readHomeConfig();
     if (!home) {
       process.stderr.write("No vault configured. Run: grounder vault init <path>\n");
       return 1;
     }
 
-    const repo = await readRepoConfig(gitRoot);
+    const linkedRoot = await findLinkedRepoRoot(cwd, gitRoot);
+    if (!linkedRoot) {
+      process.stderr.write("Folder not linked. Run: grounder init\n");
+      return 1;
+    }
+
+    const repo = await readRepoConfig(linkedRoot);
     if (!repo) {
-      process.stderr.write("Repo not linked. Run: grounder init\n");
+      process.stderr.write("Folder not linked. Run: grounder init\n");
       return 1;
     }
 

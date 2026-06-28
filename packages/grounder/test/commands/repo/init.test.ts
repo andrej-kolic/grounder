@@ -1,5 +1,7 @@
 import path from "node:path";
+import { execSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
+import { mkdir, writeFile } from "node:fs/promises";
 import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
 import { writeHomeConfig } from "../../../src/connector/home.js";
 import { readRepoConfig } from "../../../src/connector/repo.js";
@@ -73,5 +75,54 @@ describe("commands/repo/init", () => {
 
     const code = await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     expect(code).toBe(1);
+  });
+
+  it("writes marker in cwd, not git root, when run from a subfolder", async () => {
+    const env = await createTempEnv({ initGit: false, packageName: "root-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+    await writeHomeConfig({ vaultRoot: env.vault });
+
+    execSync("git init", { cwd: env.repo, stdio: "ignore" });
+
+    const packageDir = path.join(env.repo, "packages", "child-app");
+    await mkdir(packageDir, { recursive: true });
+    await writeFile(
+      path.join(packageDir, "package.json"),
+      `${JSON.stringify({ name: "child-app" }, null, 2)}\n`,
+    );
+
+    const code = await runRepoInitWithOptions({
+      cwd: packageDir,
+      yes: true,
+      homeDir: env.home,
+    });
+
+    expect(code).toBe(0);
+    expect(await readRepoConfig(packageDir)).toEqual({
+      version: 1,
+      projectId: "child-app",
+    });
+    expect(await readRepoConfig(env.repo)).toBeNull();
+  });
+
+  it("works without git when project id is provided", async () => {
+    const env = await createTempEnv({ initGit: false, packageName: undefined });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+    await writeHomeConfig({ vaultRoot: env.vault });
+
+    const code = await runRepoInitWithOptions({
+      cwd: env.repo,
+      yes: true,
+      id: "my-folder",
+      homeDir: env.home,
+    });
+
+    expect(code).toBe(0);
+    expect(await readRepoConfig(env.repo)).toEqual({
+      version: 1,
+      projectId: "my-folder",
+    });
   });
 });

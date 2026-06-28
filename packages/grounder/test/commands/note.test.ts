@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runNoteWithOptions } from "../../src/commands/note.js";
@@ -80,5 +80,28 @@ describe("commands/note", () => {
     expect(result.stdout.trim()).toBe(
       path.join(env.vault, "10-Projects", "my-app", "notes"),
     );
+  });
+
+  it("finds link walking up from a nested cwd", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const nested = path.join(env.repo, "src", "nested");
+    await mkdir(nested, { recursive: true });
+
+    const code = await runNoteWithOptions({
+      cwd: nested,
+      text: "from nested folder",
+      homeDir: env.home,
+    });
+
+    expect(code).toBe(0);
+    const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
+    const files = await import("node:fs/promises").then(({ readdir }) => readdir(notesDir));
+    expect(files.some((file) => file.includes("from-nested-folder"))).toBe(true);
   });
 });
