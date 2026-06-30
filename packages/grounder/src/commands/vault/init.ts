@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   homeConfigPath,
@@ -7,7 +7,8 @@ import {
   writeHomeConfig,
 } from "../../connector/home.js";
 import { resolveAgents } from "../../agents/index.js";
-import { projectsParent } from "../../vault/layout.js";
+import { projectsParent, projectsJsonPath } from "../../vault/layout.js";
+import { fileExists } from "../../util/fs.js";
 import { confirm } from "../../util/prompt.js";
 import { flagBool, flagStrings, parseArgs } from "../../util/parse-args.js";
 
@@ -83,8 +84,18 @@ export async function runVaultInitWithOptions(
     await writeHomeConfig({ vaultRoot });
     await mkdir(projectsDir, { recursive: true });
 
+    const registryPath = projectsJsonPath(vaultRoot);
+    const registryExisted = await fileExists(registryPath);
+    if (!registryExisted) {
+      await mkdir(path.dirname(registryPath), { recursive: true });
+      await writeFile(registryPath, `${JSON.stringify({ projects: {} }, null, 2)}\n`, "utf8");
+    }
+
     process.stdout.write("✓ Wrote home config\n");
     process.stdout.write(`✓ Vault scaffold: ${projectsDir}\n`);
+    if (!registryExisted) {
+      process.stdout.write(`✓ Created registry: ${registryPath}\n`);
+    }
 
     for (const agent of agents) {
       const result = await agent.install({ force, homeDir });
