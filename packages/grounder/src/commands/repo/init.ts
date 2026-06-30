@@ -12,6 +12,7 @@ import {
   writeRepoConfig,
 } from "../../connector/repo.js";
 import { resolveNotesDir, resolveVaultRoot } from "../../connector/vault.js";
+import { upsertProject } from "../../vault/registry.js";
 import { confirm } from "../../util/prompt.js";
 import { flagBool, flagString, parseArgs } from "../../util/parse-args.js";
 
@@ -88,6 +89,10 @@ export async function runRepoInitWithOptions(
       if (existingRepo.projectId === detected.id) {
         process.stdout.write("✓ Already linked (skipped)\n");
         await mkdir(notesDir, { recursive: true });
+        await upsertProject(vaultRoot, detected.id, {
+          repo: cwd,
+          notesDir: path.relative(vaultRoot, notesDir),
+        });
         return 0;
       }
 
@@ -99,9 +104,14 @@ export async function runRepoInitWithOptions(
 
     await writeRepoConfig(cwd, { version: 1, projectId: detected.id });
     await mkdir(notesDir, { recursive: true });
+    await upsertProject(vaultRoot, detected.id, {
+      repo: cwd,
+      notesDir: path.relative(vaultRoot, notesDir),
+    });
 
     process.stdout.write("✓ Wrote .grounder.json\n");
     process.stdout.write(`✓ Created notes folder: ${notesDir}\n`);
+    process.stdout.write(`✓ Updated registry: ${vaultRoot}/00-AI/projects.json\n`);
     return 0;
   });
 }
