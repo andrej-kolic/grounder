@@ -65,6 +65,7 @@ export async function runVaultInitWithOptions(
     process.stdout.write("Will write:\n");
     process.stdout.write(`  home   ${homeConfigPath(homeDir)}\n`);
     process.stdout.write("  vault  10-Projects/ (if missing)\n");
+    process.stdout.write("  vault  00-AI/projects.json (if missing)\n");
     for (const agent of agents) {
       process.stdout.write(`  ${agent.id.padEnd(8)} (${agent.name} artifacts)\n`);
     }
