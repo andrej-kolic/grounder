@@ -6,26 +6,26 @@ import {
   withHomeDir,
   writeHomeConfig,
 } from "../../connector/home.js";
-import {
-  grounderNoteCommandPath,
-  installGrounderNoteCommand,
-} from "../../cursor/grounder-note.js";
+import { resolveAgents } from "../../agents/index.js";
 import { projectsParent } from "../../vault/layout.js";
 import { confirm } from "../../util/prompt.js";
-import { flagBool, parseArgs } from "../../util/parse-args.js";
+import { flagBool, flagStrings, parseArgs } from "../../util/parse-args.js";
 
 export interface VaultInitOptions {
   vaultPath: string;
   yes?: boolean;
   force?: boolean;
   homeDir?: string;
+  /** Agent ids to install for. Defaults to auto-detecting installed agents. */
+  agents?: string[];
 }
 
 export async function runVaultInit(argv: string[]): Promise<number> {
-  const { positional, flags } = parseArgs(argv);
+  const { positional, flags, repeated } = parseArgs(argv);
   const vaultPathArg = positional[0];
   const yes = flagBool(flags, "yes", "y");
   const force = flagBool(flags, "force", "f");
+  const agents = flagStrings(repeated, "agent");
 
   if (!vaultPathArg) {
     process.stderr.write("Usage: grounder vault init <path>\n");
@@ -36,6 +36,7 @@ export async function runVaultInit(argv: string[]): Promise<number> {
     vaultPath: vaultPathArg,
     yes,
     force,
+    agents: agents.length > 0 ? agents : undefined,
   });
 }
 
@@ -50,13 +51,19 @@ export async function runVaultInitWithOptions(
 
     const existingHome = await readHomeConfig();
     const projectsDir = projectsParent(vaultRoot);
-    const commandPath = grounderNoteCommandPath(homeDir);
+    const agents = await resolveAgents(options.agents);
 
     process.stdout.write(`Vault root: ${vaultRoot}\n`);
     process.stdout.write("Will write:\n");
     process.stdout.write(`  home   ${homeConfigPath(homeDir)}\n`);
     process.stdout.write("  vault  10-Projects/ (if missing)\n");
-    process.stdout.write(`  cursor ${commandPath}\n\n`);
+    for (const agent of agents) {
+      process.stdout.write(`  ${agent.id.padEnd(8)} (${agent.name} artifacts)\n`);
+    }
+    if (agents.length === 0) {
+      process.stdout.write("  (no supported agents detected — skipping agent artifacts)\n");
+    }
+    process.stdout.write("\n");
 
     if (!yes) {
       const proceed = await confirm("Proceed?");
@@ -76,17 +83,18 @@ export async function runVaultInitWithOptions(
     await writeHomeConfig({ vaultRoot });
     await mkdir(projectsDir, { recursive: true });
 
-    const commandResult = await installGrounderNoteCommand({
-      force,
-      homeDir,
-    });
-
     process.stdout.write("✓ Wrote home config\n");
     process.stdout.write(`✓ Vault scaffold: ${projectsDir}\n`);
-    if (commandResult === "skipped") {
-      process.stdout.write("✓ Cursor command already exists (skipped)\n");
-    } else {
-      process.stdout.write(`✓ Installed Cursor command: ${commandPath}\n`);
+
+    for (const agent of agents) {
+      const result = await agent.install({ force, homeDir });
+      for (const [artifactPath, status] of Object.entries(result.artifacts)) {
+        const label = status === "skipped" ? "already exists (skipped)" : `installed: ${artifactPath}`;
+        process.stdout.write(`✓ ${agent.name} command ${label}\n`);
+      }
+      if (Object.keys(result.artifacts).length === 0) {
+        process.stdout.write(`✓ ${agent.name}: no artifacts to install yet\n`);
+      }
     }
 
     return 0;

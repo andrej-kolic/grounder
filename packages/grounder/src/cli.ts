@@ -30,6 +30,8 @@ Init flags:
   --force        Overwrite existing generated files
   --id <id>      Override detected project id (grounder init)
   --vault <path> Override home vault root for this run (grounder init)
+  --agent <id>   Install for a specific agent (repeatable; default: auto-detect)
+                 Supported: cursor, claude
 
 Note flags:
   --title <slug> Short slug in filename (default: slugified first line)

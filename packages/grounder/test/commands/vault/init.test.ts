@@ -3,7 +3,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
 import { homeConfigPath } from "../../../src/connector/home.js";
-import { grounderNoteCommandPath } from "../../../src/cursor/grounder-note.js";
+import { grounderNoteCommandPath } from "../../../src/agents/cursor.js";
 import { createTempEnv } from "../../helpers.js";
 
 describe("commands/vault/init", () => {
@@ -24,6 +24,7 @@ describe("commands/vault/init", () => {
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
+      agents: ["cursor"],
     });
 
     expect(code).toBe(0);
@@ -41,13 +42,14 @@ describe("commands/vault/init", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home, agents: ["cursor"] });
     const commandBefore = await readFile(grounderNoteCommandPath(env.home), "utf8");
 
     const code = await runVaultInitWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
+      agents: ["cursor"],
     });
 
     expect(code).toBe(0);
