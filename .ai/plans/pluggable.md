@@ -1,5 +1,7 @@
 ## Agent Plugin Architecture for Grounder
 
+**Status: implemented (Option B).** Vault core stays agent-agnostic; agent glue lives under `src/agents/` + `templates/agents/{id}/`. `grounder vault init` auto-detects agents or takes `--agent=<id>` (repeatable).
+
 ### What the ecosystem reveals
 
 Each major agent has settled on a specific set of files/directories:
@@ -15,7 +17,9 @@ The vault structure (`10-Projects/`, `notes/`, `logs/`) is **100% agent-agnostic
 
 ---
 
-### What Grounder currently does (the problem)
+### What Grounder currently does (the problem) — resolved
+
+Previously:
 
 ```
 commands/vault/init.ts
@@ -27,7 +31,7 @@ cursor/grounder-note.ts                   ← one artifact, one agent
 templates/cursor/                         ← agent-specific in ad-hoc location
 ```
 
-This works for one agent. Adding Claude Code means duplicating the pattern without a seam.
+This worked for one agent. Adding Claude Code meant duplicating the pattern without a seam. **Fixed by Option B below.**
 
 ---
 
@@ -64,10 +68,9 @@ The shape that fits Grounder's existing style:
 src/
   agents/
     types.ts          ← AgentAdapter interface + result types
-    cursor.ts         ← Cursor adapter (absorbs cursor/)
-    claude.ts         ← Claude Code adapter (stub)
+    cursor.ts         ← Cursor adapter
+    claude.ts         ← Claude Code adapter
     index.ts          ← registry, resolveAgents(), detectAgents()
-  cursor/             ← keep during migration, or delete once absorbed
   commands/
     vault/init.ts     ← iterates agent registry, no agent names hardcoded
   connector/          ← unchanged
@@ -76,12 +79,14 @@ src/
 templates/
   agents/
     cursor/
-      commands/grounder-note.md   ← already exists, just moves
+      commands/grounder-note.md
     claude/
-      commands/grounder-note.md   ← new
-  vault/              ← unchanged
+      commands/grounder-note.md
+  vault/              ← Phase 2+
+  bridge/             ← Phase 2+
 ```
 
+(`src/cursor/` and `templates/cursor/` were removed after absorption.)
 #### Interface (minimal, no over-engineering)
 
 ```ts
@@ -189,17 +194,16 @@ Each adapter resolves its own template path — no shared template logic needed.
 
 ---
 
-### Migration path (additive, no breakage)
+### Migration path — done
 
-1. Add `src/agents/types.ts` + `src/agents/index.ts`
-2. Add `src/agents/cursor.ts` — wraps existing `cursor/grounder-note.ts` behind the interface
-3. Update `commands/vault/init.ts` to call `resolveAgents()` instead of `installGrounderNoteCommand()` directly
-4. Move template to `templates/agents/cursor/`
-5. Delete `src/cursor/` once absorbed (or keep as internal module called by cursor adapter)
-6. Add `src/agents/claude.ts` stub — `isInstalled()` checks `~/.claude`, `install()` is a no-op until Claude artifacts are designed
+1. [x] Add `src/agents/types.ts` + `src/agents/index.ts`
+2. [x] Add `src/agents/cursor.ts` — Cursor adapter behind `AgentAdapter`
+3. [x] Update `commands/vault/init.ts` to call `resolveAgents()` instead of a hardcoded Cursor install
+4. [x] Move templates to `templates/agents/{id}/`; delete legacy `templates/cursor/`
+5. [x] Delete `src/cursor/` (logic lives in `agents/cursor.ts`)
+6. [x] Add `src/agents/claude.ts` — installs `~/.claude/commands/grounder-note.md`
 
-Tests for the adapter interface go in `test/agents/cursor.test.ts` (same pattern as `test/connector/`).
-
+Tests: `test/agents/` (mirrors `src/agents/`).
 ---
 
 ### One design decision to make

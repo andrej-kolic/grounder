@@ -24,6 +24,8 @@ The core insight: agent memory (logs, notes, plans, decisions) is personal, not 
 
 **Phase 1 done:** connector config (home + repo stores), both init commands, `grounder note`, `/grounder-note` slash command.
 
+**Also done:** pluggable agent adapters (`src/agents/`) for Cursor + Claude Code — see `pluggable.md`.
+
 ---
 
 ## What's still unbuilt (Phase 2+)
@@ -31,7 +33,7 @@ The core insight: agent memory (logs, notes, plans, decisions) is personal, not 
 | Priority | What |
 |---|---|
 | High | Full vault scaffold in `grounder vault init` (templates, `00-AI/`, `90-Inbox/`) |
-| High | Cursor artifact install (MCP config, slash commands, rule, skill) |
+| High | Richer agent artifacts (MCP config, more slash commands, rule, skill) — adapters already in place |
 | High | Bridge note (`_project.md`) + `projects.json` registry in `grounder init` |
 | Medium | `grounder status` — debug link state |
 | Medium | Session lifecycle commands (`/grounder-task`, `/grounder-task-handoff`) |
@@ -47,18 +49,16 @@ The killer feature isn't `grounder note` — it's the **full vault install**: on
 
 **Tension worth resolving:**
 
-The plan says "Cursor-first" but also "agent-agnostic vault". These aren't contradictory — the vault structure *is* agent-agnostic, while the Cursor artifacts are the first integration layer. Worth making this explicit: vault layout is the stable core, Cursor support is a pluggable target (and "VS Code + Copilot" could be another).
-
+The plan said "Cursor-first" but also "agent-agnostic vault". These aren't contradictory — the vault structure *is* agent-agnostic, while agent artifacts are a pluggable integration layer. **Implemented:** `src/agents/` adapter registry (Option B in `pluggable.md`) — Cursor and Claude Code install via the same seam; Copilot/Windsurf can follow the same pattern.
 **Session lifecycle is the daily driver:**
 
 `/grounder-task` (load context) → work → `/grounder-task-handoff` (write log) is the loop users will actually use daily. Without it, the tool is a one-time setup step, not something you rely on every session. This should be prioritized even before `status`/`doctor`.
 
 **Risks:**
 
-- Cursor-specific paths (`~/.cursor/`) — changes to Cursor's config format would break the install. Worth abstracting early.
+- Agent-specific paths (`~/.cursor/`, `~/.claude/`) — format changes break install. Mitigated by isolating each target behind `AgentAdapter`.
 - `@bitbonsai/mcpvault` dependency — you're delegating transport, which is correct, but worth having a fallback documented.
 - The Johnny Decimal folder naming (`10-Projects/`, `00-AI/`) is opinionated. Some users will want to customize. A `paths` escape hatch in config (already mentioned in the plan as a later addition) keeps the defaults but doesn't lock people out.
-
 **What would make it stand out vs. mnemex/markdown-memory:**
 
 The Cursor integration completeness (not just vault wiring but also automatic agent procedure install), the clean dual-mode `/grounder-note`, and the strict write governance (one command = one folder, no leakage). The competitors are either Claude-centric or require manual Cursor setup on top.

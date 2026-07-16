@@ -144,7 +144,10 @@ No npm dependencies for I/O. Obsidian app does not need to be running.
   <vaultRoot>/
   └── 10-Projects/          # empty parent; projects created by `init`
   ```
-- `~/.cursor/commands/grounder-note.md` — thin slash command (skip if exists unless `--force`)
+- Agent slash commands (auto-detect installed agents, or `--agent=<id>`):
+  - Cursor → `~/.cursor/commands/grounder-note.md`
+  - Claude Code → `~/.claude/commands/grounder-note.md`
+  - Skip if exists unless `--force`
 
 **Does not write:** MCP config, rules, skills, vault registry, bridge note, other slash commands.
 
@@ -159,7 +162,7 @@ Vault root: ~/Documents/obsidian/dev
 Will write:
   home   ~/.grounder/config.json
   vault  10-Projects/ (if missing)
-  cursor ~/.cursor/commands/grounder-note.md
+  cursor (Cursor artifacts)
 
 Proceed? [Y/n]
 ```
@@ -234,13 +237,14 @@ Print resolved absolute notes directory. Useful for debugging; no writes.
 
 ---
 
-## Cursor integration (minimal)
+## Agent integration (minimal)
 
-One artifact — a thin slash command:
+Thin slash commands via the `agents/` adapter registry:
 
-| File | Role |
-| --- | --- |
-| `~/.cursor/commands/grounder-note.md` | User trigger → `/grounder-note`; tells agent to run `grounder note` |
+| Agent | File | Role |
+| --- | --- | --- |
+| Cursor | `~/.cursor/commands/grounder-note.md` | `/grounder-note` → run `grounder note` |
+| Claude Code | `~/.claude/commands/grounder-note.md` | same |
 
 **Naming:** slash commands use **`grounder-`** prefix (e.g. `/grounder-note`). Rule/skill (Phase 2+) use **`grounder-vault`**.
 
@@ -326,12 +330,15 @@ packages/grounder/
 │   │   ├── layout.ts          # pure 10-Projects/… paths
 │   │   └── write-note.ts
 │   ├── commands/
-│   │   ├── vault/init.ts      # grounder vault init
+│   │   ├── vault/init.ts      # grounder vault init (uses agents registry)
 │   │   ├── repo/init.ts       # grounder init
 │   │   ├── note.ts
 │   │   └── path/notes.ts
-│   ├── cursor/
-│   │   └── grounder-note.ts
+│   ├── agents/                # AgentAdapter registry
+│   │   ├── types.ts
+│   │   ├── index.ts
+│   │   ├── cursor.ts
+│   │   └── claude.ts
 │   └── util/
 │       ├── fs.ts
 │       ├── project-id.ts
@@ -339,12 +346,16 @@ packages/grounder/
 │       ├── prompt.ts
 │       └── parse-args.ts
 ├── templates/
-│   └── cursor/
-│       └── grounder-note.md
+│   ├── agents/
+│   │   ├── cursor/commands/grounder-note.md
+│   │   └── claude/commands/grounder-note.md
+│   ├── vault/                 # Phase 2+
+│   └── bridge/                # Phase 2+
 └── test/                      # mirrors src/
     ├── connector/
     ├── vault/
     ├── commands/
+    ├── agents/
     ├── helpers.ts
     └── cli.test.ts
 
@@ -371,11 +382,13 @@ vault/
   layout.ts           # pure 10-Projects/… path segments (no config imports)
   write-note.ts       # note file I/O
 commands/             # mirrors CLI: vault/init, repo/init, note, path/notes
-cursor/grounder-note.ts
+agents/               # AgentAdapter registry (cursor, claude, …)
 util/                 # fs, project-id, note-slug, parse-args, prompt
 ```
 
 Naming: `resolve*` = config/env aware; plain names in `vault/layout.ts` = pure paths.
+
+Post–Phase 1: Cursor install moved from `cursor/` into `agents/` (see [.ai/plans/pluggable.md](pluggable.md)).
 
 ---
 
@@ -421,7 +434,7 @@ Validated: `/grounder-note` → agent runs `npx grounder note` from `fixtures/de
 - [x] `commands/vault/init.ts` — parse `[path]`, `--yes`, `--force`
 - [x] Write home config
 - [x] Create `10-Projects/` in vault if missing
-- [x] `cursor/grounder-note.ts` — install slash command template
+- [x] `agents/cursor.ts` — install slash command template (was `cursor/grounder-note.ts`; see pluggable.md)
 - [x] Confirm prompt + `--yes` skip
 - [x] Tests: temp HOME, assert files created, re-run idempotent
 
@@ -466,7 +479,7 @@ Validated: `/grounder-note` → agent runs `npx grounder note` from `fixtures/de
 | Planned | Shipped | Notes |
 | --- | --- | --- |
 | All CLI commands | Yes | `vault init`, `init`, `note`, `path notes` |
-| `/grounder-note` template | Yes | Installed to `~/.cursor/commands/grounder-note.md` |
+| `/grounder-note` template | Yes | Via `agents/` adapters → `~/.cursor/commands/` and `~/.claude/commands/` (auto-detect or `--agent`) |
 | Note frontmatter | No | Raw body only; add in Phase 2 or as polish |
 | `status`, `doctor` | No | Explicitly out of scope |
 | Monorepo dev fixture | Yes (extra) | `fixtures/dev/` + `pnpm fixture:setup` — not in original plan |

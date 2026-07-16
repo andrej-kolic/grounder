@@ -44,7 +44,12 @@ Only `packages/grounder` is published to npm:
 pnpm --filter grounder publish
 ```
 
+## Architecture
+
+Agent-agnostic core (`connector/`, `vault/`, `commands/`) plus a pluggable `agents/` adapter registry for Cursor, Claude Code, and future targets. Templates: `packages/grounder/templates/agents/{id}/`.
+
 ## Plan
 
 Phase 1: [.ai/plans/grounder-phase-1-minimal-connector.md](.ai/plans/grounder-phase-1-minimal-connector.md)  
+Agent adapters (implemented): [.ai/plans/pluggable.md](.ai/plans/pluggable.md)  
 Full roadmap: [.ai/plans/grounder-init-cli.md](.ai/plans/grounder-init-cli.md)

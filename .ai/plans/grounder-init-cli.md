@@ -358,14 +358,17 @@ packages/grounder/
 │   │   ├── layout.ts             # pure 10-Projects/… paths
 │   │   └── write-note.ts
 │   ├── commands/                 # shipped Phase 1 (mirrors CLI)
-│   │   ├── vault/init.ts
+│   │   ├── vault/init.ts         # agent-blind; uses agents registry
 │   │   ├── repo/init.ts
 │   │   ├── note.ts
 │   │   ├── path/notes.ts
 │   │   ├── status.ts             # Phase 2+
 │   │   └── doctor.ts             # Phase 2+
-│   ├── cursor/
-│   │   └── grounder-note.ts      # shipped; more commands Phase 2+
+│   ├── agents/                   # shipped (Option B — pluggable.md)
+│   │   ├── types.ts
+│   │   ├── index.ts
+│   │   ├── cursor.ts
+│   │   └── claude.ts             # more agents / artifacts Phase 2+
 │   └── util/
 │       ├── fs.ts
 │       ├── project-id.ts
@@ -373,13 +376,15 @@ packages/grounder/
 │       ├── parse-args.ts
 │       └── prompt.ts
 ├── templates/
-│   ├── cursor/grounder-note.md   # shipped
+│   ├── agents/
+│   │   ├── cursor/commands/grounder-note.md   # shipped
+│   │   └── claude/commands/grounder-note.md   # shipped
 │   ├── vault/                    # Phase 2+ (00-AI, templates, 90-Inbox)
 │   └── bridge/                   # Phase 2+ (_project.md)
 └── test/                         # mirrors src/
 ```
 
-Phase 2 additions slot into `connector/` (registry), `vault/` (bridge, logs paths), `cursor/` (rules, skills, more commands) — extend existing modules rather than reintroducing generic `config.ts` / `detect.ts`.
+Phase 2 additions slot into `connector/` (registry), `vault/` (bridge, logs paths), `agents/` (rules, skills, more commands per adapter) — extend existing modules rather than reintroducing generic `config.ts` / `detect.ts`.
 
 ---
 
