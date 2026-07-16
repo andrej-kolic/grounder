@@ -10,6 +10,13 @@ async function isGitRoot(dir: string): Promise<boolean> {
   }
 }
 
+
+/**
+ * Finds the git root directory for a given start directory.
+ * Searches upwards from the start directory, stops at the root directory.
+ * @param startDir - The directory to start searching from.
+ * @returns The git root directory, or null if not found.
+ */
 export async function findGitRoot(startDir: string): Promise<string | null> {
   let current = path.resolve(startDir);
 
