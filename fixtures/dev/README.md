@@ -24,8 +24,9 @@ Run `init` from this folder — it writes `.grounder.json` here (not at the mono
 
 After editing `packages/grounder/src`, run `pnpm build` from the repo root — the bin runs `dist/cli.js`.
 
-`/grounder-note` in Cursor uses `npx grounder note` (works with the workspace link). Re-install the slash command after template changes:
+`/grounder-note` (Cursor / Claude Code) uses `npx grounder note` (works with the workspace link). Re-install agent artifacts after template changes:
 
 ```bash
 pnpm grounder vault init ~/Documents/obsidian/dev --force --yes
+# or pin agents: --agent=cursor --agent=claude
 ```

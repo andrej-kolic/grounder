@@ -57,6 +57,15 @@ async function readGitRemoteSlug(repoRoot: string): Promise<string | null> {
   return null;
 }
 
+/**
+ * Detects the project id for a given link root.
+ * Tries to detect it from the package.json, git remote, and folder name.
+ *
+ * @param linkRoot - The root directory of the link.
+ * @param override - An optional project id to use instead of detecting one.
+ * @param gitRoot - An optional git root to use instead of detecting one.
+ * @returns The detected project id.
+ */
 export async function detectProjectId(
   linkRoot: string,
   override?: string,

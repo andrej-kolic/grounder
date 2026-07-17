@@ -19,18 +19,37 @@ npx grounder --help
 ## Quickstart
 
 ```bash
-# Once per machine — set vault location + install /grounder-note in Cursor
+# Once per machine — set vault location + install agent slash commands
 grounder vault init ~/Documents/obsidian/dev
 
 # Once per folder — link project id to vault notes folder
 cd your-project
 grounder init
 
-# Write a note (or use /grounder-note in Cursor)
+# Write a note (or use /grounder-note in Cursor / Claude Code)
 grounder note "Investigate auth middleware"
 ```
 
 Notes land in `<vault>/10-Projects/{projectId}/notes/`.
+
+## Setup overview
+
+Three steps — vault once per machine, then link each project folder:
+
+1. **`grounder vault init <path>`** (once per machine)
+   - Writes `~/.grounder/config.json` with the vault root
+   - Creates `<vault>/10-Projects/` if missing
+   - Installs agent slash commands for detected agents (or `--agent=<id>`):
+     - Cursor → `~/.cursor/commands/grounder-note.md`
+     - Claude Code → `~/.claude/commands/grounder-note.md`
+
+2. **`grounder init`** (once per project folder)
+   - Writes `.grounder.json` in the current directory (`projectId` — safe to commit)
+   - Creates `<vault>/10-Projects/{projectId}/notes/`
+
+3. **Daily use** — `grounder note "…"` or `/grounder-note` in the agent; no further install.
+
+Nothing is written into the repo except the small `.grounder.json` marker. Agent artifacts stay under the user’s home directory; vault notes stay outside the project tree.
 
 ## Commands
 
@@ -49,6 +68,7 @@ grounder path notes          Print resolved notes directory
 | `--force` | `vault init`, `init` | Overwrite existing generated files |
 | `--id <id>` | `init` | Override detected project id |
 | `--vault <path>` | `init` | Override home vault root for this run |
+| `--agent <id>` | `vault init` | Install for a specific agent (repeatable; default: auto-detect). Supported: `cursor`, `claude` |
 
 ### Note flags
 
@@ -85,9 +105,24 @@ Written by `grounder init` in the **current working directory**. Project id dete
 | `GROUNDER_VAULT` | Override vault root for the current session |
 | `GROUNDER_HOME` | Override home directory (default: `~`) for config resolution |
 
-## Cursor
+## Agents
 
-`grounder vault init` installs a `/grounder-note` slash command in `~/.cursor/commands/`. It tells the agent to run `npx grounder note "…"` from the linked project folder (no global install required). Re-run `grounder vault init <path> --force` to refresh an existing install.
+The vault layout is agent-agnostic. `grounder vault init` installs thin glue artifacts per detected agent via a pluggable adapter registry (`src/agents/`).
+
+| Agent | Detection | Artifact |
+| --- | --- | --- |
+| Cursor | `~/.cursor` exists | `~/.cursor/commands/grounder-note.md` |
+| Claude Code | `~/.claude` exists | `~/.claude/commands/grounder-note.md` |
+
+No `--agent` flag: auto-detect installed agents. Explicit install:
+
+```bash
+grounder vault init ~/Documents/obsidian/dev --agent=cursor --agent=claude
+```
+
+Each command tells the agent to run `npx grounder note "…"` from the linked project folder (no global install required). Re-run with `--force` to refresh existing installs.
+
+Templates live under `templates/agents/{id}/`. Adding another agent means one adapter file + one template directory — `vault init` stays agent-blind.
 
 ## Development
 

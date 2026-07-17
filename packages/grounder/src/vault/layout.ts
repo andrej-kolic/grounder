@@ -1,4 +1,7 @@
-// Pure vault layout: path segments only — no config files or env overrides.
+/**
+ * Pure vault layout: path segments only — no config files or env overrides.
+ */
+
 import path from "node:path";
 
 export const PROJECTS_DIR = "10-Projects";

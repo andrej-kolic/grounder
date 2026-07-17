@@ -22,16 +22,32 @@ vault/                # vault on disk
   layout.ts           # pure path conventions (10-Projects/…)
   write-note.ts       # note file I/O
 commands/             # mirrors CLI structure
-  vault/init.ts       # grounder vault init
+  vault/init.ts       # grounder vault init (agent-blind; uses agents registry)
   repo/init.ts        # grounder init
   note.ts             # grounder note
   path/notes.ts       # grounder path notes
-cursor/
-  grounder-note.ts    # install /grounder-note slash command
+agents/               # AgentAdapter registry (pluggable install targets)
+  types.ts            # AgentAdapter interface
+  index.ts            # resolveAgents(), detect
+  cursor.ts           # Cursor adapter
+  claude.ts           # Claude Code adapter
 util/                 # shared helpers (fs, parse-args, prompt, slugs)
 ```
 
 Naming rule: `resolve*` = config/env aware; plain names in `vault/layout.ts` = pure path segments.
+
+Agent-agnostic core = `connector/`, `vault/`, most of `commands/`, `util/`. Agent-specific glue lives only under `agents/` (+ matching templates).
+
+### Templates
+
+```text
+packages/grounder/templates/
+  agents/
+    cursor/commands/grounder-note.md
+    claude/commands/grounder-note.md
+  vault/              # Phase 2+ vault scaffold
+  bridge/             # Phase 2+ bridge note
+```
 
 ## Commands
 
@@ -58,8 +74,10 @@ Run tests after every change. Keep dependencies minimal.
 - TypeScript in `src/`, output to `dist/`
 - Templates ship in `packages/grounder/templates/` (included in npm `files`)
 - Idempotent file generation — never clobber user-edited vault content without `--force`
+- New agents: add `src/agents/<id>.ts` + `templates/agents/<id>/`, register in `agents/index.ts`
 
 ## Plan
 
 Phase 1 complete: `.ai/plans/grounder-phase-1-minimal-connector.md`  
+Agent adapters (Option B): `.ai/plans/pluggable.md` — **implemented**  
 Phase 2+ reference: `.ai/plans/grounder-init-cli.md`

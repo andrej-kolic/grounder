@@ -18,6 +18,10 @@ export function homeConfigPath(homeDir?: string): string {
   return path.join(resolveHomeDir(homeDir), ".grounder", "config.json");
 }
 
+/**
+ * Runs `fn` with home config resolved under `homeDir` (for tests/sandboxing).
+ * Sets `GROUNDER_HOME` for the call, then restores it. No-op if `homeDir` is unset.
+ */
 export async function withHomeDir<T>(
   homeDir: string | undefined,
   fn: () => Promise<T>,

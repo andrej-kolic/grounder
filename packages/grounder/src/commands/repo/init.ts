@@ -70,9 +70,11 @@ export async function runRepoInitWithOptions(
     process.stdout.write(
       `✓ Project:  ${detected.id} (${formatProjectIdSource(detected.source)})\n\n`,
     );
+    const notesDirRelative = path.relative(vaultRoot, notesDir);
+
     process.stdout.write("Will create:\n");
     process.stdout.write(`  link   ${repoConfigPath(cwd)}\n`);
-    process.stdout.write(`  vault  ${path.relative(vaultRoot, notesDir)}/\n\n`);
+    process.stdout.write(`  vault  ${notesDirRelative}/\n`);
 
     if (!yes) {
       const proceed = await confirm("Proceed?");
