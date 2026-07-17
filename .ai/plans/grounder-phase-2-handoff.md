@@ -1,12 +1,12 @@
 # Grounder Phase 2 — Session handoff (product idea)
 
-**Status:** product idea + implementation steps (details TBD)  
+**Status:** implementation plan  
 **Created:** 2026-07-17  
-**Updated:** 2026-07-17 (implementation steps)  
+**Updated:** 2026-07-17 (implementation plan)  
 **Basis:** `.ai/plans/grounder-product-idea.md`, `.ai/discussions/purpose.md`, design discussion 2026-07-17  
 **Builds on:** Phase 1 slim connector (`grounder note`, marker + home config + convention)
 
-> Product decisions above. Implementation **steps** below. Per-step details still TBD.
+> Product decisions above. Implementation plan below.
 
 ---
 
@@ -189,26 +189,204 @@ A developer feels Phase 2 worked when:
 
 ---
 
-## Implementation steps
+## Implementation plan
 
-Order: **write path before recall**; within each side, **CLI before agent glue**. Details per step TBD.
+Order: **write path before recall**; within each side, **CLI before agent glue**.
 
-| Step | Focus | Deliverable |
-| --- | --- | --- |
-| **1** | Vault write core | `logs/` path resolution + write handoff file (timestamp, optional title, no clobber, lean template) |
-| **2** | Handoff CLI | `grounder handoff` — agent-supplied body → vault file; print path |
-| **3** | Handoff tests | Unit + CLI smoke (mirror `note`) |
-| **4** | Handoff agent glue | `/grounder-task-handoff` slash command (summarize → CLI); install via adapters |
-| **5** | Recall CLI | List/resolve recent handoffs (e.g. newest or last N paths) — no content dump required |
-| **6** | Recall tests | Unit + CLI smoke for list/resolve |
-| **7** | Recall agent glue | `/grounder-task` — run recall CLI → read newest log + `AGENTS.md` |
+### Locked decisions
 
-### Rules for the sequence
+| # | Decision |
+| --- | --- |
+| 1 | **One file per handoff** — never overwrite; newest filename wins on resume |
+| 2 | **Positional body** — same UX as `note`: agent supplies markdown body; no `--done` / `--next` flags |
+| 3 | **CLI prepends frontmatter** — `project`, `branch`, `created`, optional `title`; body is agent content |
+| 4 | **Filename** — reuse note slug rules: `YYYY-MM-DD-HHmm[-title].md`; second-precision + numeric suffix on collision |
+| 5 | **`logs/` on init** — create alongside `notes/` in `grounder init` |
+| 6 | **Branch** — best-effort from git at write time; omit if not in a git repo |
+| 7 | **Recall CLI** — list paths only (`handoff list`, `path logs`); agent reads file contents |
+| 8 | **Empty logs** — `/grounder-task` proceeds with `AGENTS.md` only; report no handoffs yet |
+| 9 | **Bridge** — out of scope for this phase |
+| 10 | **Agent glue last** — slash commands only; no rule/skill unless slash alone proves insufficient |
 
-- Do not start agent templates until the matching CLI works and is tested.
-- Skill/router rule only if slash commands alone are insufficient.
-- Bridge note stays out of this phase.
+### Package additions (mirror Phase 1)
 
-### Next
+```text
+packages/grounder/src/
+  vault/
+    layout.ts           # + logsDir()
+    write-handoff.ts    # mkdir, slug, frontmatter, writeFile
+    list-handoffs.ts    # sort logs/*.md, limit N
+  connector/
+    vault.ts            # + resolveLogsDir()
+    git.ts              # + currentBranch(gitRoot) — best-effort
+  commands/
+    handoff.ts          # grounder handoff <text>
+    handoff/list.ts     # grounder handoff list [--limit N]
+    path/logs.ts        # grounder path logs
+templates/
+  agents/
+    cursor/commands/grounder-task-handoff.md
+    cursor/commands/grounder-task.md
+    claude/commands/grounder-task-handoff.md
+    claude/commands/grounder-task.md
+  vault/session-handoff.md   # reference template for slash commands (not auto-filled by CLI)
+test/
+  vault/write-handoff.test.ts
+  vault/list-handoffs.test.ts
+  commands/handoff.test.ts
+  commands/handoff/list.test.ts
+  commands/path/logs.test.ts
+```
 
-Fill in implementation details per step (API surface, file layout, acceptance criteria), starting with step 1.
+Reuse `noteBasename` / collision logic from `write-note.ts` (extract shared basename helper or call same slug functions).
+
+### CLI surface
+
+```text
+grounder handoff <text>       Write handoff to vault logs/
+  --title <slug>              Optional filename slug + frontmatter title
+
+grounder handoff list         Print recent handoff paths (newest first)
+  --limit <n>                 Default 5
+
+grounder path logs            Print resolved logs directory
+```
+
+**Handoff input:** agent builds the markdown body (H1 + `## Done` / `## Next` / …) per slash-command instructions; passes it as positional text to `grounder handoff`. CLI does not validate section presence in v1 (enforce via slash prompt only).
+
+**Handoff output file:**
+
+```markdown
+---
+project: <projectId>
+branch: <branch or omitted>
+created: <ISO-8601>
+title: <slug or omitted>
+---
+
+<body from agent>
+```
+
+**List output:** one absolute path per line, newest first. Exit 0 with no output when `logs/` is empty.
+
+---
+
+### Step 1 — Vault write core
+
+- [ ] `vault/layout.ts` — `logsDir(vaultRoot, projectId)`
+- [ ] `connector/vault.ts` — `resolveLogsDir(home, repo, vaultOverride?)`
+- [ ] `connector/git.ts` — `currentBranch(gitRoot)` (e.g. `git rev-parse --abbrev-ref HEAD`; return `undefined` on failure)
+- [ ] `vault/write-handoff.ts` — `writeHandoff(logsDir, body, { title?, projectId, branch?, now? })`
+  - mkdir `logsDir`
+  - basename via same rules as notes
+  - prepend YAML frontmatter + body
+  - return written path
+- [ ] Tests: frontmatter fields, slug/collision, mkdir when missing
+
+### Step 2 — Handoff CLI
+
+- [ ] `commands/handoff.ts` — `runHandoff(argv)` / `runHandoffWithOptions`
+  - same link resolution as `note` (home → linked repo → logs dir)
+  - `--title` flag
+  - stdout: `Wrote <path>`
+- [ ] `cli.ts` — route `handoff` subcommand; update help text
+- [ ] `commands/repo/init.ts` — also `mkdir(logsDir)`; update “Will create” output
+
+### Step 3 — Handoff tests
+
+- [ ] `test/vault/write-handoff.test.ts` — unit tests for write + collision
+- [ ] `test/commands/handoff.test.ts` — end-to-end + CLI smoke (mirror `note.test.ts`)
+- [ ] `pnpm test` green
+
+### Step 4 — Handoff agent glue
+
+- [ ] `templates/vault/session-handoff.md` — lean section reference (Done / Next / Blockers / Decisions / Files)
+- [ ] `templates/agents/cursor/commands/grounder-task-handoff.md`
+  - summarize session into template (not transcript)
+  - run `npx grounder handoff "<body>"` with optional `--title`
+  - do not compute vault paths or write files directly
+- [ ] `templates/agents/claude/commands/grounder-task-handoff.md` — same instructions
+- [ ] Extend `agents/cursor.ts` + `agents/claude.ts` — install new command(s) on `vault init` (skip if exists unless `--force`)
+- [ ] Tests: adapter install copies new templates
+
+### Step 5 — Recall CLI
+
+- [ ] `vault/list-handoffs.ts` — `listHandoffs(logsDir, { limit? })` → sorted `.md` paths, desc
+- [ ] `commands/handoff/list.ts` — `runHandoffList(argv)`; `--limit` default 5
+- [ ] `commands/path/logs.ts` — `runPathLogs(argv)` (mirror `path notes`)
+- [ ] `cli.ts` — route `handoff list` and `path logs`; update help
+
+### Step 6 — Recall tests
+
+- [ ] `test/vault/list-handoffs.test.ts` — sort order, limit, empty dir
+- [ ] `test/commands/handoff/list.test.ts` + `test/commands/path/logs.test.ts`
+- [ ] `pnpm test` green
+
+### Step 7 — Recall agent glue
+
+- [ ] `templates/agents/cursor/commands/grounder-task.md`
+  - run `grounder handoff list --limit 5` (or `path logs` + read newest)
+  - read newest handoff file + repo `AGENTS.md`
+  - if no handoffs: say so, read `AGENTS.md` only
+  - read-only — no vault writes
+- [ ] `templates/agents/claude/commands/grounder-task.md` — same
+- [ ] Extend adapters to install recall command(s)
+- [ ] Tests: adapter install
+
+### Step 8 — Polish
+
+- [ ] README: handoff quickstart (`handoff` → `/grounder-task-handoff` → `/grounder-task`)
+- [ ] `AGENTS.md` — document new modules if layout changed materially
+- [ ] Dogfood in `fixtures/dev/`
+
+---
+
+## Acceptance criteria
+
+1. `grounder init` creates `10-Projects/{id}/logs/` alongside `notes/`.
+2. `grounder handoff "<body>"` writes a new `.md` in `logs/` with frontmatter; prints path; never overwrites.
+3. Second handoff in the same minute gets a distinct filename (second precision or suffix).
+4. `grounder handoff list` prints newest paths first; empty when no logs.
+5. `grounder path logs` prints resolved logs directory.
+6. `/grounder-task-handoff` (via agent) invokes CLI; file appears in vault with expected sections.
+7. `/grounder-task` reads newest handoff + `AGENTS.md`; works when `logs/` is empty.
+8. Re-run `init` remains safe — no log deletion.
+
+---
+
+## Explicitly deferred (post Phase 2)
+
+| Feature | Notes |
+| --- | --- |
+| Bridge `_project.md` | Convention + newest log is enough for now |
+| `/grounder-task-continue` | Same as task with “prioritize handoff” emphasis — add if task alone is insufficient |
+| CLI body validation | Warn if `## Next` missing |
+| Section flags (`--done`, `--next`) | Only if positional body quality fails in practice |
+| Branch-aware filenames | Frontmatter `branch:` first; filename suffix later |
+| SessionEnd hooks | Explicit slash discipline first |
+| MCP vault read | Agent reads files directly for now |
+| Cursor rule + skill | Slash commands only |
+| `status`, `doctor` | Ops tooling |
+| `plans/`, `decisions/` commands | Later capture types |
+
+---
+
+## Risks
+
+| Risk | Mitigation |
+| --- | --- |
+| Agent skips required sections | Slash template is explicit; optional CLI validation later |
+| Long body breaks shell quoting | Agent uses heredoc or escaped string; document in slash command |
+| Branch detection fails outside git | Omit `branch` in frontmatter |
+| Adapter install only on `vault init` | Document re-run `vault init --force` or manual copy for existing users |
+| Handoff quality still depends on agent | Template + “Next is mandatory” in slash prompt |
+
+---
+
+## How to run (new chat)
+
+```text
+Implement Grounder Phase 2 per .ai/plans/grounder-phase-2-handoff.md.
+Start with Step 1 (vault write core). CLI before agent glue.
+Run pnpm test after each step.
+```
