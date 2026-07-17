@@ -294,9 +294,9 @@ title: <slug or omitted>
 
 ### Step 3 — Handoff tests
 
-- [ ] `test/vault/write-handoff.test.ts` — unit tests for write + collision
-- [ ] `test/commands/handoff.test.ts` — end-to-end + CLI smoke (mirror `note.test.ts`)
-- [ ] `pnpm test` green
+- [x] `test/vault/write-handoff.test.ts` — unit tests for write + collision
+- [x] `test/commands/handoff.test.ts` — end-to-end + CLI smoke (mirror `note.test.ts`)
+- [x] `pnpm test` green
 
 ### Step 4 — Handoff agent glue
 
