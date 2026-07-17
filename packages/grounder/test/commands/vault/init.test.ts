@@ -55,4 +55,23 @@ describe("commands/vault/init", () => {
     expect(code).toBe(0);
     expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toBe(commandBefore);
   });
+
+  it("returns error before prompting when vault already configured to a different path", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    // First init succeeds
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home, agents: [] });
+
+    // Re-init with a different vault path and no --force should fail immediately (exit 1)
+    // without hanging on a confirmation prompt (yes: false but no TTY needed since it errors first)
+    const code = await runVaultInitWithOptions({
+      vaultPath: env.vault + "-other",
+      yes: false,
+      homeDir: env.home,
+      agents: [],
+    });
+
+    expect(code).toBe(1);
+  });
 });

@@ -53,6 +53,13 @@ export async function runVaultInitWithOptions(
     const projectsDir = projectsParent(vaultRoot);
     const agents = await resolveAgents(options.agents);
 
+    if (existingHome && existingHome.vaultRoot !== vaultRoot && !force) {
+      process.stderr.write(
+        `Home config already exists with vault ${existingHome.vaultRoot}. Use --force to overwrite.\n`,
+      );
+      return 1;
+    }
+
     process.stdout.write(`Vault root: ${vaultRoot}\n`);
     process.stdout.write("Will write:\n");
     process.stdout.write(`  home   ${homeConfigPath(homeDir)}\n`);
@@ -71,13 +78,6 @@ export async function runVaultInitWithOptions(
         process.stdout.write("Aborted.\n");
         return 0;
       }
-    }
-
-    if (existingHome && existingHome.vaultRoot !== vaultRoot && !force) {
-      process.stderr.write(
-        `Home config already exists with vault ${existingHome.vaultRoot}. Use --force to overwrite.\n`,
-      );
-      return 1;
     }
 
     await writeHomeConfig({ vaultRoot });
