@@ -74,8 +74,6 @@ export async function runRepoInitWithOptions(
     );
     const notesDirRelative = path.relative(vaultRoot, notesDir);
 
-    const notesDirRelative = path.relative(vaultRoot, notesDir);
-
     process.stdout.write("Will create:\n");
     process.stdout.write(`  link   ${repoConfigPath(cwd)}\n`);
     process.stdout.write(`  vault  ${notesDirRelative}/\n`);
