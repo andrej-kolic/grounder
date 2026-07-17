@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
 import { homeConfigPath } from "../../../src/connector/home.js";
 import { grounderNoteCommandPath } from "../../../src/agents/cursor.js";
+import { projectsJsonPath } from "../../../src/vault/layout.js";
 import { createTempEnv } from "../../helpers.js";
 
 describe("commands/vault/init", () => {
@@ -32,6 +33,7 @@ describe("commands/vault/init", () => {
       vaultRoot: env.vault,
     });
     await access(path.join(env.vault, "10-Projects"));
+    expect(JSON.parse(await readFile(projectsJsonPath(env.vault), "utf8"))).toEqual({ projects: {} });
     expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain("npx grounder note");
     expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain(
       "approve shell permissions",
@@ -44,6 +46,7 @@ describe("commands/vault/init", () => {
 
     await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home, agents: ["cursor"] });
     const commandBefore = await readFile(grounderNoteCommandPath(env.home), "utf8");
+    const registryBefore = await readFile(projectsJsonPath(env.vault), "utf8");
 
     const code = await runVaultInitWithOptions({
       vaultPath: env.vault,
@@ -54,6 +57,8 @@ describe("commands/vault/init", () => {
 
     expect(code).toBe(0);
     expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toBe(commandBefore);
+    // projects.json should not be overwritten on re-run
+    expect(await readFile(projectsJsonPath(env.vault), "utf8")).toBe(registryBefore);
   });
 
   it("returns error before prompting when vault already configured to a different path", async () => {

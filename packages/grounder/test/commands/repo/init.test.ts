@@ -5,6 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
 import { writeHomeConfig } from "../../../src/connector/home.js";
 import { readRepoConfig } from "../../../src/connector/repo.js";
+import { readRegistry } from "../../../src/vault/registry.js";
 import { createTempEnv } from "../../helpers.js";
 
 describe("commands/repo/init", () => {
@@ -24,7 +25,7 @@ describe("commands/repo/init", () => {
     return env;
   }
 
-  it("writes repo marker and creates notes folder", async () => {
+  it("writes marker and creates notes folder", async () => {
     const env = await setupLinkedEnv();
     cleanup = env.cleanup;
 
@@ -38,6 +39,11 @@ describe("commands/repo/init", () => {
     expect(await readRepoConfig(env.repo)).toEqual({ version: 1, projectId: "my-app" });
     const { access } = await import("node:fs/promises");
     await access(path.join(env.vault, "10-Projects", "my-app", "notes"));
+    const registry = await readRegistry(env.vault);
+    expect(registry.projects["my-app"]).toEqual({
+      repo: env.repo,
+      notesDir: "10-Projects/my-app/notes",
+    });
   });
 
   it("is safe to run twice", async () => {
@@ -49,6 +55,8 @@ describe("commands/repo/init", () => {
 
     expect(code).toBe(0);
     expect(await readRepoConfig(env.repo)).toEqual({ version: 1, projectId: "my-app" });
+    const registry = await readRegistry(env.vault);
+    expect(registry.projects["my-app"]).toMatchObject({ repo: env.repo });
   });
 
   it("overwrites marker with --force", async () => {
