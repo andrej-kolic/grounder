@@ -11,7 +11,11 @@ import {
   repoConfigPath,
   writeRepoConfig,
 } from "../../connector/repo.js";
-import { resolveNotesDir, resolveVaultRoot } from "../../connector/vault.js";
+import {
+  resolveLogsDir,
+  resolveNotesDir,
+  resolveVaultRoot,
+} from "../../connector/vault.js";
 import { confirm } from "../../util/prompt.js";
 import { flagBool, flagString, parseArgs } from "../../util/parse-args.js";
 
@@ -56,11 +60,9 @@ export async function runRepoInitWithOptions(
     const vaultRoot = resolveVaultRoot(home!, options.vault);
     const detected = await detectProjectId(cwd, options.id, gitRoot);
     const existingRepo = await readRepoConfig(cwd);
-    const notesDir = resolveNotesDir(
-      home!,
-      { version: 1, projectId: detected.id },
-      options.vault,
-    );
+    const projectConfig = { version: 1 as const, projectId: detected.id };
+    const notesDir = resolveNotesDir(home!, projectConfig, options.vault);
+    const logsDir = resolveLogsDir(home!, projectConfig, options.vault);
 
     process.stdout.write(`✓ Folder:   ${cwd}\n`);
     if (gitRoot) {
@@ -71,10 +73,12 @@ export async function runRepoInitWithOptions(
       `✓ Project:  ${detected.id} (${formatProjectIdSource(detected.source)})\n\n`,
     );
     const notesDirRelative = path.relative(vaultRoot, notesDir);
+    const logsDirRelative = path.relative(vaultRoot, logsDir);
 
     process.stdout.write("Will create:\n");
     process.stdout.write(`  link   ${repoConfigPath(cwd)}\n`);
     process.stdout.write(`  vault  ${notesDirRelative}/\n`);
+    process.stdout.write(`  vault  ${logsDirRelative}/\n`);
 
     if (!yes) {
       const proceed = await confirm("Proceed?");
@@ -88,6 +92,7 @@ export async function runRepoInitWithOptions(
       if (existingRepo.projectId === detected.id) {
         process.stdout.write("✓ Already linked (skipped)\n");
         await mkdir(notesDir, { recursive: true });
+        await mkdir(logsDir, { recursive: true });
         return 0;
       }
 
@@ -99,9 +104,11 @@ export async function runRepoInitWithOptions(
 
     await writeRepoConfig(cwd, { version: 1, projectId: detected.id });
     await mkdir(notesDir, { recursive: true });
+    await mkdir(logsDir, { recursive: true });
 
     process.stdout.write("✓ Wrote .grounder.json\n");
     process.stdout.write(`✓ Created notes folder: ${notesDir}\n`);
+    process.stdout.write(`✓ Created logs folder: ${logsDir}\n`);
     return 0;
   });
 }

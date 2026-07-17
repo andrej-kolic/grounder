@@ -6,10 +6,15 @@ import {
   timestampedBasenameWithSeconds,
 } from "../util/timestamp-slug.js";
 
+/** Options for {@link writeHandoff}. */
 export interface WriteHandoffOptions {
+  /** Project id written into YAML frontmatter. */
   projectId: string;
+  /** Optional title slug for the filename and frontmatter. */
   title?: string;
+  /** Git branch when known; omitted from frontmatter if unset. */
   branch?: string;
+  /** Timestamp for filename prefix and `created` (default: now). */
   now?: Date;
 }
 
@@ -58,8 +63,11 @@ function buildFrontmatter(options: {
 
 /**
  * Writes a new handoff markdown file under `logsDir` (created if missing).
- * Prepends YAML frontmatter (`project`, optional `branch`/`title`, `created`);
- * never overwrites — collisions bump to second precision, then a numeric suffix.
+ * Prepends YAML frontmatter (`project`, optional `branch`/`title`, `created`)
+ * ahead of `body`. Never overwrites — collisions bump to second precision,
+ * then a numeric suffix.
+ * @param logsDir - Absolute project logs directory.
+ * @param body - Agent-supplied markdown (sections such as Done / Next); not validated here.
  * @returns Absolute path of the written file.
  */
 export async function writeHandoff(

@@ -3,6 +3,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { runHandoff } from "./commands/handoff.js";
 import { runNote } from "./commands/note.js";
 import { runPathNotes } from "./commands/path/notes.js";
 import { runRepoInit } from "./commands/repo/init.js";
@@ -19,6 +20,7 @@ Usage:
   grounder vault init <path>   Initialize vault + home config (once per machine)
   grounder init                Connect the current repo to your vault
   grounder note <text>         Write a note to the vault
+  grounder handoff <text>      Write a session handoff to vault logs/
   grounder path notes          Print resolved notes directory
 
 Options:
@@ -33,13 +35,14 @@ Init flags:
   --agent <id>   Install for a specific agent (repeatable; default: auto-detect)
                  Supported: cursor, claude
 
-Note flags:
+Note / handoff flags:
   --title <slug> Short slug in filename (default: slugified first line)
 
 Quickstart:
   grounder vault init ~/Documents/obsidian/dev
   grounder init
   grounder note "my first note"
+  grounder handoff "# Handoff\\n\\n## Next\\n1. …"
 `;
 
 function printHelp(): void {
@@ -75,6 +78,10 @@ async function main(): Promise<void> {
 
   if (command === "note") {
     process.exit(await runNote(rest));
+  }
+
+  if (command === "handoff") {
+    process.exit(await runHandoff(rest));
   }
 
   if (command === "path" && rest[0] === "notes") {
