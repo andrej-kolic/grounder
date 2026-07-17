@@ -1,11 +1,12 @@
 # Grounder Phase 2 — Session handoff (product idea)
 
-**Status:** idea only (no implementation plan)  
+**Status:** product idea + implementation steps (details TBD)  
 **Created:** 2026-07-17  
+**Updated:** 2026-07-17 (implementation steps)  
 **Basis:** `.ai/plans/grounder-product-idea.md`, `.ai/discussions/purpose.md`, design discussion 2026-07-17  
 **Builds on:** Phase 1 slim connector (`grounder note`, marker + home config + convention)
 
-> Implementation details and steps are out of scope here. Capture product decisions only.
+> Product decisions above. Implementation **steps** below. Per-step details still TBD.
 
 ---
 
@@ -16,7 +17,7 @@
 Phase 1 wired the vault. Phase 2 makes the **session loop** real.
 
 ```text
-/task → work → /task-handoff → next /task
+/grounder-task → work → /grounder-task-handoff → next /grounder-task
 ```
 
 ---
@@ -40,8 +41,8 @@ The chat stays in the chat. Obsidian gets a **structured checkpoint**.
 
 | Piece | Role |
 | --- | --- |
-| **Handoff** | Primary product — one new log file per close |
-| **Start task** | Read-only hydrate — newest handoff + repo truth (`AGENTS.md`) |
+| **`/grounder-task-handoff`** | Primary product — one new log file per close |
+| **`/grounder-task`** | Read-only hydrate — newest handoff + repo truth (`AGENTS.md`) |
 | **CLI write path** | Same split as `note`: agent summarizes, CLI writes |
 | **Lean template** | Fixed sections agents can fill consistently |
 
@@ -89,7 +90,7 @@ Same pattern as `grounder note`:
 | **CLI** | Resolve project → logs dir, wrap frontmatter, write new file, print path |
 | **Slash command** | Thin trigger: fill template → run CLI — do not invent vault paths |
 
-Start task is **read-only**: resolve project → read newest log (optionally list recent) → read `AGENTS.md` → work. No vault write.
+`/grounder-task` is **read-only**: resolve project → read newest log (optionally list recent) → read `AGENTS.md` → work. No vault write.
 
 ---
 
@@ -136,7 +137,7 @@ Fat sections (architecture overview, env state, long TOCs) are out of the defaul
 
 ---
 
-## Start task (recall)
+## `/grounder-task` (recall)
 
 Minimal hydrate — no bridge required:
 
@@ -156,7 +157,7 @@ Optional session name / index as a free-text slash arg is fine. A native Cursor 
 | Peer pattern | Grounder choice |
 | --- | --- |
 | Rolling `handoff.md` (markdown-memory) | One immutable file per close; newest = current |
-| Auto SessionEnd hooks | Explicit `/task-handoff` first |
+| Auto SessionEnd hooks | Explicit `/grounder-task-handoff` first |
 | Fat session-handoff templates | Lean five-section body |
 | In-repo memory (`ai/`) | Personal vault `logs/` only |
 | Bridge/passport as load-bearing | Deferred; convention + newest log |
@@ -188,6 +189,26 @@ A developer feels Phase 2 worked when:
 
 ---
 
-## Next
+## Implementation steps
 
-When ready to build: write an **implementation plan** (CLI surface, templates, slash commands, tests, acceptance criteria) separately. Do not expand this file into a build checklist until then.
+Order: **write path before recall**; within each side, **CLI before agent glue**. Details per step TBD.
+
+| Step | Focus | Deliverable |
+| --- | --- | --- |
+| **1** | Vault write core | `logs/` path resolution + write handoff file (timestamp, optional title, no clobber, lean template) |
+| **2** | Handoff CLI | `grounder handoff` — agent-supplied body → vault file; print path |
+| **3** | Handoff tests | Unit + CLI smoke (mirror `note`) |
+| **4** | Handoff agent glue | `/grounder-task-handoff` slash command (summarize → CLI); install via adapters |
+| **5** | Recall CLI | List/resolve recent handoffs (e.g. newest or last N paths) — no content dump required |
+| **6** | Recall tests | Unit + CLI smoke for list/resolve |
+| **7** | Recall agent glue | `/grounder-task` — run recall CLI → read newest log + `AGENTS.md` |
+
+### Rules for the sequence
+
+- Do not start agent templates until the matching CLI works and is tested.
+- Skill/router rule only if slash commands alone are insufficient.
+- Bridge note stays out of this phase.
+
+### Next
+
+Fill in implementation details per step (API surface, file layout, acceptance criteria), starting with step 1.
