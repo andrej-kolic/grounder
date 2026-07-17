@@ -37,6 +37,11 @@ async function resolveNotePath(
   return filePath;
 }
 
+/**
+ * Writes a new note markdown file under `notesDir` (created if missing).
+ * Never overwrites — collisions bump to second precision, then a numeric suffix.
+ * @returns Absolute path of the written file.
+ */
 export async function writeNote(
   notesDir: string,
   text: string,

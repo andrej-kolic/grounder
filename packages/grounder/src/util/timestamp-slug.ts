@@ -4,6 +4,10 @@ export const MAX_SLUG_LENGTH = 20;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+/**
+ * Builds a short filesystem-safe slug from text.
+ * Uses only the first line, truncated to {@link MAX_SLUG_LENGTH}.
+ */
 export function slugifyText(text: string): string {
   const firstLine = text.trim().split(/\r?\n/)[0] ?? "";
   return sanitizeProjectId(firstLine.trim().slice(0, MAX_SLUG_LENGTH));
@@ -17,15 +21,20 @@ function datePrefix(date: Date, includeSeconds: boolean): string {
   return `${y}-${m}-${d}-${time}`;
 }
 
+/** Local-time prefix `YYYY-MM-DD-HHmm` for sortable filenames. */
 export function dateMinutePrefix(date: Date): string {
   return datePrefix(date, false);
 }
 
+/** Local-time prefix `YYYY-MM-DD-HHmmss` used after a minute-precision collision. */
 export function dateSecondPrefix(date: Date): string {
   return datePrefix(date, true);
 }
 
-/** @deprecated Kept for compatibility; prefer dateSecondPrefix. */
+/**
+ * @deprecated Prefer {@link dateSecondPrefix} (hyphenated date + time).
+ * Legacy `YYYY-MM-DD-HH-mm-ss` form.
+ */
 export function timestampSlug(date = new Date()): string {
   return [
     date.getFullYear(),
@@ -37,6 +46,10 @@ export function timestampSlug(date = new Date()): string {
   ].join("-");
 }
 
+/**
+ * Filename stem: `YYYY-MM-DD-HHmm` plus optional slug from `title`, else from `text`.
+ * Returns the date prefix alone when the slug is empty.
+ */
 export function timestampedBasename(
   text: string,
   options: { title?: string; now?: Date } = {},
@@ -47,6 +60,10 @@ export function timestampedBasename(
   return shortSlug ? `${prefix}-${shortSlug}` : prefix;
 }
 
+/**
+ * Same as {@link timestampedBasename} but with second precision (`YYYY-MM-DD-HHmmss`).
+ * Used when the minute-precision name already exists.
+ */
 export function timestampedBasenameWithSeconds(
   text: string,
   options: { title?: string; now?: Date } = {},

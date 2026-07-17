@@ -14,12 +14,9 @@ async function isGitRoot(dir: string): Promise<boolean> {
   }
 }
 
-
 /**
- * Finds the git root directory for a given start directory.
- * Searches upwards from the start directory, stops at the root directory.
- * @param startDir - The directory to start searching from.
- * @returns The git root directory, or null if not found.
+ * Walks upward from `startDir` looking for a `.git` entry.
+ * @returns Absolute git root, or `null` if none is found.
  */
 export async function findGitRoot(startDir: string): Promise<string | null> {
   let current = path.resolve(startDir);
@@ -38,8 +35,9 @@ export async function findGitRoot(startDir: string): Promise<string | null> {
 }
 
 /**
- * Best-effort current branch name for a git root.
- * Returns undefined when git fails or the name is empty.
+ * Best-effort branch name via `git rev-parse --abbrev-ref HEAD`.
+ * @returns Branch name, or `undefined` if git fails / output is empty
+ *   (no commits, not a repo, detached edge cases, etc.).
  */
 export async function currentBranch(gitRoot: string): Promise<string | undefined> {
   try {

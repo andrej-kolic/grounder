@@ -56,6 +56,12 @@ function buildFrontmatter(options: {
   return `${lines.join("\n")}\n\n`;
 }
 
+/**
+ * Writes a new handoff markdown file under `logsDir` (created if missing).
+ * Prepends YAML frontmatter (`project`, optional `branch`/`title`, `created`);
+ * never overwrites — collisions bump to second precision, then a numeric suffix.
+ * @returns Absolute path of the written file.
+ */
 export async function writeHandoff(
   logsDir: string,
   body: string,

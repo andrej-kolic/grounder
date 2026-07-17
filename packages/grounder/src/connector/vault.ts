@@ -4,6 +4,9 @@ import type { HomeConfig } from "./home.js";
 import type { RepoConfig } from "./repo.js";
 import { logsDir, notesDir } from "../vault/layout.js";
 
+/**
+ * Effective vault root, in order: explicit `override`, `GROUNDER_VAULT`, then home config.
+ */
 export function resolveVaultRoot(home: HomeConfig, override?: string): string {
   if (override) {
     return path.resolve(override);
@@ -14,6 +17,7 @@ export function resolveVaultRoot(home: HomeConfig, override?: string): string {
   return path.resolve(home.vaultRoot);
 }
 
+/** Project notes directory under the effective vault root. */
 export function resolveNotesDir(
   home: HomeConfig,
   repo: RepoConfig,
@@ -23,6 +27,7 @@ export function resolveNotesDir(
   return notesDir(vaultRoot, repo.projectId);
 }
 
+/** Project logs (handoff) directory under the effective vault root. */
 export function resolveLogsDir(
   home: HomeConfig,
   repo: RepoConfig,
