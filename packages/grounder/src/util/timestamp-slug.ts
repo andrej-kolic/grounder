@@ -1,12 +1,12 @@
 import { sanitizeProjectId } from "./project-id.js";
 
-export const MAX_NOTE_SLUG_LENGTH = 20;
+export const MAX_SLUG_LENGTH = 20;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
 export function slugifyText(text: string): string {
   const firstLine = text.trim().split(/\r?\n/)[0] ?? "";
-  return sanitizeProjectId(firstLine.trim().slice(0, MAX_NOTE_SLUG_LENGTH));
+  return sanitizeProjectId(firstLine.trim().slice(0, MAX_SLUG_LENGTH));
 }
 
 function datePrefix(date: Date, includeSeconds: boolean): string {
@@ -37,7 +37,7 @@ export function timestampSlug(date = new Date()): string {
   ].join("-");
 }
 
-export function noteBasename(
+export function timestampedBasename(
   text: string,
   options: { title?: string; now?: Date } = {},
 ): string {
@@ -47,7 +47,7 @@ export function noteBasename(
   return shortSlug ? `${prefix}-${shortSlug}` : prefix;
 }
 
-export function noteBasenameWithSecondPrecision(
+export function timestampedBasenameWithSeconds(
   text: string,
   options: { title?: string; now?: Date } = {},
 ): string {

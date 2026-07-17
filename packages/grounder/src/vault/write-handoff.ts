@@ -1,7 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileExists } from "../util/fs.js";
-import { noteBasename, noteBasenameWithSecondPrecision } from "../util/note-slug.js";
+import {
+  timestampedBasename,
+  timestampedBasenameWithSeconds,
+} from "../util/timestamp-slug.js";
 
 export interface WriteHandoffOptions {
   projectId: string;
@@ -16,11 +19,11 @@ async function resolveHandoffPath(
   options: { title?: string; now: Date },
 ): Promise<string> {
   const slugOptions = { title: options.title, now: options.now };
-  let basename = noteBasename(body, slugOptions);
+  let basename = timestampedBasename(body, slugOptions);
   let filePath = path.join(logsDir, `${basename}.md`);
 
   if (await fileExists(filePath)) {
-    basename = noteBasenameWithSecondPrecision(body, slugOptions);
+    basename = timestampedBasenameWithSeconds(body, slugOptions);
     filePath = path.join(logsDir, `${basename}.md`);
   }
 

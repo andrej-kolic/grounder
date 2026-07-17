@@ -238,7 +238,7 @@ test/
   commands/path/logs.test.ts
 ```
 
-Reuse `noteBasename` / collision logic from `write-note.ts` (extract shared basename helper or call same slug functions).
+Reuse `timestampedBasename` / collision logic from `write-note.ts` (extract shared basename helper or call same slug functions).
 
 ### CLI surface
 

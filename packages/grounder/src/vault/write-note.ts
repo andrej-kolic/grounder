@@ -1,7 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileExists } from "../util/fs.js";
-import { noteBasename, noteBasenameWithSecondPrecision } from "../util/note-slug.js";
+import {
+  timestampedBasename,
+  timestampedBasenameWithSeconds,
+} from "../util/timestamp-slug.js";
 
 export interface WriteNoteOptions {
   title?: string;
@@ -15,11 +18,11 @@ async function resolveNotePath(
 ): Promise<string> {
   const now = options.now ?? new Date();
   const slugOptions = { title: options.title, now };
-  let basename = noteBasename(text, slugOptions);
+  let basename = timestampedBasename(text, slugOptions);
   let filePath = path.join(notesDir, `${basename}.md`);
 
   if (await fileExists(filePath)) {
-    basename = noteBasenameWithSecondPrecision(text, slugOptions);
+    basename = timestampedBasenameWithSeconds(text, slugOptions);
     filePath = path.join(notesDir, `${basename}.md`);
   }
 
