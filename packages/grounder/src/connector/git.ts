@@ -1,5 +1,9 @@
+import { execFile } from "node:child_process";
 import { access } from "node:fs/promises";
+import { promisify } from "node:util";
 import path from "node:path";
+
+const execFileAsync = promisify(execFile);
 
 async function isGitRoot(dir: string): Promise<boolean> {
   try {
@@ -30,5 +34,23 @@ export async function findGitRoot(startDir: string): Promise<string | null> {
       return null;
     }
     current = parent;
+  }
+}
+
+/**
+ * Best-effort current branch name for a git root.
+ * Returns undefined when git fails or the name is empty.
+ */
+export async function currentBranch(gitRoot: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["rev-parse", "--abbrev-ref", "HEAD"],
+      { cwd: gitRoot, encoding: "utf8" },
+    );
+    const branch = String(stdout).trim();
+    return branch || undefined;
+  } catch {
+    return undefined;
   }
 }

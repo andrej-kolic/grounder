@@ -17,3 +17,7 @@ export function projectDir(vaultRoot: string, projectId: string): string {
 export function notesDir(vaultRoot: string, projectId: string): string {
   return path.join(vaultRoot, PROJECTS_DIR, projectId, "notes");
 }
+
+export function logsDir(vaultRoot: string, projectId: string): string {
+  return path.join(vaultRoot, PROJECTS_DIR, projectId, "logs");
+}

@@ -273,15 +273,15 @@ title: <slug or omitted>
 
 ### Step 1 — Vault write core
 
-- [ ] `vault/layout.ts` — `logsDir(vaultRoot, projectId)`
-- [ ] `connector/vault.ts` — `resolveLogsDir(home, repo, vaultOverride?)`
-- [ ] `connector/git.ts` — `currentBranch(gitRoot)` (e.g. `git rev-parse --abbrev-ref HEAD`; return `undefined` on failure)
-- [ ] `vault/write-handoff.ts` — `writeHandoff(logsDir, body, { title?, projectId, branch?, now? })`
+- [x] `vault/layout.ts` — `logsDir(vaultRoot, projectId)`
+- [x] `connector/vault.ts` — `resolveLogsDir(home, repo, vaultOverride?)`
+- [x] `connector/git.ts` — `currentBranch(gitRoot)` (e.g. `git rev-parse --abbrev-ref HEAD`; return `undefined` on failure)
+- [x] `vault/write-handoff.ts` — `writeHandoff(logsDir, body, { title?, projectId, branch?, now? })`
   - mkdir `logsDir`
   - basename via same rules as notes
   - prepend YAML frontmatter + body
   - return written path
-- [ ] Tests: frontmatter fields, slug/collision, mkdir when missing
+- [x] Tests: frontmatter fields, slug/collision, mkdir when missing
 
 ### Step 2 — Handoff CLI
 
