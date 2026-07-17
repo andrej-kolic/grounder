@@ -285,12 +285,12 @@ title: <slug or omitted>
 
 ### Step 2 — Handoff CLI
 
-- [ ] `commands/handoff.ts` — `runHandoff(argv)` / `runHandoffWithOptions`
+- [x] `commands/handoff.ts` — `runHandoff(argv)` / `runHandoffWithOptions`
   - same link resolution as `note` (home → linked repo → logs dir)
   - `--title` flag
   - stdout: `Wrote <path>`
-- [ ] `cli.ts` — route `handoff` subcommand; update help text
-- [ ] `commands/repo/init.ts` — also `mkdir(logsDir)`; update “Will create” output
+- [x] `cli.ts` — route `handoff` subcommand; update help text
+- [x] `commands/repo/init.ts` — also `mkdir(logsDir)`; update “Will create” output
 
 ### Step 3 — Handoff tests
 
