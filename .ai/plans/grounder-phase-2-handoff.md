@@ -311,10 +311,10 @@ title: <slug or omitted>
 
 ### Step 5 — Recall CLI
 
-- [ ] `vault/list-handoffs.ts` — `listHandoffs(logsDir, { limit? })` → sorted `.md` paths, desc
-- [ ] `commands/handoff/list.ts` — `runHandoffList(argv)`; `--limit` default 5
-- [ ] `commands/path/logs.ts` — `runPathLogs(argv)` (mirror `path notes`)
-- [ ] `cli.ts` — route `handoff list` and `path logs`; update help
+- [x] `vault/list-handoffs.ts` — `listHandoffs(logsDir, { limit? })` → sorted `.md` paths, desc
+- [x] `commands/handoff/list.ts` — `runHandoffList(argv)`; `--limit` default 5
+- [x] `commands/path/logs.ts` — `runPathLogs(argv)` (mirror `path notes`)
+- [x] `cli.ts` — route `handoff list` and `path logs`; update help
 
 ### Step 6 — Recall tests
 
