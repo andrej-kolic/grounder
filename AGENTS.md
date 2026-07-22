@@ -15,23 +15,30 @@ Grounder is a Node CLI (`packages/grounder`) that wires project folders to perso
 connector/          # repo ↔ vault wiring (config stores + resolution)
   home.ts             # ~/.grounder/config.json
   repo.ts             # .grounder.json marker, findLinkedRepoRoot
-  vault.ts            # resolveVaultRoot, resolveNotesDir (config-aware)
+  linked.ts           # resolveLinkedProject (home + marker Result)
+  vault.ts            # resolveVaultRoot, resolveNotesDir/LogsDir (config-aware)
   git.ts              # findGitRoot
   project-id.ts       # detectProjectId
 vault/                # vault on disk
   layout.ts           # pure path conventions (10-Projects/…)
   write-note.ts       # note file I/O
+  write-handoff.ts    # handoff file I/O
+  list-handoffs.ts    # list logs/*.md newest-first
 commands/             # mirrors CLI structure
+  require-linked.ts   # CLI stderr wrapper around resolveLinkedProject
   vault/init.ts       # grounder vault init (agent-blind; uses agents registry)
   repo/init.ts        # grounder init
   note.ts             # grounder note
+  handoff.ts          # grounder handoff
+  handoff/list.ts     # grounder handoff list
   path/notes.ts       # grounder path notes
+  path/logs.ts        # grounder path logs
 agents/               # AgentAdapter registry (pluggable install targets)
   types.ts            # AgentAdapter interface
   index.ts            # resolveAgents(), detect
   cursor.ts           # Cursor adapter
   claude.ts           # Claude Code adapter
-util/                 # shared helpers (fs, parse-args, prompt, slugs)
+util/                 # shared helpers (fs, parse-args, prompt, slugs, path)
 ```
 
 Naming rule: `resolve*` = config/env aware; plain names in `vault/layout.ts` = pure path segments.

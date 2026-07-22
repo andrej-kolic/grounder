@@ -1,9 +1,9 @@
-import { currentBranch, findGitRoot } from "../connector/git.js";
-import { readHomeConfig, withHomeDir } from "../connector/home.js";
-import { findLinkedRepoRoot, readRepoConfig } from "../connector/repo.js";
+import { currentBranch } from "../connector/git.js";
+import { withHomeDir } from "../connector/home.js";
 import { resolveLogsDir } from "../connector/vault.js";
 import { writeHandoff } from "../vault/write-handoff.js";
 import { flagString, parseArgs } from "../util/parse-args.js";
+import { requireLinkedProject } from "./require-linked.js";
 
 /** Options for {@link runHandoffWithOptions} (CLI parsing and tests). */
 export interface HandoffOptions {
@@ -45,27 +45,12 @@ export async function runHandoff(argv: string[]): Promise<number> {
  */
 export async function runHandoffWithOptions(options: HandoffOptions): Promise<number> {
   return withHomeDir(options.homeDir, async () => {
-    const cwd = options.cwd ?? process.cwd();
-    const gitRoot = await findGitRoot(cwd);
-
-    const home = await readHomeConfig();
-    if (!home) {
-      process.stderr.write("No vault configured. Run: grounder vault init <path>\n");
+    const linked = await requireLinkedProject(options.cwd ?? process.cwd());
+    if (!linked) {
       return 1;
     }
 
-    const linkedRoot = await findLinkedRepoRoot(cwd, gitRoot);
-    if (!linkedRoot) {
-      process.stderr.write("Folder not linked. Run: grounder init\n");
-      return 1;
-    }
-
-    const repo = await readRepoConfig(linkedRoot);
-    if (!repo) {
-      process.stderr.write("Folder not linked. Run: grounder init\n");
-      return 1;
-    }
-
+    const { home, repo, gitRoot } = linked;
     const logsDir = resolveLogsDir(home, repo);
     const branch = gitRoot ? await currentBranch(gitRoot) : undefined;
     const writtenPath = await writeHandoff(logsDir, options.text, {
