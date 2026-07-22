@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { writeUniqueMarkdown } from "../util/fs.js";
 import { timestampedBasename } from "../util/timestamp-slug.js";
+import { yamlDoubleQuoted } from "../util/yaml.js";
 
 /** Options for {@link writeHandoff}. */
 export interface WriteHandoffOptions {
@@ -20,13 +21,13 @@ function buildFrontmatter(options: {
   created: string;
   title?: string;
 }): string {
-  const lines = ["---", `project: ${options.projectId}`];
+  const lines = ["---", `project: ${yamlDoubleQuoted(options.projectId)}`];
   if (options.branch) {
-    lines.push(`branch: ${options.branch}`);
+    lines.push(`branch: ${yamlDoubleQuoted(options.branch)}`);
   }
-  lines.push(`created: ${options.created}`);
+  lines.push(`created: ${yamlDoubleQuoted(options.created)}`);
   if (options.title) {
-    lines.push(`title: ${options.title}`);
+    lines.push(`title: ${yamlDoubleQuoted(options.title)}`);
   }
   lines.push("---");
   return `${lines.join("\n")}\n\n`;

@@ -40,15 +40,32 @@ describe("vault/write-handoff", () => {
     expect(await readFile(writtenPath, "utf8")).toBe(
       [
         "---",
-        "project: my-app",
-        "branch: main",
-        `created: ${fixedTime.toISOString()}`,
-        "title: auth",
+        'project: "my-app"',
+        'branch: "main"',
+        `created: "${fixedTime.toISOString()}"`,
+        'title: "auth"',
         "---",
         "",
         body,
       ].join("\n"),
     );
+  });
+
+  it("quotes title and branch so YAML stays valid", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const logsDir = path.join(env.vault, "logs");
+
+    const writtenPath = await writeHandoff(logsDir, body, {
+      projectId: "my-app",
+      branch: "feat/foo:bar",
+      title: "session: #1",
+      now: fixedTime,
+    });
+
+    const content = await readFile(writtenPath, "utf8");
+    expect(content).toContain('branch: "feat/foo:bar"\n');
+    expect(content).toContain('title: "session: #1"\n');
   });
 
   it("omits branch and title when not provided", async () => {
@@ -62,8 +79,8 @@ describe("vault/write-handoff", () => {
     });
 
     const content = await readFile(writtenPath, "utf8");
-    expect(content).toContain("project: my-app\n");
-    expect(content).toContain(`created: ${fixedTime.toISOString()}\n`);
+    expect(content).toContain('project: "my-app"\n');
+    expect(content).toContain(`created: "${fixedTime.toISOString()}"\n`);
     expect(content).not.toContain("branch:");
     expect(content).not.toContain("title:");
   });

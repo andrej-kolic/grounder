@@ -61,14 +61,14 @@ describe("commands/handoff", () => {
       "2026-06-26-143000-auth.md",
     );
     const content = await readFile(handoffPath, "utf8");
-    expect(content).toContain("project: my-app\n");
-    expect(content).toContain(`created: ${fixedTime.toISOString()}\n`);
-    expect(content).toContain("title: auth\n");
+    expect(content).toContain('project: "my-app"\n');
+    expect(content).toContain(`created: "${fixedTime.toISOString()}"\n`);
+    expect(content).toContain('title: "auth"\n');
     expect(content.endsWith(handoffBody)).toBe(true);
 
     const branch = await currentBranch(env.repo);
     if (branch) {
-      expect(content).toContain(`branch: ${branch}\n`);
+      expect(content).toContain(`branch: "${branch}"\n`);
     } else {
       expect(content).not.toContain("branch:");
     }
