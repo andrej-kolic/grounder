@@ -17,17 +17,17 @@ connector/          # repo ↔ vault wiring (config stores + resolution)
   repo.ts             # .grounder.json marker, findLinkedRepoRoot
   linked.ts           # resolveLinkedProject (home + marker Result)
   vault.ts            # resolveVaultRoot, resolveNotesDir/LogsDir (config-aware)
-  git.ts              # findGitRoot
+  git.ts              # findGitRoot, currentBranch (best-effort)
   project-id.ts       # detectProjectId
 vault/                # vault on disk
-  layout.ts           # pure path conventions (10-Projects/…)
+  layout.ts           # pure path conventions (10-Projects/… notes/ + logs/)
   write-note.ts       # note file I/O
-  write-handoff.ts    # handoff file I/O
+  write-handoff.ts    # handoff file I/O (frontmatter + body)
   list-handoffs.ts    # list logs/*.md newest-first
 commands/             # mirrors CLI structure
   require-linked.ts   # CLI stderr wrapper around resolveLinkedProject
   vault/init.ts       # grounder vault init (agent-blind; uses agents registry)
-  repo/init.ts        # grounder init
+  repo/init.ts        # grounder init (creates notes/ + logs/)
   note.ts             # grounder note
   handoff.ts          # grounder handoff
   handoff/list.ts     # grounder handoff list
@@ -50,10 +50,17 @@ Agent-agnostic core = `connector/`, `vault/`, most of `commands/`, `util/`. Agen
 ```text
 packages/grounder/templates/
   agents/
-    cursor/commands/grounder-note.md
-    claude/commands/grounder-note.md
-  vault/              # Phase 2+ vault scaffold
-  bridge/             # Phase 2+ bridge note
+    cursor/commands/
+      grounder-note.md
+      grounder-task.md            # recall — read-only hydrate
+      grounder-task-handoff.md    # write session checkpoint
+    claude/commands/
+      grounder-note.md
+      grounder-task.md
+      grounder-task-handoff.md
+  vault/
+    session-handoff.md            # lean section reference for slash commands
+  bridge/                         # deferred (Phase 2+)
 ```
 
 ## Commands
@@ -87,4 +94,5 @@ Run tests after every change. Keep dependencies minimal.
 
 Phase 1 complete: `.ai/plans/grounder-phase-1-minimal-connector.md`  
 Agent adapters (Option B): `.ai/plans/pluggable.md` — **implemented**  
+Phase 2 handoff: `.ai/plans/grounder-phase-2-handoff.md`  
 Phase 2+ reference: `.ai/plans/grounder-init-cli.md`

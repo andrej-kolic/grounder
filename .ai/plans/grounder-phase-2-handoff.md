@@ -1,8 +1,8 @@
 # Grounder Phase 2 — Session handoff (product idea)
 
-**Status:** implementation plan  
+**Status:** complete  
 **Created:** 2026-07-17  
-**Updated:** 2026-07-17 (implementation plan)  
+**Updated:** 2026-07-22 (step 8 polish)  
 **Basis:** `.ai/plans/grounder-product-idea.md`, `.ai/discussions/purpose.md`, design discussion 2026-07-17  
 **Builds on:** Phase 1 slim connector (`grounder note`, marker + home config + convention)
 
@@ -335,9 +335,9 @@ title: <slug or omitted>
 
 ### Step 8 — Polish
 
-- [ ] README: handoff quickstart (`handoff` → `/grounder-task-handoff` → `/grounder-task`)
-- [ ] `AGENTS.md` — document new modules if layout changed materially
-- [ ] Dogfood in `fixtures/dev/`
+- [x] README: handoff quickstart (`handoff` → `/grounder-task-handoff` → `/grounder-task`)
+- [x] `AGENTS.md` — document new modules if layout changed materially
+- [x] Dogfood in `fixtures/dev/`
 
 ---
 
