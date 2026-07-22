@@ -65,13 +65,15 @@ Each `/grounder-task-handoff` creates a **new** file under the project logs fold
 
 ```text
 10-Projects/{projectId}/logs/
-  2026-07-17T2030.md
-  2026-07-17T2030-session-loop.md   # optional title slug
+  2026-07-17-203045.md
+  2026-07-17-203045-session-loop.md   # optional title slug
+  2026-07-17-203045-session-loop_02.md  # collision (same second)
 ```
 
 | Rule | Decision |
 | --- | --- |
-| Naming | Timestamp prefix (sortable); optional `--title` / name slug appended |
+| Naming | Local-time `YYYY-MM-DD-HHmmss` prefix (sortable); optional `--title` / name slug appended |
+| Collisions | Exclusive create; append zero-padded `_NN` (`_02`, `_03`, …) so lex newest-first stays correct |
 | Multiple handoffs in one chat | Allowed — each is a new checkpoint; **newest wins** on resume |
 | Overwrite | Never — same no-clobber posture as notes |
 | “Latest” | Sort `logs/*` by filename; no bridge pointer required |
@@ -200,7 +202,7 @@ Order: **write path before recall**; within each side, **CLI before agent glue**
 | 1 | **One file per handoff** — never overwrite; newest filename wins on resume |
 | 2 | **Positional body** — same UX as `note`: agent supplies markdown body; no `--done` / `--next` flags |
 | 3 | **CLI prepends frontmatter** — `project`, `branch`, `created`, optional `title`; body is agent content |
-| 4 | **Filename** — reuse note slug rules: `YYYY-MM-DD-HHmm[-title].md`; second-precision + numeric suffix on collision |
+| 4 | **Filename** — `YYYY-MM-DD-HHmmss[-title].md`; collisions append `_NN` (exclusive `wx` create) |
 | 5 | **`logs/` on init** — create alongside `notes/` in `grounder init` |
 | 6 | **Branch** — best-effort from git at write time; omit if not in a git repo |
 | 7 | **Recall CLI** — list paths only (`handoff list`, `path logs`); agent reads file contents |
@@ -345,7 +347,7 @@ title: <slug or omitted>
 
 1. `grounder init` creates `10-Projects/{id}/logs/` alongside `notes/`.
 2. `grounder handoff "<body>"` writes a new `.md` in `logs/` with frontmatter; prints path; never overwrites.
-3. Second handoff in the same minute gets a distinct filename (second precision or suffix).
+3. Second handoff in the same second gets a distinct filename (`_NN` suffix).
 4. `grounder handoff list` prints newest paths first; empty when no logs.
 5. `grounder path logs` prints resolved logs directory.
 6. `/grounder-task-handoff` (via agent) invokes CLI; file appears in vault with expected sections.
