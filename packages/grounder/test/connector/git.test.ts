@@ -50,4 +50,17 @@ describe("connector/git", () => {
 
     expect(await currentBranch(env.repo)).toBeUndefined();
   });
+
+  it("returns undefined on detached HEAD", async () => {
+    const env = await createTempEnv();
+    cleanup = env.cleanup;
+
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(path.join(env.repo, "README.md"), "hi\n", "utf8");
+    execSync("git add README.md", { cwd: env.repo, stdio: "ignore" });
+    execSync('git commit -m "init"', { cwd: env.repo, stdio: "ignore" });
+    execSync("git checkout --detach HEAD", { cwd: env.repo, stdio: "ignore" });
+
+    expect(await currentBranch(env.repo)).toBeUndefined();
+  });
 });

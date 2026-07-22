@@ -37,7 +37,7 @@ export async function findGitRoot(startDir: string): Promise<string | null> {
 /**
  * Best-effort branch name via `git rev-parse --abbrev-ref HEAD`.
  * @returns Branch name, or `undefined` if git fails / output is empty
- *   (no commits, not a repo, detached edge cases, etc.).
+ *   / detached HEAD (`abbrev-ref` prints `HEAD`), etc.
  */
 export async function currentBranch(gitRoot: string): Promise<string | undefined> {
   try {
@@ -47,7 +47,10 @@ export async function currentBranch(gitRoot: string): Promise<string | undefined
       { cwd: gitRoot, encoding: "utf8" },
     );
     const branch = String(stdout).trim();
-    return branch || undefined;
+    if (!branch || branch === "HEAD") {
+      return undefined;
+    }
+    return branch;
   } catch {
     return undefined;
   }
