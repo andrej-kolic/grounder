@@ -318,9 +318,9 @@ title: <slug or omitted>
 
 ### Step 6 — Recall tests
 
-- [ ] `test/vault/list-handoffs.test.ts` — sort order, limit, empty dir
-- [ ] `test/commands/handoff/list.test.ts` + `test/commands/path/logs.test.ts`
-- [ ] `pnpm test` green
+- [x] `test/vault/list-handoffs.test.ts` — sort order, limit, empty dir
+- [x] `test/commands/handoff/list.test.ts` + `test/commands/path/logs.test.ts`
+- [x] `pnpm test` green
 
 ### Step 7 — Recall agent glue
 
