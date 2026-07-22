@@ -300,14 +300,14 @@ title: <slug or omitted>
 
 ### Step 4 — Handoff agent glue
 
-- [ ] `templates/vault/session-handoff.md` — lean section reference (Done / Next / Blockers / Decisions / Files)
-- [ ] `templates/agents/cursor/commands/grounder-task-handoff.md`
+- [x] `templates/vault/session-handoff.md` — lean section reference (Done / Next / Blockers / Decisions / Files)
+- [x] `templates/agents/cursor/commands/grounder-task-handoff.md`
   - summarize session into template (not transcript)
   - run `npx grounder handoff "<body>"` with optional `--title`
   - do not compute vault paths or write files directly
-- [ ] `templates/agents/claude/commands/grounder-task-handoff.md` — same instructions
-- [ ] Extend `agents/cursor.ts` + `agents/claude.ts` — install new command(s) on `vault init` (skip if exists unless `--force`)
-- [ ] Tests: adapter install copies new templates
+- [x] `templates/agents/claude/commands/grounder-task-handoff.md` — same instructions
+- [x] Extend `agents/cursor.ts` + `agents/claude.ts` — install new command(s) on `vault init` (skip if exists unless `--force`)
+- [x] Tests: adapter install copies new templates
 
 ### Step 5 — Recall CLI
 

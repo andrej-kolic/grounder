@@ -3,7 +3,10 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
 import { homeConfigPath } from "../../../src/connector/home.js";
-import { grounderNoteCommandPath } from "../../../src/agents/cursor.js";
+import {
+  grounderNoteCommandPath,
+  grounderTaskHandoffCommandPath,
+} from "../../../src/agents/cursor.js";
 import { createTempEnv } from "../../helpers.js";
 
 describe("commands/vault/init", () => {
@@ -16,7 +19,7 @@ describe("commands/vault/init", () => {
     }
   });
 
-  it("creates home config, vault scaffold, and cursor command", async () => {
+  it("creates home config, vault scaffold, and cursor commands", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
@@ -36,6 +39,9 @@ describe("commands/vault/init", () => {
     expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain(
       "approve shell permissions",
     );
+    expect(await readFile(grounderTaskHandoffCommandPath(env.home), "utf8")).toContain(
+      "npx grounder handoff",
+    );
   });
 
   it("is idempotent on re-run", async () => {
@@ -43,7 +49,8 @@ describe("commands/vault/init", () => {
     cleanup = env.cleanup;
 
     await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home, agents: ["cursor"] });
-    const commandBefore = await readFile(grounderNoteCommandPath(env.home), "utf8");
+    const noteBefore = await readFile(grounderNoteCommandPath(env.home), "utf8");
+    const handoffBefore = await readFile(grounderTaskHandoffCommandPath(env.home), "utf8");
 
     const code = await runVaultInitWithOptions({
       vaultPath: env.vault,
@@ -53,7 +60,8 @@ describe("commands/vault/init", () => {
     });
 
     expect(code).toBe(0);
-    expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toBe(commandBefore);
+    expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toBe(noteBefore);
+    expect(await readFile(grounderTaskHandoffCommandPath(env.home), "utf8")).toBe(handoffBefore);
   });
 
   it("returns error before prompting when vault already configured to a different path", async () => {
