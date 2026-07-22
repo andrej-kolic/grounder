@@ -2,7 +2,7 @@
 
 **Status:** idea only (no implementation plan)  
 **Created:** 2026-07-17  
-**Basis:** `.ai/plans/grounder-init-cli.md` (original vision), filtered by `.ai/discussions/purpose.md` and `.ai/analysis-1.md`, on top of the slim Phase 1 connector.
+**Basis:** `.ai/plans/grounder-init-cli.md` (original vision), filtered by `.ai/discussions/purpose.md` and `.ai/discussions/analysis-1.md`, on top of the slim Phase 1 connector.
 
 > Implementation details are out of scope here. See Phase 1 plan + `AGENTS.md` for what already shipped.
 
@@ -182,9 +182,9 @@ Ship for layers 1–4 first. Layer 5 fills out the command surface. Layers 6–7
 | --- | --- |
 | `grounder-product-idea.md` (this) | Product idea — what and why |
 | `grounder-phase-1-minimal-connector.md` | What shipped (connector + note) |
-| `pluggable.md` | Agent adapter architecture (shipped) |
-| `purpose.md` | Market / value thesis (source for priorities here) |
-| `analysis-1.md` | Earlier snapshot; priorities superseded by this doc where they conflict |
+| `.ai/discussions/pluggable.md` | Agent adapter architecture (shipped) |
+| `.ai/discussions/purpose.md` | Market / value thesis (source for priorities here) |
+| `.ai/discussions/analysis-1.md` | Earlier snapshot; priorities superseded by this doc where they conflict |
 | `grounder-init-cli.md` | Historical full vision — reference only, not the active roadmap |
 
 ---

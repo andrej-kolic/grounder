@@ -56,6 +56,6 @@ Agent-agnostic core (`connector/`, `vault/`, `commands/`) plus a pluggable `agen
 ## Plan
 
 Phase 1: [.ai/plans/grounder-phase-1-minimal-connector.md](.ai/plans/grounder-phase-1-minimal-connector.md)  
-Agent adapters (implemented): [.ai/plans/pluggable.md](.ai/plans/pluggable.md)  
+Agent adapters (implemented): [.ai/discussions/pluggable.md](.ai/discussions/pluggable.md)  
 Phase 2 handoff: [.ai/plans/grounder-phase-2-handoff.md](.ai/plans/grounder-phase-2-handoff.md)  
 Full roadmap: [.ai/plans/grounder-init-cli.md](.ai/plans/grounder-init-cli.md)

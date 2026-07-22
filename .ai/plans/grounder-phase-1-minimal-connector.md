@@ -388,7 +388,7 @@ util/                 # fs, project-id, note-slug, parse-args, prompt
 
 Naming: `resolve*` = config/env aware; plain names in `vault/layout.ts` = pure paths.
 
-Post–Phase 1: Cursor install moved from `cursor/` into `agents/` (see [.ai/plans/pluggable.md](pluggable.md)).
+Post–Phase 1: Cursor install moved from `cursor/` into `agents/` (see [.ai/discussions/pluggable.md](../discussions/pluggable.md)).
 
 ---
 
@@ -434,7 +434,7 @@ Validated: `/grounder-note` → agent runs `npx grounder note` from `fixtures/de
 - [x] `commands/vault/init.ts` — parse `[path]`, `--yes`, `--force`
 - [x] Write home config
 - [x] Create `10-Projects/` in vault if missing
-- [x] `agents/cursor.ts` — install slash command template (was `cursor/grounder-note.ts`; see pluggable.md)
+- [x] `agents/cursor.ts` — install slash command template (was `cursor/grounder-note.ts`; see `.ai/discussions/pluggable.md`)
 - [x] Confirm prompt + `--yes` skip
 - [x] Tests: temp HOME, assert files created, re-run idempotent
 
@@ -537,4 +537,4 @@ Validated: `/grounder-note` → agent runs `npx grounder note` from `fixtures/de
 ## Links
 
 - Full plan (later phases): `.ai/plans/grounder-init-cli.md`
-- Product discussion: `.ai/plans/discussions/purpose.md`
+- Product discussion: `.ai/discussions/purpose.md`

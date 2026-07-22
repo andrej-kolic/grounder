@@ -364,7 +364,7 @@ packages/grounder/
 │   │   ├── path/notes.ts
 │   │   ├── status.ts             # Phase 2+
 │   │   └── doctor.ts             # Phase 2+
-│   ├── agents/                   # shipped (Option B — pluggable.md)
+│   ├── agents/                   # shipped (Option B — .ai/discussions/pluggable.md)
 │   │   ├── types.ts
 │   │   ├── index.ts
 │   │   ├── cursor.ts

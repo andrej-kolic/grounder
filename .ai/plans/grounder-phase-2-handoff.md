@@ -187,7 +187,7 @@ A developer feels Phase 2 worked when:
 | `grounder-phase-1-minimal-connector.md` | What shipped (connector + note) |
 | `grounder-phase-2-handoff.md` (this) | Product idea for handoff / session continuity |
 | `grounder-init-cli.md` | Historical full vision — reference only where it does not conflict |
-| `purpose.md` | Market thesis (handoff quality, recall budget, governance) |
+| `.ai/discussions/purpose.md` | Market thesis (handoff quality, recall budget, governance) |
 
 ---
 

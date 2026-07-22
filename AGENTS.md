@@ -93,6 +93,6 @@ Run tests after every change. Keep dependencies minimal.
 ## Plan
 
 Phase 1 complete: `.ai/plans/grounder-phase-1-minimal-connector.md`  
-Agent adapters (Option B): `.ai/plans/pluggable.md` — **implemented**  
+Agent adapters (Option B): `.ai/discussions/pluggable.md` — **implemented**  
 Phase 2 handoff: `.ai/plans/grounder-phase-2-handoff.md`  
 Phase 2+ reference: `.ai/plans/grounder-init-cli.md`
