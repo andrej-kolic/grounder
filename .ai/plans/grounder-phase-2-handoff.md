@@ -324,14 +324,14 @@ title: <slug or omitted>
 
 ### Step 7 — Recall agent glue
 
-- [ ] `templates/agents/cursor/commands/grounder-task.md`
+- [x] `templates/agents/cursor/commands/grounder-task.md`
   - run `grounder handoff list --limit 5` (or `path logs` + read newest)
   - read newest handoff file + repo `AGENTS.md`
   - if no handoffs: say so, read `AGENTS.md` only
   - read-only — no vault writes
-- [ ] `templates/agents/claude/commands/grounder-task.md` — same
-- [ ] Extend adapters to install recall command(s)
-- [ ] Tests: adapter install
+- [x] `templates/agents/claude/commands/grounder-task.md` — same
+- [x] Extend adapters to install recall command(s)
+- [x] Tests: adapter install
 
 ### Step 8 — Polish
 

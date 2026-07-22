@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   cursor,
   grounderNoteCommandPath,
+  grounderTaskCommandPath,
   grounderTaskHandoffCommandPath,
 } from "../../src/agents/cursor.js";
 import { createTempEnv } from "../helpers.js";
@@ -26,24 +27,31 @@ describe("agents/cursor", () => {
       expect(grounderTaskHandoffCommandPath("/home/user")).toBe(
         "/home/user/.cursor/commands/grounder-task-handoff.md",
       );
+      expect(grounderTaskCommandPath("/home/user")).toBe(
+        "/home/user/.cursor/commands/grounder-task.md",
+      );
     });
   });
 
   describe("cursor.install", () => {
-    it("creates note and handoff command files", async () => {
+    it("creates note, handoff, and task command files", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
 
       const result = await cursor.install({ homeDir: env.home });
       const noteDest = grounderNoteCommandPath(env.home);
       const handoffDest = grounderTaskHandoffCommandPath(env.home);
+      const taskDest = grounderTaskCommandPath(env.home);
 
       expect(result.artifacts[noteDest]).toBe("created");
       expect(result.artifacts[handoffDest]).toBe("created");
+      expect(result.artifacts[taskDest]).toBe("created");
       await access(noteDest);
       await access(handoffDest);
+      await access(taskDest);
       expect(await readFile(noteDest, "utf8")).toContain("npx grounder note");
       expect(await readFile(handoffDest, "utf8")).toContain("npx grounder handoff");
+      expect(await readFile(taskDest, "utf8")).toContain("npx grounder handoff list");
     });
 
     it("skips existing files and creates missing ones", async () => {
@@ -56,11 +64,14 @@ describe("agents/cursor", () => {
 
       const result = await cursor.install({ homeDir: env.home });
       const handoffDest = grounderTaskHandoffCommandPath(env.home);
+      const taskDest = grounderTaskCommandPath(env.home);
 
       expect(result.artifacts[noteDest]).toBe("skipped");
       expect(result.artifacts[handoffDest]).toBe("created");
+      expect(result.artifacts[taskDest]).toBe("created");
       expect(await readFile(noteDest, "utf8")).toBe("custom note command\n");
       expect(await readFile(handoffDest, "utf8")).toContain("npx grounder handoff");
+      expect(await readFile(taskDest, "utf8")).toContain("npx grounder handoff list");
     });
 
     it("skips if already exists and force is false", async () => {
@@ -71,9 +82,11 @@ describe("agents/cursor", () => {
       const result = await cursor.install({ homeDir: env.home });
       const noteDest = grounderNoteCommandPath(env.home);
       const handoffDest = grounderTaskHandoffCommandPath(env.home);
+      const taskDest = grounderTaskCommandPath(env.home);
 
       expect(result.artifacts[noteDest]).toBe("skipped");
       expect(result.artifacts[handoffDest]).toBe("skipped");
+      expect(result.artifacts[taskDest]).toBe("skipped");
     });
 
     it("overwrites if force is true", async () => {
@@ -84,9 +97,11 @@ describe("agents/cursor", () => {
       const result = await cursor.install({ homeDir: env.home, force: true });
       const noteDest = grounderNoteCommandPath(env.home);
       const handoffDest = grounderTaskHandoffCommandPath(env.home);
+      const taskDest = grounderTaskCommandPath(env.home);
 
       expect(result.artifacts[noteDest]).toBe("overwritten");
       expect(result.artifacts[handoffDest]).toBe("overwritten");
+      expect(result.artifacts[taskDest]).toBe("overwritten");
     });
   });
 

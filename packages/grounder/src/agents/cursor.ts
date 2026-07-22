@@ -8,7 +8,7 @@ import type { AgentAdapter, AgentInstallOptions, AgentInstallResult, ArtifactSta
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const templateDir = path.join(pkgRoot, "templates", "agents", "cursor", "commands");
 
-const COMMANDS = ["grounder-note.md", "grounder-task-handoff.md"] as const;
+const COMMANDS = ["grounder-note.md", "grounder-task-handoff.md", "grounder-task.md"] as const;
 
 export function cursorCommandsDir(homeDir?: string): string {
   return path.join(resolveHomeDir(homeDir), ".cursor", "commands");
@@ -20,6 +20,10 @@ export function grounderNoteCommandPath(homeDir?: string): string {
 
 export function grounderTaskHandoffCommandPath(homeDir?: string): string {
   return path.join(cursorCommandsDir(homeDir), "grounder-task-handoff.md");
+}
+
+export function grounderTaskCommandPath(homeDir?: string): string {
+  return path.join(cursorCommandsDir(homeDir), "grounder-task.md");
 }
 
 async function installCommand(
