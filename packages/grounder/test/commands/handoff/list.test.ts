@@ -128,6 +128,11 @@ describe("commands/handoff/list", () => {
     expect(code).toBe(1);
   });
 
+  it("returns usage error for unexpected positionals", async () => {
+    const code = await runHandoffList(["remaining", "work"]);
+    expect(code).toBe(1);
+  });
+
   it("finds link walking up from a nested cwd", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;

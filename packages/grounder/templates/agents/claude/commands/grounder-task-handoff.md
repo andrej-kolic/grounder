@@ -40,11 +40,13 @@ Optional short title slug (filename + frontmatter):
 
 For multi-line bodies, prefer a shell heredoc so quoting does not break:
 
-  npx grounder handoff "$(cat <<'EOF'
-  # Handoff: …
-  …
-  EOF
-  )"
+```bash
+npx grounder handoff "$(cat <<'EOF'
+# Handoff: …
+…
+EOF
+)"
+```
 
 The vault is outside the workspace — grant shell permissions if Claude Code prompts you.
 

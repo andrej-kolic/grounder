@@ -21,7 +21,12 @@ export interface HandoffListOptions {
  * @returns Exit code (`0` on success, `1` on usage or config errors).
  */
 export async function runHandoffList(argv: string[]): Promise<number> {
-  const { flags } = parseArgs(argv);
+  const { positional, flags } = parseArgs(argv);
+  if (positional.length > 0) {
+    process.stderr.write("Usage: grounder handoff list [--limit <n>]\n");
+    return 1;
+  }
+
   const limitRaw = flagString(flags, "limit");
   let limit = DEFAULT_LIMIT;
   if (limitRaw !== undefined) {
