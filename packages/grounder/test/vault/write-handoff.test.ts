@@ -118,4 +118,26 @@ describe("vault/write-handoff", () => {
 
     expect(writtenPath).toBe(path.join(logsDir, "2026-06-26-143000-dup_03.md"));
   });
+
+  it("does not clobber under concurrent same-slug writes", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const logsDir = path.join(env.vault, "logs");
+
+    const results = await Promise.all(
+      Array.from({ length: 8 }, (_, i) =>
+        writeHandoff(logsDir, `body-${i}`, {
+          projectId: "my-app",
+          title: "race",
+          now: fixedTime,
+        }),
+      ),
+    );
+
+    const unique = new Set(results);
+    expect(unique.size).toBe(8);
+    for (const filePath of results) {
+      expect(await readFile(filePath, "utf8")).toMatch(/^---\n/);
+    }
+  });
 });

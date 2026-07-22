@@ -1,36 +1,15 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { fileExists } from "../util/fs.js";
-import { collisionSuffix, timestampedBasename } from "../util/timestamp-slug.js";
+import { mkdir } from "node:fs/promises";
+import { writeUniqueMarkdown } from "../util/fs.js";
+import { timestampedBasename } from "../util/timestamp-slug.js";
 
 export interface WriteNoteOptions {
   title?: string;
   now?: Date;
 }
 
-async function resolveNotePath(
-  notesDir: string,
-  text: string,
-  options: WriteNoteOptions,
-): Promise<string> {
-  const now = options.now ?? new Date();
-  const basename = timestampedBasename(text, { title: options.title, now });
-  let filePath = path.join(notesDir, `${basename}.md`);
-
-  if (await fileExists(filePath)) {
-    let n = 2;
-    while (await fileExists(path.join(notesDir, `${basename}${collisionSuffix(n)}.md`))) {
-      n += 1;
-    }
-    filePath = path.join(notesDir, `${basename}${collisionSuffix(n)}.md`);
-  }
-
-  return filePath;
-}
-
 /**
  * Writes a new note markdown file under `notesDir` (created if missing).
- * Never overwrites — collisions append a `_NN` suffix.
+ * Never overwrites — exclusive create with `_NN` on collision.
  * @returns Absolute path of the written file.
  */
 export async function writeNote(
@@ -41,7 +20,6 @@ export async function writeNote(
   const now = options.now ?? new Date();
   await mkdir(notesDir, { recursive: true });
 
-  const filePath = await resolveNotePath(notesDir, text, options);
-  await writeFile(filePath, text, "utf8");
-  return filePath;
+  const basename = timestampedBasename(text, { title: options.title, now });
+  return writeUniqueMarkdown(notesDir, basename, text);
 }

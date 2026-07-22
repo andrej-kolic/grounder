@@ -1,7 +1,6 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { fileExists } from "../util/fs.js";
-import { collisionSuffix, timestampedBasename } from "../util/timestamp-slug.js";
+import { mkdir } from "node:fs/promises";
+import { writeUniqueMarkdown } from "../util/fs.js";
+import { timestampedBasename } from "../util/timestamp-slug.js";
 
 /** Options for {@link writeHandoff}. */
 export interface WriteHandoffOptions {
@@ -13,28 +12,6 @@ export interface WriteHandoffOptions {
   branch?: string;
   /** Timestamp for filename prefix and `created` (default: now). */
   now?: Date;
-}
-
-async function resolveHandoffPath(
-  logsDir: string,
-  body: string,
-  options: { title?: string; now: Date },
-): Promise<string> {
-  const basename = timestampedBasename(body, {
-    title: options.title,
-    now: options.now,
-  });
-  let filePath = path.join(logsDir, `${basename}.md`);
-
-  if (await fileExists(filePath)) {
-    let n = 2;
-    while (await fileExists(path.join(logsDir, `${basename}${collisionSuffix(n)}.md`))) {
-      n += 1;
-    }
-    filePath = path.join(logsDir, `${basename}${collisionSuffix(n)}.md`);
-  }
-
-  return filePath;
 }
 
 function buildFrontmatter(options: {
@@ -58,7 +35,7 @@ function buildFrontmatter(options: {
 /**
  * Writes a new handoff markdown file under `logsDir` (created if missing).
  * Prepends YAML frontmatter (`project`, optional `branch`/`title`, `created`)
- * ahead of `body`. Never overwrites — collisions append a `_NN` suffix.
+ * ahead of `body`. Never overwrites — exclusive create with `_NN` on collision.
  * @param logsDir - Absolute project logs directory.
  * @param body - Agent-supplied markdown (sections such as Done / Next); not validated here.
  * @returns Absolute path of the written file.
@@ -71,11 +48,10 @@ export async function writeHandoff(
   const now = options.now ?? new Date();
   await mkdir(logsDir, { recursive: true });
 
-  const filePath = await resolveHandoffPath(logsDir, body, {
+  const basename = timestampedBasename(body, {
     title: options.title,
     now,
   });
-
   const content =
     buildFrontmatter({
       projectId: options.projectId,
@@ -84,6 +60,5 @@ export async function writeHandoff(
       title: options.title,
     }) + body;
 
-  await writeFile(filePath, content, "utf8");
-  return filePath;
+  return writeUniqueMarkdown(logsDir, basename, content);
 }
