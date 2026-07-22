@@ -16,6 +16,7 @@ import {
   resolveNotesDir,
   resolveVaultRoot,
 } from "../../connector/vault.js";
+import { resolveUserPath } from "../../util/path.js";
 import { confirm } from "../../util/prompt.js";
 import { flagBool, flagString, parseArgs } from "../../util/parse-args.js";
 
@@ -54,7 +55,7 @@ export async function runRepoInitWithOptions(
     }
 
     if (!home && options.vault) {
-      home = { vaultRoot: path.resolve(options.vault) };
+      home = { vaultRoot: resolveUserPath(options.vault) };
     }
 
     const vaultRoot = resolveVaultRoot(home!, options.vault);

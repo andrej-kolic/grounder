@@ -1,4 +1,5 @@
 import path from "node:path";
+import os from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import { writeHomeConfig } from "../../src/connector/home.js";
 import {
@@ -31,6 +32,24 @@ describe("connector/vault", () => {
     expect(resolved).toBe(path.resolve(overrideVault));
 
     delete process.env.GROUNDER_VAULT;
+  });
+
+  it("expands leading ~ in vault root and overrides", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    const prevHome = process.env.GROUNDER_HOME;
+    process.env.GROUNDER_HOME = env.home;
+    try {
+      const tildeVault = "~/Documents/obsidian/dev";
+      const expected = path.join(os.homedir(), "Documents/obsidian/dev");
+
+      expect(resolveVaultRoot({ vaultRoot: tildeVault })).toBe(expected);
+      expect(resolveVaultRoot({ vaultRoot: env.vault }, tildeVault)).toBe(expected);
+    } finally {
+      if (prevHome === undefined) delete process.env.GROUNDER_HOME;
+      else process.env.GROUNDER_HOME = prevHome;
+    }
   });
 
   it("resolves notes dir from home and repo config", async () => {

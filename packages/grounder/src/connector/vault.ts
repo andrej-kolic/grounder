@@ -1,20 +1,21 @@
 // Config-aware vault resolution: effective vault root and artifact paths from connector state.
-import path from "node:path";
 import type { HomeConfig } from "./home.js";
 import type { RepoConfig } from "./repo.js";
+import { resolveUserPath } from "../util/path.js";
 import { logsDir, notesDir } from "../vault/layout.js";
 
 /**
  * Effective vault root, in order: explicit `override`, `GROUNDER_VAULT`, then home config.
+ * Expands a leading `~` so vault paths like `~/Documents/…` resolve to the user home.
  */
 export function resolveVaultRoot(home: HomeConfig, override?: string): string {
   if (override) {
-    return path.resolve(override);
+    return resolveUserPath(override);
   }
   if (process.env.GROUNDER_VAULT) {
-    return path.resolve(process.env.GROUNDER_VAULT);
+    return resolveUserPath(process.env.GROUNDER_VAULT);
   }
-  return path.resolve(home.vaultRoot);
+  return resolveUserPath(home.vaultRoot);
 }
 
 /** Project notes directory under the effective vault root. */
