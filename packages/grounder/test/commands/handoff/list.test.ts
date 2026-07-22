@@ -124,8 +124,11 @@ describe("commands/handoff/list", () => {
   });
 
   it("returns usage error for invalid --limit", async () => {
-    const code = await runHandoffList(["--limit", "abc"]);
-    expect(code).toBe(1);
+    expect(await runHandoffList(["--limit", "abc"])).toBe(1);
+    expect(await runHandoffList(["--limit", "0"])).toBe(1);
+    expect(await runHandoffList(["--limit"])).toBe(1);
+    expect(await runHandoffList(["--limit", "-1"])).toBe(1);
+    expect(await runHandoffList(["--unknown"])).toBe(1);
   });
 
   it("returns usage error for unexpected positionals", async () => {

@@ -1,7 +1,7 @@
 import { withHomeDir } from "../../connector/home.js";
 import { resolveLogsDir } from "../../connector/vault.js";
 import { listHandoffs } from "../../vault/list-handoffs.js";
-import { flagString, parseArgs } from "../../util/parse-args.js";
+import { parseArgs } from "../../util/parse-args.js";
 import { requireLinkedProject } from "../require-linked.js";
 
 const DEFAULT_LIMIT = 5;
@@ -16,25 +16,40 @@ export interface HandoffListOptions {
   homeDir?: string;
 }
 
+const USAGE = "Usage: grounder handoff list [--limit <n>]\n";
+
+function usageError(): number {
+  process.stderr.write(USAGE);
+  return 1;
+}
+
 /**
  * CLI entry for `grounder handoff list [--limit <n>]`.
+ * `--limit` must be a positive integer when provided.
  * @returns Exit code (`0` on success, `1` on usage or config errors).
  */
 export async function runHandoffList(argv: string[]): Promise<number> {
   const { positional, flags } = parseArgs(argv);
   if (positional.length > 0) {
-    process.stderr.write("Usage: grounder handoff list [--limit <n>]\n");
-    return 1;
+    return usageError();
   }
 
-  const limitRaw = flagString(flags, "limit");
+  for (const key of flags.keys()) {
+    if (key !== "limit") {
+      return usageError();
+    }
+  }
+
+  const limitRaw = flags.get("limit");
   let limit = DEFAULT_LIMIT;
   if (limitRaw !== undefined) {
+    if (typeof limitRaw !== "string") {
+      return usageError();
+    }
     const trimmed = limitRaw.trim();
     const parsed = Number.parseInt(trimmed, 10);
-    if (!/^\d+$/.test(trimmed) || Number.isNaN(parsed)) {
-      process.stderr.write("Usage: grounder handoff list [--limit <n>]\n");
-      return 1;
+    if (!/^\d+$/.test(trimmed) || Number.isNaN(parsed) || parsed < 1) {
+      return usageError();
     }
     limit = parsed;
   }
