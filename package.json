@@ -4,6 +4,7 @@
   "description": "Monorepo for the Grounder CLI",
   "scripts": {
     "build": "pnpm --filter grounder build",
+    "typecheck": "pnpm --filter grounder typecheck",
     "test": "pnpm -r test",
     "grounder": "node packages/grounder/dist/cli.js",
     "fixture:setup": "node scripts/fixture-setup.mjs"
