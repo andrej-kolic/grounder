@@ -1,5 +1,4 @@
 import { mkdir } from "node:fs/promises";
-import path from "node:path";
 import {
   homeConfigPath,
   readHomeConfig,
@@ -8,6 +7,7 @@ import {
 } from "../../connector/home.js";
 import { resolveAgents } from "../../agents/index.js";
 import { projectsParent } from "../../vault/layout.js";
+import { resolveUserPath } from "../../util/path.js";
 import { confirm } from "../../util/prompt.js";
 import { flagBool, flagStrings, parseArgs } from "../../util/parse-args.js";
 
@@ -44,7 +44,7 @@ export async function runVaultInitWithOptions(
   options: VaultInitOptions,
 ): Promise<number> {
   return withHomeDir(options.homeDir, async () => {
-    const vaultRoot = path.resolve(options.vaultPath);
+    const vaultRoot = resolveUserPath(options.vaultPath);
     const yes = options.yes ?? false;
     const force = options.force ?? false;
     const homeDir = options.homeDir;

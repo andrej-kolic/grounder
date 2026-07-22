@@ -25,7 +25,7 @@ describe("vault/write-note", () => {
       now: fixedTime,
     });
     expect(writtenPath).toBe(
-      path.join(notesDir, "2026-06-26-1430-investigate-auth-mid.md"),
+      path.join(notesDir, "2026-06-26-143000-investigate-auth-mid.md"),
     );
     expect(await readFile(writtenPath, "utf8")).toBe("Investigate auth middleware");
   });
@@ -39,7 +39,7 @@ describe("vault/write-note", () => {
       title: "Custom Title",
       now: fixedTime,
     });
-    expect(writtenPath).toBe(path.join(notesDir, "2026-06-26-1430-custom-title.md"));
+    expect(writtenPath).toBe(path.join(notesDir, "2026-06-26-143000-custom-title.md"));
   });
 
   it("truncates long text to a short slug", async () => {
@@ -51,12 +51,12 @@ describe("vault/write-note", () => {
 
     const writtenPath = await writeNote(notesDir, text, { now: fixedTime });
     expect(writtenPath).toBe(
-      path.join(notesDir, "2026-06-26-1430-very-long-very-long.md"),
+      path.join(notesDir, "2026-06-26-143000-very-long-very-long.md"),
     );
     expect(await readFile(writtenPath, "utf8")).toBe(text);
   });
 
-  it("uses second precision on slug collision", async () => {
+  it("uses _NN suffix on slug collision", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
     const notesDir = path.join(env.vault, "notes");
@@ -64,8 +64,8 @@ describe("vault/write-note", () => {
     const first = await writeNote(notesDir, "first", { title: "dup", now: fixedTime });
     const second = await writeNote(notesDir, "second", { title: "dup", now: fixedTime });
 
-    expect(first).toBe(path.join(notesDir, "2026-06-26-1430-dup.md"));
-    expect(second).toBe(path.join(notesDir, "2026-06-26-143000-dup.md"));
+    expect(first).toBe(path.join(notesDir, "2026-06-26-143000-dup.md"));
+    expect(second).toBe(path.join(notesDir, "2026-06-26-143000-dup_02.md"));
     expect(await readFile(second, "utf8")).toBe("second");
   });
 });

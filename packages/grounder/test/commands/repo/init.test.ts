@@ -24,7 +24,7 @@ describe("commands/repo/init", () => {
     return env;
   }
 
-  it("writes repo marker and creates notes folder", async () => {
+  it("writes repo marker and creates notes and logs folders", async () => {
     const env = await setupLinkedEnv();
     cleanup = env.cleanup;
 
@@ -38,6 +38,7 @@ describe("commands/repo/init", () => {
     expect(await readRepoConfig(env.repo)).toEqual({ version: 1, projectId: "my-app" });
     const { access } = await import("node:fs/promises");
     await access(path.join(env.vault, "10-Projects", "my-app", "notes"));
+    await access(path.join(env.vault, "10-Projects", "my-app", "logs"));
   });
 
   it("is safe to run twice", async () => {

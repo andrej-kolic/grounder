@@ -1,7 +1,12 @@
 import path from "node:path";
+import os from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import { writeHomeConfig } from "../../src/connector/home.js";
-import { resolveNotesDir, resolveVaultRoot } from "../../src/connector/vault.js";
+import {
+  resolveLogsDir,
+  resolveNotesDir,
+  resolveVaultRoot,
+} from "../../src/connector/vault.js";
 import { createTempEnv } from "../helpers.js";
 
 describe("connector/vault", () => {
@@ -29,6 +34,24 @@ describe("connector/vault", () => {
     delete process.env.GROUNDER_VAULT;
   });
 
+  it("expands leading ~ in vault root and overrides", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    const prevHome = process.env.GROUNDER_HOME;
+    process.env.GROUNDER_HOME = env.home;
+    try {
+      const tildeVault = "~/Documents/obsidian/dev";
+      const expected = path.join(os.homedir(), "Documents/obsidian/dev");
+
+      expect(resolveVaultRoot({ vaultRoot: tildeVault })).toBe(expected);
+      expect(resolveVaultRoot({ vaultRoot: env.vault }, tildeVault)).toBe(expected);
+    } finally {
+      if (prevHome === undefined) delete process.env.GROUNDER_HOME;
+      else process.env.GROUNDER_HOME = prevHome;
+    }
+  });
+
   it("resolves notes dir from home and repo config", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
@@ -38,6 +61,18 @@ describe("connector/vault", () => {
 
     expect(resolveNotesDir(home, repo)).toBe(
       path.join(env.vault, "10-Projects", "my-app", "notes"),
+    );
+  });
+
+  it("resolves logs dir from home and repo config", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    const home = { vaultRoot: env.vault };
+    const repo = { version: 1 as const, projectId: "my-app" };
+
+    expect(resolveLogsDir(home, repo)).toBe(
+      path.join(env.vault, "10-Projects", "my-app", "logs"),
     );
   });
 });

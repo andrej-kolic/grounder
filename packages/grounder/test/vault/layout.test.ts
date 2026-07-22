@@ -1,6 +1,6 @@
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { notesDir, projectDir, projectsParent } from "../../src/vault/layout.js";
+import { logsDir, notesDir, projectDir, projectsParent } from "../../src/vault/layout.js";
 import { createTempEnv } from "../helpers.js";
 
 describe("vault/layout", () => {
@@ -23,6 +23,9 @@ describe("vault/layout", () => {
     );
     expect(notesDir(env.vault, "my-app")).toBe(
       path.join(env.vault, "10-Projects", "my-app", "notes"),
+    );
+    expect(logsDir(env.vault, "my-app")).toBe(
+      path.join(env.vault, "10-Projects", "my-app", "logs"),
     );
   });
 });

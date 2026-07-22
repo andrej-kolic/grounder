@@ -32,7 +32,12 @@ pnpm grounder vault init ~/Documents/obsidian/dev --yes   # once per machine
 cd fixtures/dev
 pnpm grounder init --yes
 pnpm grounder note "hello from dev fixture"
+pnpm grounder handoff "# Handoff"$'\n\n'"## Next"$'\n'"1. Try /grounder-task next session"
+pnpm grounder handoff list
+pnpm grounder path logs
 ```
+
+Session loop in the agent: `/grounder-task` → work → `/grounder-task-handoff`.
 
 See [fixtures/dev/README.md](fixtures/dev/README.md).
 
@@ -52,4 +57,5 @@ Agent-agnostic core (`connector/`, `vault/`, `commands/`) plus a pluggable `agen
 
 Phase 1: [.ai/plans/grounder-phase-1-minimal-connector.md](.ai/plans/grounder-phase-1-minimal-connector.md)  
 Agent adapters (implemented): [.ai/plans/pluggable.md](.ai/plans/pluggable.md)  
+Phase 2 handoff: [.ai/plans/grounder-phase-2-handoff.md](.ai/plans/grounder-phase-2-handoff.md)  
 Full roadmap: [.ai/plans/grounder-init-cli.md](.ai/plans/grounder-init-cli.md)
