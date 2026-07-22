@@ -1,10 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileExists } from "../util/fs.js";
-import {
-  timestampedBasename,
-  timestampedBasenameWithSeconds,
-} from "../util/timestamp-slug.js";
+import { collisionSuffix, timestampedBasename } from "../util/timestamp-slug.js";
 
 /** Options for {@link writeHandoff}. */
 export interface WriteHandoffOptions {
@@ -23,21 +20,18 @@ async function resolveHandoffPath(
   body: string,
   options: { title?: string; now: Date },
 ): Promise<string> {
-  const slugOptions = { title: options.title, now: options.now };
-  let basename = timestampedBasename(body, slugOptions);
+  const basename = timestampedBasename(body, {
+    title: options.title,
+    now: options.now,
+  });
   let filePath = path.join(logsDir, `${basename}.md`);
 
   if (await fileExists(filePath)) {
-    basename = timestampedBasenameWithSeconds(body, slugOptions);
-    filePath = path.join(logsDir, `${basename}.md`);
-  }
-
-  if (await fileExists(filePath)) {
     let n = 2;
-    while (await fileExists(path.join(logsDir, `${basename}-${n}.md`))) {
+    while (await fileExists(path.join(logsDir, `${basename}${collisionSuffix(n)}.md`))) {
       n += 1;
     }
-    filePath = path.join(logsDir, `${basename}-${n}.md`);
+    filePath = path.join(logsDir, `${basename}${collisionSuffix(n)}.md`);
   }
 
   return filePath;
@@ -64,8 +58,7 @@ function buildFrontmatter(options: {
 /**
  * Writes a new handoff markdown file under `logsDir` (created if missing).
  * Prepends YAML frontmatter (`project`, optional `branch`/`title`, `created`)
- * ahead of `body`. Never overwrites — collisions bump to second precision,
- * then a numeric suffix.
+ * ahead of `body`. Never overwrites — collisions append a `_NN` suffix.
  * @param logsDir - Absolute project logs directory.
  * @param body - Agent-supplied markdown (sections such as Done / Next); not validated here.
  * @returns Absolute path of the written file.

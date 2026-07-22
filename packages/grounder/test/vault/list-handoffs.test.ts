@@ -36,15 +36,31 @@ describe("vault/list-handoffs", () => {
     cleanup = env.cleanup;
     const logsDir = path.join(env.vault, "logs");
     await mkdir(logsDir, { recursive: true });
-    await writeFile(path.join(logsDir, "2026-06-26-1430.md"), "a", "utf8");
-    await writeFile(path.join(logsDir, "2026-06-26-1500-later.md"), "b", "utf8");
-    await writeFile(path.join(logsDir, "2026-06-25-0900-old.md"), "c", "utf8");
+    await writeFile(path.join(logsDir, "2026-06-26-143000.md"), "a", "utf8");
+    await writeFile(path.join(logsDir, "2026-06-26-150000-later.md"), "b", "utf8");
+    await writeFile(path.join(logsDir, "2026-06-25-090000-old.md"), "c", "utf8");
     await writeFile(path.join(logsDir, "readme.txt"), "skip", "utf8");
 
     expect(await listHandoffs(logsDir)).toEqual([
-      path.join(logsDir, "2026-06-26-1500-later.md"),
-      path.join(logsDir, "2026-06-26-1430.md"),
-      path.join(logsDir, "2026-06-25-0900-old.md"),
+      path.join(logsDir, "2026-06-26-150000-later.md"),
+      path.join(logsDir, "2026-06-26-143000.md"),
+      path.join(logsDir, "2026-06-25-090000-old.md"),
+    ]);
+  });
+
+  it("lists _NN collision suffixes newest-first (not the unsuffixed base)", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const logsDir = path.join(env.vault, "logs");
+    await mkdir(logsDir, { recursive: true });
+    await writeFile(path.join(logsDir, "2026-06-26-143000-dup.md"), "first", "utf8");
+    await writeFile(path.join(logsDir, "2026-06-26-143000-dup_02.md"), "second", "utf8");
+    await writeFile(path.join(logsDir, "2026-06-26-143000-dup_10.md"), "tenth", "utf8");
+
+    expect(await listHandoffs(logsDir)).toEqual([
+      path.join(logsDir, "2026-06-26-143000-dup_10.md"),
+      path.join(logsDir, "2026-06-26-143000-dup_02.md"),
+      path.join(logsDir, "2026-06-26-143000-dup.md"),
     ]);
   });
 

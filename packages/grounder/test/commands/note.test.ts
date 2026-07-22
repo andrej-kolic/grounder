@@ -48,7 +48,7 @@ describe("commands/note", () => {
       "10-Projects",
       "my-app",
       "notes",
-      "2026-06-26-1430-investigate-auth-mid.md",
+      "2026-06-26-143000-investigate-auth-mid.md",
     );
     expect(await readFile(notePath, "utf8")).toBe("Investigate auth middleware");
   });
@@ -63,7 +63,7 @@ describe("commands/note", () => {
     const result = runCli(["note", "hello world"], withGroundedHome(env.home), env.repo);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Wrote ");
-    expect(result.stdout).toMatch(/\d{4}-\d{2}-\d{2}-\d{4}-hello-world\.md/);
+    expect(result.stdout).toMatch(/\d{4}-\d{2}-\d{2}-\d{6}-hello-world\.md/);
   });
 
   it("path notes prints resolved directory", async () => {

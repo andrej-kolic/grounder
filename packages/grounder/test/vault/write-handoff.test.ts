@@ -36,7 +36,7 @@ describe("vault/write-handoff", () => {
       now: fixedTime,
     });
 
-    expect(writtenPath).toBe(path.join(logsDir, "2026-06-26-1430-auth.md"));
+    expect(writtenPath).toBe(path.join(logsDir, "2026-06-26-143000-auth.md"));
     expect(await readFile(writtenPath, "utf8")).toBe(
       [
         "---",
@@ -82,7 +82,7 @@ describe("vault/write-handoff", () => {
     expect(writtenPath.startsWith(logsDir + path.sep)).toBe(true);
   });
 
-  it("uses second precision on slug collision", async () => {
+  it("uses _NN suffix on slug collision", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
     const logsDir = path.join(env.vault, "logs");
@@ -98,17 +98,17 @@ describe("vault/write-handoff", () => {
       now: fixedTime,
     });
 
-    expect(first).toBe(path.join(logsDir, "2026-06-26-1430-dup.md"));
-    expect(second).toBe(path.join(logsDir, "2026-06-26-143000-dup.md"));
+    expect(first).toBe(path.join(logsDir, "2026-06-26-143000-dup.md"));
+    expect(second).toBe(path.join(logsDir, "2026-06-26-143000-dup_02.md"));
   });
 
-  it("uses numeric suffix when second-precision path also exists", async () => {
+  it("increments _NN when prior collision suffixes exist", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
     const logsDir = path.join(env.vault, "logs");
     await mkdir(logsDir, { recursive: true });
-    await writeFile(path.join(logsDir, "2026-06-26-1430-dup.md"), "x", "utf8");
-    await writeFile(path.join(logsDir, "2026-06-26-143000-dup.md"), "y", "utf8");
+    await writeFile(path.join(logsDir, "2026-06-26-143000-dup.md"), "x", "utf8");
+    await writeFile(path.join(logsDir, "2026-06-26-143000-dup_02.md"), "y", "utf8");
 
     const writtenPath = await writeHandoff(logsDir, "third", {
       projectId: "my-app",
@@ -116,6 +116,6 @@ describe("vault/write-handoff", () => {
       now: fixedTime,
     });
 
-    expect(writtenPath).toBe(path.join(logsDir, "2026-06-26-143000-dup-2.md"));
+    expect(writtenPath).toBe(path.join(logsDir, "2026-06-26-143000-dup_03.md"));
   });
 });

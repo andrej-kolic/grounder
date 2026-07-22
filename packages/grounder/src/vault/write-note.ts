@@ -1,10 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileExists } from "../util/fs.js";
-import {
-  timestampedBasename,
-  timestampedBasenameWithSeconds,
-} from "../util/timestamp-slug.js";
+import { collisionSuffix, timestampedBasename } from "../util/timestamp-slug.js";
 
 export interface WriteNoteOptions {
   title?: string;
@@ -17,21 +14,15 @@ async function resolveNotePath(
   options: WriteNoteOptions,
 ): Promise<string> {
   const now = options.now ?? new Date();
-  const slugOptions = { title: options.title, now };
-  let basename = timestampedBasename(text, slugOptions);
+  const basename = timestampedBasename(text, { title: options.title, now });
   let filePath = path.join(notesDir, `${basename}.md`);
 
   if (await fileExists(filePath)) {
-    basename = timestampedBasenameWithSeconds(text, slugOptions);
-    filePath = path.join(notesDir, `${basename}.md`);
-  }
-
-  if (await fileExists(filePath)) {
     let n = 2;
-    while (await fileExists(path.join(notesDir, `${basename}-${n}.md`))) {
+    while (await fileExists(path.join(notesDir, `${basename}${collisionSuffix(n)}.md`))) {
       n += 1;
     }
-    filePath = path.join(notesDir, `${basename}-${n}.md`);
+    filePath = path.join(notesDir, `${basename}${collisionSuffix(n)}.md`);
   }
 
   return filePath;
@@ -39,7 +30,7 @@ async function resolveNotePath(
 
 /**
  * Writes a new note markdown file under `notesDir` (created if missing).
- * Never overwrites — collisions bump to second precision, then a numeric suffix.
+ * Never overwrites — collisions append a `_NN` suffix.
  * @returns Absolute path of the written file.
  */
 export async function writeNote(

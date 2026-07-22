@@ -58,7 +58,7 @@ describe("commands/handoff", () => {
       "10-Projects",
       "my-app",
       "logs",
-      "2026-06-26-1430-auth.md",
+      "2026-06-26-143000-auth.md",
     );
     const content = await readFile(handoffPath, "utf8");
     expect(content).toContain("project: my-app\n");
@@ -88,7 +88,7 @@ describe("commands/handoff", () => {
     );
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Wrote ");
-    expect(result.stdout).toMatch(/\d{4}-\d{2}-\d{2}-\d{4}-session\.md/);
+    expect(result.stdout).toMatch(/\d{4}-\d{2}-\d{2}-\d{6}-session\.md/);
   });
 
   it("finds link walking up from a nested cwd", async () => {

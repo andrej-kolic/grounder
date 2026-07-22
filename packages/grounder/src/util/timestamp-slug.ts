@@ -21,12 +21,12 @@ function datePrefix(date: Date, includeSeconds: boolean): string {
   return `${y}-${m}-${d}-${time}`;
 }
 
-/** Local-time prefix `YYYY-MM-DD-HHmm` for sortable filenames. */
+/** Local-time prefix `YYYY-MM-DD-HHmm` (legacy minute precision). */
 export function dateMinutePrefix(date: Date): string {
   return datePrefix(date, false);
 }
 
-/** Local-time prefix `YYYY-MM-DD-HHmmss` used after a minute-precision collision. */
+/** Local-time prefix `YYYY-MM-DD-HHmmss` for sortable filenames. */
 export function dateSecondPrefix(date: Date): string {
   return datePrefix(date, true);
 }
@@ -47,7 +47,7 @@ export function timestampSlug(date = new Date()): string {
 }
 
 /**
- * Filename stem: `YYYY-MM-DD-HHmm` plus optional slug from `title`, else from `text`.
+ * Filename stem: `YYYY-MM-DD-HHmmss` plus optional slug from `title`, else from `text`.
  * Returns the date prefix alone when the slug is empty.
  */
 export function timestampedBasename(
@@ -56,20 +56,26 @@ export function timestampedBasename(
 ): string {
   const now = options.now ?? new Date();
   const shortSlug = options.title ? slugifyText(options.title) : slugifyText(text);
-  const prefix = dateMinutePrefix(now);
+  const prefix = dateSecondPrefix(now);
   return shortSlug ? `${prefix}-${shortSlug}` : prefix;
 }
 
 /**
- * Same as {@link timestampedBasename} but with second precision (`YYYY-MM-DD-HHmmss`).
- * Used when the minute-precision name already exists.
+ * @deprecated Alias of {@link timestampedBasename} (always second precision).
  */
 export function timestampedBasenameWithSeconds(
   text: string,
   options: { title?: string; now?: Date } = {},
 ): string {
-  const now = options.now ?? new Date();
-  const shortSlug = options.title ? slugifyText(options.title) : slugifyText(text);
-  const prefix = dateSecondPrefix(now);
-  return shortSlug ? `${prefix}-${shortSlug}` : prefix;
+  return timestampedBasename(text, options);
+}
+
+/**
+ * Numeric collision suffix for a basename that already exists.
+ * Uses `_` so `base_02.md` sorts after `base.md` lexicographically
+ * (`_` > `.`), keeping filename-desc “newest first” correct.
+ * Zero-padded to 2 digits so `_02` < `_10`.
+ */
+export function collisionSuffix(n: number): string {
+  return `_${String(n).padStart(2, "0")}`;
 }
