@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runNoteWithOptions } from "../../src/commands/note.js";
 import { runRepoInitWithOptions } from "../../src/commands/repo/init.js";
@@ -77,9 +77,7 @@ describe("commands/note", () => {
     const result = runCli(["path", "notes"], withGroundedHome(env.home), env.repo);
 
     expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe(
-      path.join(env.vault, "10-Projects", "my-app", "notes"),
-    );
+    expect(result.stdout.trim()).toBe(path.join(env.vault, "10-Projects", "my-app", "notes"));
   });
 
   it("finds link walking up from a nested cwd", async () => {

@@ -1,9 +1,9 @@
-import { cursor } from "./cursor.js";
 import { claude } from "./claude.js";
+import { cursor } from "./cursor.js";
 import type { AgentAdapter } from "./types.js";
 
-export { cursor } from "./cursor.js";
 export { claude } from "./claude.js";
+export { cursor } from "./cursor.js";
 export type {
   AgentAdapter,
   AgentInstallOptions,

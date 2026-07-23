@@ -1,8 +1,8 @@
 import { currentBranch } from "../connector/git.js";
 import { withHomeDir } from "../connector/home.js";
 import { resolveLogsDir } from "../connector/vault.js";
-import { writeHandoff } from "../vault/write-handoff.js";
 import { flagString, parseArgs } from "../util/parse-args.js";
+import { writeHandoff } from "../vault/write-handoff.js";
 import { requireLinkedProject } from "./require-linked.js";
 
 /** Options for {@link runHandoffWithOptions} (CLI parsing and tests). */

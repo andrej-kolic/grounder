@@ -1,7 +1,7 @@
 import { withHomeDir } from "../connector/home.js";
 import { resolveNotesDir } from "../connector/vault.js";
-import { writeNote } from "../vault/write-note.js";
 import { flagString, parseArgs } from "../util/parse-args.js";
+import { writeNote } from "../vault/write-note.js";
 import { requireLinkedProject } from "./require-linked.js";
 
 export interface NoteOptions {

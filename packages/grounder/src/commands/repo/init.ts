@@ -2,23 +2,12 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { findGitRoot } from "../../connector/git.js";
 import { readHomeConfig, withHomeDir } from "../../connector/home.js";
-import {
-  detectProjectId,
-  formatProjectIdSource,
-} from "../../connector/project-id.js";
-import {
-  readRepoConfig,
-  repoConfigPath,
-  writeRepoConfig,
-} from "../../connector/repo.js";
-import {
-  resolveLogsDir,
-  resolveNotesDir,
-  resolveVaultRoot,
-} from "../../connector/vault.js";
+import { detectProjectId, formatProjectIdSource } from "../../connector/project-id.js";
+import { readRepoConfig, repoConfigPath, writeRepoConfig } from "../../connector/repo.js";
+import { resolveLogsDir, resolveNotesDir, resolveVaultRoot } from "../../connector/vault.js";
+import { flagBool, flagString, parseArgs } from "../../util/parse-args.js";
 import { resolveUserPath } from "../../util/path.js";
 import { confirm } from "../../util/prompt.js";
-import { flagBool, flagString, parseArgs } from "../../util/parse-args.js";
 
 export interface RepoInitOptions {
   cwd?: string;
@@ -39,9 +28,7 @@ export async function runRepoInit(argv: string[]): Promise<number> {
   });
 }
 
-export async function runRepoInitWithOptions(
-  options: RepoInitOptions = {},
-): Promise<number> {
+export async function runRepoInitWithOptions(options: RepoInitOptions = {}): Promise<number> {
   return withHomeDir(options.homeDir, async () => {
     const cwd = path.resolve(options.cwd ?? process.cwd());
     const yes = options.yes ?? false;
@@ -49,21 +36,20 @@ export async function runRepoInitWithOptions(
     const gitRoot = await findGitRoot(cwd);
 
     let home = await readHomeConfig();
-    if (!home && !options.vault) {
-      process.stderr.write("No vault configured. Run: grounder vault init <path>\n");
-      return 1;
-    }
-
-    if (!home && options.vault) {
+    if (!home) {
+      if (!options.vault) {
+        process.stderr.write("No vault configured. Run: grounder vault init <path>\n");
+        return 1;
+      }
       home = { vaultRoot: resolveUserPath(options.vault) };
     }
 
-    const vaultRoot = resolveVaultRoot(home!, options.vault);
+    const vaultRoot = resolveVaultRoot(home, options.vault);
     const detected = await detectProjectId(cwd, options.id, gitRoot);
     const existingRepo = await readRepoConfig(cwd);
     const projectConfig = { version: 1 as const, projectId: detected.id };
-    const notesDir = resolveNotesDir(home!, projectConfig, options.vault);
-    const logsDir = resolveLogsDir(home!, projectConfig, options.vault);
+    const notesDir = resolveNotesDir(home, projectConfig, options.vault);
+    const logsDir = resolveLogsDir(home, projectConfig, options.vault);
 
     process.stdout.write(`✓ Folder:   ${cwd}\n`);
     if (gitRoot) {

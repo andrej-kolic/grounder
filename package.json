@@ -5,9 +5,15 @@
   "scripts": {
     "build": "pnpm --filter grounder build",
     "typecheck": "pnpm --filter grounder typecheck",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "check": "pnpm typecheck && biome check . && pnpm test",
     "test": "pnpm -r test",
     "grounder": "node packages/grounder/dist/cli.js",
     "fixture:setup": "node scripts/fixture-setup.mjs"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@biomejs/biome": "2.5.4"
+  }
 }

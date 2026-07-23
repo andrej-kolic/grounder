@@ -24,9 +24,7 @@ describe("vault/write-note", () => {
     const writtenPath = await writeNote(notesDir, "Investigate auth middleware", {
       now: fixedTime,
     });
-    expect(writtenPath).toBe(
-      path.join(notesDir, "2026-06-26-143000-investigate-auth-mid.md"),
-    );
+    expect(writtenPath).toBe(path.join(notesDir, "2026-06-26-143000-investigate-auth-mid.md"));
     expect(await readFile(writtenPath, "utf8")).toBe("Investigate auth middleware");
   });
 
@@ -50,9 +48,7 @@ describe("vault/write-note", () => {
       "very long, very long, very long, very long, very long, very long, very long, very long, very long, very long, very long, very long, very long, POST";
 
     const writtenPath = await writeNote(notesDir, text, { now: fixedTime });
-    expect(writtenPath).toBe(
-      path.join(notesDir, "2026-06-26-143000-very-long-very-long.md"),
-    );
+    expect(writtenPath).toBe(path.join(notesDir, "2026-06-26-143000-very-long-very-long.md"));
     expect(await readFile(writtenPath, "utf8")).toBe(text);
   });
 

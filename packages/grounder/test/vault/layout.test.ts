@@ -18,9 +18,7 @@ describe("vault/layout", () => {
     cleanup = env.cleanup;
 
     expect(projectsParent(env.vault)).toBe(path.join(env.vault, "10-Projects"));
-    expect(projectDir(env.vault, "my-app")).toBe(
-      path.join(env.vault, "10-Projects", "my-app"),
-    );
+    expect(projectDir(env.vault, "my-app")).toBe(path.join(env.vault, "10-Projects", "my-app"));
     expect(notesDir(env.vault, "my-app")).toBe(
       path.join(env.vault, "10-Projects", "my-app", "notes"),
     );

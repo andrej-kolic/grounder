@@ -1,9 +1,14 @@
 import { copyFile, mkdir } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { resolveHomeDir } from "../connector/home.js";
 import { fileExists } from "../util/fs.js";
-import type { AgentAdapter, AgentInstallOptions, AgentInstallResult, ArtifactStatus } from "./types.js";
+import type {
+  AgentAdapter,
+  AgentInstallOptions,
+  AgentInstallResult,
+  ArtifactStatus,
+} from "./types.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const templateDir = path.join(pkgRoot, "templates", "agents", "claude", "commands");

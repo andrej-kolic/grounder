@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { runHandoff } from "./commands/handoff.js";
+import { fileURLToPath } from "node:url";
 import { runHandoffList } from "./commands/handoff/list.js";
+import { runHandoff } from "./commands/handoff.js";
 import { runNote } from "./commands/note.js";
 import { runPathLogs } from "./commands/path/logs.js";
 import { runPathNotes } from "./commands/path/notes.js";
@@ -12,9 +12,9 @@ import { runRepoInit } from "./commands/repo/init.js";
 import { runVaultInit } from "./commands/vault/init.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const pkg = JSON.parse(
-  readFileSync(path.join(pkgRoot, "package.json"), "utf8"),
-) as { version: string };
+const pkg = JSON.parse(readFileSync(path.join(pkgRoot, "package.json"), "utf8")) as {
+  version: string;
+};
 
 const USAGE = `grounder — connect git projects to Obsidian dev vaults for AI agents
 
