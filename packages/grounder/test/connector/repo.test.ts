@@ -1,7 +1,7 @@
-import path from "node:path";
 import { execSync } from "node:child_process";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdir, writeFile } from "node:fs/promises";
 import {
   findLinkedRepoRoot,
   readRepoConfig,

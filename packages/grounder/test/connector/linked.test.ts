@@ -1,8 +1,8 @@
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdir } from "node:fs/promises";
+import { withHomeDir, writeHomeConfig } from "../../src/connector/home.js";
 import { resolveLinkedProject } from "../../src/connector/linked.js";
-import { writeHomeConfig, withHomeDir } from "../../src/connector/home.js";
 import { writeRepoConfig } from "../../src/connector/repo.js";
 import { createTempEnv } from "../helpers.js";
 

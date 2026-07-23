@@ -1,12 +1,12 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
-import { homeConfigPath } from "../../../src/connector/home.js";
 import {
   grounderNoteCommandPath,
   grounderTaskHandoffCommandPath,
 } from "../../../src/agents/cursor.js";
+import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
+import { homeConfigPath } from "../../../src/connector/home.js";
 import { createTempEnv } from "../../helpers.js";
 
 describe("commands/vault/init", () => {
@@ -35,7 +35,9 @@ describe("commands/vault/init", () => {
       vaultRoot: env.vault,
     });
     await access(path.join(env.vault, "10-Projects"));
-    expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain("npx grounder note");
+    expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain(
+      "npx grounder note",
+    );
     expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain(
       "approve shell permissions",
     );
@@ -48,7 +50,12 @@ describe("commands/vault/init", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home, agents: ["cursor"] });
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
     const noteBefore = await readFile(grounderNoteCommandPath(env.home), "utf8");
     const handoffBefore = await readFile(grounderTaskHandoffCommandPath(env.home), "utf8");
 
@@ -69,12 +76,17 @@ describe("commands/vault/init", () => {
     cleanup = env.cleanup;
 
     // First init succeeds
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home, agents: [] });
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: [],
+    });
 
     // Re-init with a different vault path and no --force should fail immediately (exit 1)
     // without hanging on a confirmation prompt (yes: false but no TTY needed since it errors first)
     const code = await runVaultInitWithOptions({
-      vaultPath: env.vault + "-other",
+      vaultPath: `${env.vault}-other`,
       yes: false,
       homeDir: env.home,
       agents: [],

@@ -1,7 +1,7 @@
-import path from "node:path";
 import { execSync } from "node:child_process";
-import { afterEach, describe, expect, it } from "vitest";
 import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
 import { writeHomeConfig } from "../../../src/connector/home.js";
 import { readRepoConfig } from "../../../src/connector/repo.js";

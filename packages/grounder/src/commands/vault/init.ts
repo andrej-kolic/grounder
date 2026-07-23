@@ -1,15 +1,15 @@
 import { mkdir } from "node:fs/promises";
+import { resolveAgents } from "../../agents/index.js";
 import {
   homeConfigPath,
   readHomeConfig,
   withHomeDir,
   writeHomeConfig,
 } from "../../connector/home.js";
-import { resolveAgents } from "../../agents/index.js";
-import { projectsParent } from "../../vault/layout.js";
+import { flagBool, flagStrings, parseArgs } from "../../util/parse-args.js";
 import { resolveUserPath } from "../../util/path.js";
 import { confirm } from "../../util/prompt.js";
-import { flagBool, flagStrings, parseArgs } from "../../util/parse-args.js";
+import { projectsParent } from "../../vault/layout.js";
 
 export interface VaultInitOptions {
   vaultPath: string;
@@ -40,9 +40,7 @@ export async function runVaultInit(argv: string[]): Promise<number> {
   });
 }
 
-export async function runVaultInitWithOptions(
-  options: VaultInitOptions,
-): Promise<number> {
+export async function runVaultInitWithOptions(options: VaultInitOptions): Promise<number> {
   return withHomeDir(options.homeDir, async () => {
     const vaultRoot = resolveUserPath(options.vaultPath);
     const yes = options.yes ?? false;
@@ -89,7 +87,8 @@ export async function runVaultInitWithOptions(
     for (const agent of agents) {
       const result = await agent.install({ force, homeDir });
       for (const [artifactPath, status] of Object.entries(result.artifacts)) {
-        const label = status === "skipped" ? "already exists (skipped)" : `installed: ${artifactPath}`;
+        const label =
+          status === "skipped" ? "already exists (skipped)" : `installed: ${artifactPath}`;
         process.stdout.write(`✓ ${agent.name} command ${label}\n`);
       }
       if (Object.keys(result.artifacts).length === 0) {

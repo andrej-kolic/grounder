@@ -11,9 +11,7 @@ export async function runPathLogs(_argv: string[]): Promise<number> {
   return runPathLogsWithOptions({});
 }
 
-export async function runPathLogsWithOptions(
-  options: PathLogsOptions = {},
-): Promise<number> {
+export async function runPathLogsWithOptions(options: PathLogsOptions = {}): Promise<number> {
   return withHomeDir(options.homeDir, async () => {
     const linked = await requireLinkedProject(options.cwd ?? process.cwd());
     if (!linked) {

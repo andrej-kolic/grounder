@@ -1,10 +1,6 @@
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  homeConfigPath,
-  readHomeConfig,
-  writeHomeConfig,
-} from "../../src/connector/home.js";
+import { homeConfigPath, readHomeConfig, writeHomeConfig } from "../../src/connector/home.js";
 import { createTempEnv } from "../helpers.js";
 
 describe("connector/home", () => {

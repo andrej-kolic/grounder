@@ -1,6 +1,6 @@
 import { findGitRoot } from "./git.js";
-import { readHomeConfig, type HomeConfig } from "./home.js";
-import { findLinkedRepoRoot, readRepoConfig, type RepoConfig } from "./repo.js";
+import { type HomeConfig, readHomeConfig } from "./home.js";
+import { findLinkedRepoRoot, type RepoConfig, readRepoConfig } from "./repo.js";
 
 /** Home config + linked repo marker resolved from a cwd. */
 export interface LinkedProject {
@@ -22,9 +22,7 @@ export type ResolveLinkedProjectResult =
  * Resolves home vault config and the linked project marker for `cwd`.
  * Does not write to stderr — callers map {@link LinkedProjectError} to UX.
  */
-export async function resolveLinkedProject(
-  cwd: string,
-): Promise<ResolveLinkedProjectResult> {
+export async function resolveLinkedProject(cwd: string): Promise<ResolveLinkedProjectResult> {
   const home = await readHomeConfig();
   if (!home) {
     return { ok: false, error: "no-vault" };

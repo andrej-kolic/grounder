@@ -46,10 +46,7 @@ export function flagBool(flags: Map<string, string | boolean>, ...keys: string[]
   return false;
 }
 
-export function flagString(
-  flags: Map<string, string | boolean>,
-  key: string,
-): string | undefined {
+export function flagString(flags: Map<string, string | boolean>, key: string): string | undefined {
   const value = flags.get(key);
   return typeof value === "string" ? value : undefined;
 }

@@ -1,6 +1,6 @@
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { writeFile } from "node:fs/promises";
 import { afterEach, describe, expect, it } from "vitest";
 import { detectProjectId } from "../../src/connector/project-id.js";
 import { createTempEnv } from "../helpers.js";

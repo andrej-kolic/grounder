@@ -1,7 +1,7 @@
 import { withHomeDir } from "../../connector/home.js";
 import { resolveLogsDir } from "../../connector/vault.js";
-import { listHandoffs } from "../../vault/list-handoffs.js";
 import { parseArgs } from "../../util/parse-args.js";
+import { listHandoffs } from "../../vault/list-handoffs.js";
 import { requireLinkedProject } from "../require-linked.js";
 
 const DEFAULT_LIMIT = 5;
@@ -63,9 +63,7 @@ export async function runHandoffList(argv: string[]): Promise<number> {
  * prerequisites as `grounder handoff`.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
-export async function runHandoffListWithOptions(
-  options: HandoffListOptions = {},
-): Promise<number> {
+export async function runHandoffListWithOptions(options: HandoffListOptions = {}): Promise<number> {
   return withHomeDir(options.homeDir, async () => {
     const linked = await requireLinkedProject(options.cwd ?? process.cwd());
     if (!linked) {

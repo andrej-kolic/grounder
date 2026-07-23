@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runPathLogsWithOptions } from "../../../src/commands/path/logs.js";
 import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
@@ -40,9 +40,7 @@ describe("commands/path/logs", () => {
     try {
       const code = await runPathLogsWithOptions({ cwd: env.repo, homeDir: env.home });
       expect(code).toBe(0);
-      expect(chunks.join("").trim()).toBe(
-        path.join(env.vault, "10-Projects", "my-app", "logs"),
-      );
+      expect(chunks.join("").trim()).toBe(path.join(env.vault, "10-Projects", "my-app", "logs"));
     } finally {
       spy.mockRestore();
     }
@@ -59,8 +57,6 @@ describe("commands/path/logs", () => {
     const result = runCli(["path", "logs"], withGroundedHome(env.home), env.repo);
 
     expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe(
-      path.join(env.vault, "10-Projects", "my-app", "logs"),
-    );
+    expect(result.stdout.trim()).toBe(path.join(env.vault, "10-Projects", "my-app", "logs"));
   });
 });

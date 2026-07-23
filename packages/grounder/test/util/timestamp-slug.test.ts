@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  MAX_SLUG_LENGTH,
   collisionSuffix,
+  MAX_SLUG_LENGTH,
   slugifyText,
   timestampedBasename,
 } from "../../src/util/timestamp-slug.js";

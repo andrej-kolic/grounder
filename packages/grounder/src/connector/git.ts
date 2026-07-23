@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { access } from "node:fs/promises";
-import { promisify } from "node:util";
 import path from "node:path";
+import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
@@ -41,11 +41,10 @@ export async function findGitRoot(startDir: string): Promise<string | null> {
  */
 export async function currentBranch(gitRoot: string): Promise<string | undefined> {
   try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["rev-parse", "--abbrev-ref", "HEAD"],
-      { cwd: gitRoot, encoding: "utf8" },
-    );
+    const { stdout } = await execFileAsync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+      cwd: gitRoot,
+      encoding: "utf8",
+    });
     const branch = String(stdout).trim();
     if (!branch || branch === "HEAD") {
       return undefined;

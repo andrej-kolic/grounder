@@ -9,7 +9,7 @@ export function expandHome(input: string): string {
   if (input === "~") {
     return os.homedir();
   }
-  if (input.startsWith("~/") || input.startsWith("~" + path.sep)) {
+  if (input.startsWith("~/") || input.startsWith(`~${path.sep}`)) {
     return path.join(os.homedir(), input.slice(2));
   }
   return input;

@@ -1,7 +1,4 @@
-import {
-  resolveLinkedProject,
-  type LinkedProject,
-} from "../connector/linked.js";
+import { type LinkedProject, resolveLinkedProject } from "../connector/linked.js";
 
 /**
  * Resolves the linked project for CLI commands.
