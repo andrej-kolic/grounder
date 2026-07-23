@@ -68,19 +68,23 @@ packages/grounder/templates/
 ```bash
 pnpm install          # from repo root
 pnpm build            # compile packages/grounder
+pnpm typecheck        # tsc --noEmit
+pnpm lint             # biome check (format + lint)
+pnpm format           # biome format --write
 pnpm test             # unit + CLI smoke tests
+pnpm check            # build + typecheck + lint + test (CI / local one-shot)
 pnpm grounder --version
 pnpm fixture:setup    # print dev fixture next steps
 ```
 
-Run tests after every change. Keep dependencies minimal.
+Root scripts are the quality contract — CI and agents should call these entrypoints, not ad-hoc tool invocations. Keep dependencies minimal.
 
 ## Quality loop
 
 1. Implement in `packages/grounder/src/`
 2. Add or update tests in `packages/grounder/test/` (mirror `src/` layout)
 3. Use `fixtures/minimal-git-repo/` for integration tests that need a git project
-4. Run `pnpm test` before finishing
+4. Run `pnpm check` before finishing
 
 ## Conventions
 
