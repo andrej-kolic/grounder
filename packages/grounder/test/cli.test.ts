@@ -1,17 +1,12 @@
-import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const pkgRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-);
+const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(pkgRoot, "dist", "cli.js");
-const { version } = JSON.parse(
-  readFileSync(path.join(pkgRoot, "package.json"), "utf8"),
-) as {
+const { version } = JSON.parse(readFileSync(path.join(pkgRoot, "package.json"), "utf8")) as {
   version: string;
 };
 
