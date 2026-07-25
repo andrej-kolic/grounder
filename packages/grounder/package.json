@@ -28,8 +28,18 @@
     "cli"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrej-kolic/grounder.git",
+    "directory": "packages/grounder"
+  },
+  "bugs": {
+    "url": "https://github.com/andrej-kolic/grounder/issues"
+  },
+  "homepage": "https://github.com/andrej-kolic/grounder/tree/main/packages/grounder#readme",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
