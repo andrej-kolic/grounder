@@ -41,15 +41,7 @@
    - **Publishability check (2026-07-25):** Name owned; `publishConfig.access: public` + `prepublishOnly` present; `bin` has shebang; `pnpm pack` includes `dist/`, `templates/`, README, LICENSE. Local meta drift vs npm (description + `license: MIT` vs published `ISC`) will sync on next publish.
    - **Trusted Publisher (#3) — repo-side done; npm UI needs you:**
      - `packages/grounder/package.json` now has `repository.url` = `git+https://github.com/andrej-kolic/grounder.git` (required for GitHub OIDC/provenance; must match exactly).
-     - No npm CLI for this — configure at [npmjs.com/package/grounder/access](https://www.npmjs.com/package/grounder/access) → Trusted Publisher → GitHub Actions:
-       | Field | Value |
-       | --- | --- |
-       | Organization or user | `andrej-kolic` |
-       | Repository | `grounder` |
-       | Workflow filename | `release.yml` |
-       | Environment name | *(leave blank)* |
-       | Allowed actions | `npm publish` |
-     - npm may 404 on save if `release.yml` is missing from the default branch (observed 2026-07-25). Push `.github/workflows/release.yml` first, then configure Trusted Publisher.
+     - **Done (2026-07-25):** Trusted Publisher connected on npm after `release.yml` landed on `main`. Form values: `andrej-kolic` / `grounder` / `release.yml`.
      - After a successful OIDC publish: optionally Settings → Publishing access → “Require 2FA and disallow tokens”.
    - **`NPM_TOKEN` fallback:** Granular automation token in repo secrets, `NODE_AUTH_TOKEN` via `actions/setup-node` `registry-url: https://registry.npmjs.org`. Rotate every ≤90 days if classic tokens stay deprecated. Prefer OIDC so you are not babysitting secrets.
 
