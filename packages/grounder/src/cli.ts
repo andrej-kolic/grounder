@@ -9,6 +9,7 @@ import { runNote } from "./commands/note.js";
 import { runPathLogs } from "./commands/path/logs.js";
 import { runPathNotes } from "./commands/path/notes.js";
 import { runRepoInit } from "./commands/repo/init.js";
+import { runStatus } from "./commands/status.js";
 import { runVaultInit } from "./commands/vault/init.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -26,6 +27,7 @@ Usage:
   grounder handoff list        Print recent handoff paths (newest first)
   grounder path notes          Print resolved notes directory
   grounder path logs           Print resolved logs directory
+  grounder status              Snapshot of project link + resolved paths
 
 Options:
   -h, --help     Show this help
@@ -100,6 +102,10 @@ async function main(): Promise<void> {
 
   if (command === "path" && rest[0] === "logs") {
     process.exit(await runPathLogs(rest.slice(1)));
+  }
+
+  if (command === "status") {
+    process.exit(await runStatus(rest));
   }
 
   process.stderr.write(`Unknown command: ${args.join(" ")}\n\n`);
