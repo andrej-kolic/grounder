@@ -1,8 +1,18 @@
 # Grounder
 
-Connect project folders to a personal Obsidian vault so AI agents (Cursor, Claude Code, etc.) get persistent memory without committing personal docs to the repo.
+[![npm version](https://img.shields.io/npm/v/grounder.svg)](https://www.npmjs.com/package/grounder)
+[![license](https://img.shields.io/npm/l/grounder.svg)](../../LICENSE)
+
+AI coding agents forget everything between sessions. Grounder gives them persistent memory in a personal Obsidian vault — notes and handoffs live outside the repo, under your control, and never get committed.
+
+- **Private by default** — vault notes live outside the project tree; only a small `projectId` marker is safe to commit
+- **Built for agents** — installs `/grounder-note`, `/grounder-task`, `/grounder-task-handoff` slash commands in Cursor and Claude Code
+- **Structured handoffs** — end a session with a Done/Next/Blockers/Decisions checkpoint; resume next time by hydrating from it
+- **Zero per-project install** — slash commands shell out via `npx`; nothing to add to the repo besides the marker file
 
 **Requirements:** Node.js 18+ and an Obsidian vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
+
+**Contents:** [Install](#install) · [Quickstart](#quickstart) · [Setup overview](#setup-overview) · [Commands](#commands) · [Configuration](#configuration) · [Agents](#agents) · [Troubleshooting](#troubleshooting)
 
 ## Install
 
@@ -18,48 +28,48 @@ npx grounder --help
 
 ## Quickstart
 
+**1. One-time setup:**
+
 ```bash
 # Once per machine — set vault location + install agent slash commands
-grounder vault init ~/Documents/obsidian/dev
+grounder vault init <path-to-your-vault>
 
-# Once per folder — link project id to vault notes/ + logs/
+# Once per project folder — link project id to vault notes/ + logs/
 cd your-project
 grounder init
+```
 
-# Write a note (or use /grounder-note in Cursor / Claude Code)
-grounder note "Investigate auth middleware"
+**2. Daily use — from your agent's chat:**
 
-# End a session with a structured handoff (or use /grounder-task-handoff)
-grounder handoff "$(cat <<'EOF'
-# Handoff: auth middleware
+```text
+> /grounder-task
 
-## Done
-- Mapped middleware order
+  Reading latest handoff… (logs/2026-07-21-auth-middleware.md)
+  Done: mapped middleware order.
+  Next: 1. Add tests for 401 path
+  Starting on tests for the 401 path now.
 
-## Next
-1. Add tests for 401 path
+> ...you work with the agent...
 
-## Blockers
-- None
+> /grounder-task-handoff
 
-## Decisions
-- Keep cookie session for now
+  Wrote handoff → <vault>/10-Projects/your-project/logs/2026-07-28-auth-middleware.md
+```
 
-## Files
-- src/middleware/auth.ts
-EOF
-)"
+`/grounder-task` hydrates the agent from the newest handoff plus `AGENTS.md`; `/grounder-task-handoff` writes the next checkpoint when you close the session. Behind the scenes these run `grounder handoff list` and `grounder handoff <text>` for you — see [Session loop](#session-loop).
 
-# Next session — hydrate from newest handoff (or use /grounder-task)
-grounder handoff list
+No agent, or want to write by hand? The same actions are plain CLI commands:
 
-# Inspect link state / debug setup
-grounder status
-grounder doctor
+```bash
+grounder note "Investigate auth middleware"      # ad-hoc note
+grounder handoff "# Handoff: ...\n\n## Next\n1. ..."  # session checkpoint
+grounder handoff list                            # newest handoffs, for manual hydrate
 ```
 
 Notes land in `<vault>/10-Projects/{projectId}/notes/`.  
 Handoffs land in `<vault>/10-Projects/{projectId}/logs/` (one file per close; newest wins).
+
+Inspect or debug setup any time with `grounder status` / `grounder doctor` — see [Troubleshooting](#troubleshooting).
 
 ### Session loop
 
@@ -75,20 +85,9 @@ Handoffs land in `<vault>/10-Projects/{projectId}/logs/` (one file per close; ne
 
 ## Setup overview
 
-Three steps — vault once per machine, then link each project folder:
-
-1. **`grounder vault init <path>`** (once per machine)
-   - Writes `~/.grounder/config.json` with the vault root
-   - Creates `<vault>/10-Projects/` if missing
-   - Installs agent slash commands for detected agents (or `--agent=<id>`):
-     - Cursor → `~/.cursor/commands/grounder-{note,task,task-handoff}.md`
-     - Claude Code → `~/.claude/commands/grounder-{note,task,task-handoff}.md`
-
-2. **`grounder init`** (once per project folder)
-   - Writes `.grounder.json` in the current directory (`projectId` — safe to commit)
-   - Creates `<vault>/10-Projects/{projectId}/notes/` and `logs/`
-
-3. **Daily use** — notes, handoffs, and recall via CLI or slash commands; no further install.
+- **`grounder vault init <path>`** (once per machine) writes `~/.grounder/config.json`, creates `<vault>/10-Projects/`, and installs slash commands for detected agents (Cursor → `~/.cursor/commands/`, Claude Code → `~/.claude/commands/`; override with `--agent=<id>`).
+- **`grounder init`** (once per project folder) writes `.grounder.json` (`projectId` — safe to commit) and creates `<vault>/10-Projects/{projectId}/notes/` and `logs/`.
+- **Daily use** — notes, handoffs, and recall via CLI or slash commands; no further install.
 
 Nothing is written into the repo except the small `.grounder.json` marker. Agent artifacts stay under the user’s home directory; vault notes stay outside the project tree.
 
@@ -179,7 +178,7 @@ The vault layout is agent-agnostic. `grounder vault init` installs thin glue art
 No `--agent` flag: auto-detect installed agents. Explicit install:
 
 ```bash
-grounder vault init ~/Documents/obsidian/dev --agent=cursor --agent=claude
+grounder vault init <path-to-your-vault> --agent=cursor --agent=claude
 ```
 
 Slash commands tell the agent to run `npx grounder …` from the linked project folder (no global install required). Re-run with `--force` to refresh existing installs.
