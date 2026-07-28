@@ -35,6 +35,8 @@ pnpm grounder note "hello from dev fixture"
 pnpm grounder handoff "# Handoff"$'\n\n'"## Next"$'\n'"1. Try /grounder-task next session"
 pnpm grounder handoff list
 pnpm grounder path logs
+pnpm grounder status
+pnpm grounder doctor
 ```
 
 Session loop in the agent: `/grounder-task` → work → `/grounder-task-handoff`.
@@ -65,4 +67,5 @@ Agent-agnostic core (`connector/`, `vault/`, `commands/`) plus a pluggable `agen
 Phase 1: [.ai/plans/grounder-phase-1-minimal-connector.md](.ai/plans/grounder-phase-1-minimal-connector.md)  
 Agent adapters (implemented): [.ai/discussions/pluggable.md](.ai/discussions/pluggable.md)  
 Phase 2 handoff: [.ai/plans/grounder-phase-2-handoff.md](.ai/plans/grounder-phase-2-handoff.md)  
+Phase 3 status + doctor: [.ai/plans/grounder-phase-3-status-doctor.md](.ai/plans/grounder-phase-3-status-doctor.md)  
 Full roadmap: [.ai/plans/grounder-init-cli.md](.ai/plans/grounder-init-cli.md)

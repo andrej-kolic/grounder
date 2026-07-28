@@ -1,6 +1,6 @@
 # Grounder Phase 3 — `status` + `doctor`
 
-**Status:** in progress (Step 3 `doctor` done; Step 4 docs + tests next)  
+**Status:** complete (Steps 1–4 done)  
 **Created:** 2026-07-25  
 **Basis:** `.ai/plans/grounder-product-idea.md` (ops layer), Phase 1 connector, Phase 2 handoff  
 **Builds on:** home config + repo config (`.grounder.json`) + convention resolution  
@@ -215,9 +215,9 @@ Wire routes + help in `cli.ts`. Prefer small pure helpers for check results (eas
 
 ### Step 4 — Docs + quality
 
-- [ ] Update `packages/grounder/README.md` (status/doctor in quickstart / troubleshooting)
-- [ ] Mention in root README if useful
-- [ ] `pnpm check` green
+- [x] Update `packages/grounder/README.md` (status/doctor in quickstart / troubleshooting)
+- [x] Mention in root README if useful
+- [x] `pnpm check` green
 
 ---
 
