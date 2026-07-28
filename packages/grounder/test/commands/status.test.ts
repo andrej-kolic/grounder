@@ -31,7 +31,7 @@ describe("commands/status", () => {
     }
   });
 
-  it("prints linked snapshot with vault and project sections", async () => {
+  it("prints linked snapshot with machine and project sections", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -43,9 +43,9 @@ describe("commands/status", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain("Vault\n");
+    expect(out).toContain("Machine\n");
     expect(out).toContain(`  Config:     ${homeConfigPath(env.home)}`);
-    expect(out).toContain(`  Root:       ${env.vault}`);
+    expect(out).toContain(`  Vault:      ${env.vault}`);
     expect(out).toContain("Project\n");
     expect(out).toContain("  Linked:     yes");
     expect(out).toContain(`  Folder:     ${env.repo}`);
@@ -67,9 +67,9 @@ describe("commands/status", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain("Vault\n");
+    expect(out).toContain("Machine\n");
     expect(out).toContain("  Config:     missing → run: grounder vault init <path>");
-    expect(out).not.toContain("Root:");
+    expect(out).not.toContain("Vault:");
     expect(out).toContain("Project\n");
     expect(out).toContain("  Linked:     no");
     expect(out).not.toContain("incomplete");
@@ -107,9 +107,9 @@ describe("commands/status", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain("Vault\n");
+    expect(out).toContain("Machine\n");
     expect(out).toContain(`  Config:     ${homeConfigPath(env.home)}`);
-    expect(out).toContain(`  Root:       ${env.vault}`);
+    expect(out).toContain(`  Vault:      ${env.vault}`);
     expect(out).toContain("Project\n");
     expect(out).toContain("  Linked:     no");
     expect(out).toContain("  Config:     missing → run: grounder init");

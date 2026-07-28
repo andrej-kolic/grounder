@@ -1,6 +1,6 @@
 # Grounder Phase 3 — `status` + `doctor`
 
-**Status:** in progress (Step 2 `status` done; Step 3 `doctor` next)  
+**Status:** in progress (Step 3 `doctor` done; Step 4 docs + tests next)  
 **Created:** 2026-07-25  
 **Basis:** `.ai/plans/grounder-product-idea.md` (ops layer), Phase 1 connector, Phase 2 handoff  
 **Builds on:** home config + repo config (`.grounder.json`) + convention resolution  
@@ -56,7 +56,7 @@ Both are **read-only**. Neither writes config, agent files, or vault content.
 | 5 | **Stdout human text** — labeled lines; exit non-zero only when useful (see exit codes) |
 | 6 | **Reuse connectors** — home/repo/vault/git helpers + agent registry; `status` does **not** short-circuit on `resolveLinkedProject` (inspect pieces separately). Write commands keep `requireLinked` / `resolveLinkedProject` |
 | 7 | **Agent artifact check via adapters** — extend `AgentAdapter` with path listing (no new home-config agent list) |
-| 8 | **`status` = two sections** — **Vault** (home `config.json` + vault root) and **Project** (repo `.grounder.json` + paths). Label each config file **Config:** (not “Home” / “Marker”) |
+| 8 | **`status` / `doctor` = two sections** — **Machine** (home `config.json` + vault path [+ agent checks in doctor]) and **Project** (repo `.grounder.json` + paths). Label each config file **Config:** (not “Home” / “Marker”). Status vault path label is **Vault:** (not “Root”) |
 | 9 | **`Linked:` values** — `yes` (both configs resolve); `no` (project config missing); `incomplete` (project config present, vault/home missing). Omit Notes/Logs until vault exists |
 
 ---
@@ -82,16 +82,16 @@ No flags on `status` in v1 (cwd only). Optional later: `--json`.
 
 ## `status` output (target)
 
-Two sections: **Vault** (machine/home config) and **Project** (repo config + paths).
+Two sections: **Machine** (home config + vault path) and **Project** (repo config + paths).
 Each section shows its **Config** file path when present.
-Vault and project are inspected **independently**.
+Machine and project are inspected **independently**.
 
 When fully linked:
 
 ```text
-Vault
+Machine
   Config:     /Users/you/.grounder/config.json
-  Root:       /path/to/vault
+  Vault:      /path/to/vault
 
 Project
   Linked:     yes
@@ -106,7 +106,7 @@ Project
 Neither vault nor project configured:
 
 ```text
-Vault
+Machine
   Config:     missing → run: grounder vault init <path>
 
 Project
@@ -116,7 +116,7 @@ Project
 Project config exists but vault does not (`Linked: incomplete`; no Notes/Logs):
 
 ```text
-Vault
+Machine
   Config:     missing → run: grounder vault init <path>
 
 Project
@@ -130,9 +130,9 @@ Project
 Vault exists but project is not linked:
 
 ```text
-Vault
+Machine
   Config:     /Users/you/.grounder/config.json
-  Root:       /path/to/vault
+  Vault:      /path/to/vault
 
 Project
   Linked:     no
@@ -143,14 +143,15 @@ Project
 
 ## `doctor` checks (target)
 
-Ordered checklist. Each line: `ok` / `fail` / `warn` + message + fix hint when not ok.
+Ordered checklist under **Machine** / **Project** sections (omit Project with `--global`).
+Each line: `ok` / `fail` / `warn` + message + fix hint when not ok.
 
 ### Machine (always)
 
 | Check | Fail when | Fix hint |
 | --- | --- | --- |
 | Home config present | `~/.grounder/config.json` missing / invalid | `grounder vault init <path>` |
-| Vault root reachable | path missing or not a directory | Fix path or re-run vault init |
+| Vault reachable | path missing or not a directory | Fix path or re-run vault init |
 | `10-Projects/` exists | parent missing | `grounder vault init <path>` (idempotent) |
 | Agent commands | detected agent missing expected slash files | `grounder vault init <path> --force` (or `--agent=<id>`) |
 
@@ -199,18 +200,18 @@ Wire routes + help in `cli.ts`. Prefer small pure helpers for check results (eas
 ### Step 2 — `status`
 
 - [x] `commands/status.ts` — resolve vault + project independently (partial-state; no `requireLinked` early-exit UX)
-- [x] Two sections (Vault / Project); `Config:` for both config files; `Linked:` yes | no | incomplete
+- [x] Two sections (Machine / Project); `Config:` for both config files; Machine `Vault:` path; `Linked:` yes | no | incomplete
 - [x] Print snapshot fields (folder, id, notes, logs, git/branch when applicable)
 - [x] `cli.ts` route + help
 - [x] Tests: linked; neither configured; vault without project; project without vault
 
 ### Step 3 — `doctor`
 
-- [ ] `commands/doctor.ts` — run machine checks; unless `--global`, run project checks for cwd
-- [ ] Print one line per check; summarize pass/fail count
-- [ ] Exit `1` if any `fail` (warns alone → still `0`)
-- [ ] `cli.ts` route + help
-- [ ] Tests: healthy linked project; missing home; missing repo config; missing agent command file; `--global` skips project checks
+- [x] `commands/doctor.ts` — run machine checks; unless `--global`, run project checks for cwd
+- [x] Print one line per check; summarize pass/fail count
+- [x] Exit `1` if any `fail` (warns alone → still `0`)
+- [x] `cli.ts` route + help
+- [x] Tests: healthy linked project; missing home; missing repo config; missing agent command file; `--global` skips project checks
 
 ### Step 4 — Docs + quality
 
@@ -225,7 +226,7 @@ Wire routes + help in `cli.ts`. Prefer small pure helpers for check results (eas
 1. From a linked repo, `grounder status` shows project Id + notes/logs paths that match `path notes` / `path logs`
 2. From an unlinked folder with home config, `status` says Project `Linked: no` and hints `grounder init` under Project Config
 3. From a folder with `.grounder.json` but no home config, `status` says Project `Linked: incomplete` and still shows Folder / Config / Id
-4. `doctor` fails with a fix hint when vault root is missing
+4. `doctor` fails with a fix hint when vault is missing
 5. `doctor` fails when a detected agent’s Grounder command file is absent
 6. `doctor --global` does not require `.grounder.json`
 7. Neither command creates, overwrites, or deletes any file

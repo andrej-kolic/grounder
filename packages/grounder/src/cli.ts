@@ -3,6 +3,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { runDoctor } from "./commands/doctor.js";
 import { runHandoffList } from "./commands/handoff/list.js";
 import { runHandoff } from "./commands/handoff.js";
 import { runNote } from "./commands/note.js";
@@ -27,7 +28,8 @@ Usage:
   grounder handoff list        Print recent handoff paths (newest first)
   grounder path notes          Print resolved notes directory
   grounder path logs           Print resolved logs directory
-  grounder status              Snapshot of project link + resolved paths
+  grounder status              Snapshot of machine + project link + resolved paths
+  grounder doctor              Health checks with fix hints
 
 Options:
   -h, --help     Show this help
@@ -40,6 +42,9 @@ Init flags:
   --vault <path> Override home vault root for this run (grounder init)
   --agent <id>   Install for a specific agent (repeatable; default: auto-detect)
                  Supported: cursor, claude
+
+Doctor flags:
+  --global       Machine-only checks (skip project/link checks)
 
 Note / handoff flags:
   --title <slug> Short slug in filename (default: slugified first line)
@@ -106,6 +111,10 @@ async function main(): Promise<void> {
 
   if (command === "status") {
     process.exit(await runStatus(rest));
+  }
+
+  if (command === "doctor") {
+    process.exit(await runDoctor(rest));
   }
 
   process.stderr.write(`Unknown command: ${args.join(" ")}\n\n`);

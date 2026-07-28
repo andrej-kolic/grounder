@@ -45,12 +45,12 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
     const linkedRoot = await findLinkedRepoRoot(cwd, gitRoot);
     const repo: RepoConfig | null = linkedRoot ? await readRepoConfig(linkedRoot) : null;
 
-    process.stdout.write(section("Vault"));
+    process.stdout.write(section("Machine"));
     if (!home) {
       process.stdout.write(statusLine("Config:", "missing → run: grounder vault init <path>"));
     } else {
       process.stdout.write(statusLine("Config:", homeConfigPath()));
-      process.stdout.write(statusLine("Root:", resolveVaultRoot(home)));
+      process.stdout.write(statusLine("Vault:", resolveVaultRoot(home)));
     }
 
     process.stdout.write("\n");
