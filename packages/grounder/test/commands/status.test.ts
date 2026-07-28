@@ -1,3 +1,4 @@
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runRepoInitWithOptions } from "../../src/commands/repo/init.js";
@@ -113,5 +114,46 @@ describe("commands/status", () => {
     expect(out).toContain("Project\n");
     expect(out).toContain("  Linked:     no");
     expect(out).toContain("  Config:     missing → run: grounder init");
+  });
+
+  it("reports invalid home config without aborting", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await mkdir(path.dirname(homeConfigPath(env.home)), { recursive: true });
+    await writeFile(homeConfigPath(env.home), "{not-json", "utf8");
+    await writeRepoConfig(env.repo, { version: 1, projectId: "my-app" });
+
+    const { code, out } = await captureStdout(() =>
+      runStatusWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("  Config:     invalid → run: grounder vault init <path>");
+    expect(out).not.toContain("Vault:");
+    expect(out).toContain("  Linked:     incomplete → run: grounder vault init <path>");
+    expect(out).toContain(`  Folder:     ${env.repo}`);
+    expect(out).toContain("  Id:         my-app");
+  });
+
+  it("reports invalid repo config without aborting", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await writeFile(path.join(env.repo, ".grounder.json"), '{"version":1}\n', "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runStatusWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain(`  Config:     ${homeConfigPath(env.home)}`);
+    expect(out).toContain(`  Vault:      ${env.vault}`);
+    expect(out).toContain("  Linked:     incomplete → run: grounder init --force");
+    expect(out).toContain(`  Folder:     ${env.repo}`);
+    expect(out).toContain("  Config:     invalid → run: grounder init --force");
+    expect(out).not.toContain("Notes:");
+    expect(out).not.toContain("Id:");
   });
 });
