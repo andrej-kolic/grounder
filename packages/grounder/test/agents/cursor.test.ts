@@ -33,6 +33,26 @@ describe("agents/cursor", () => {
     });
   });
 
+  describe("cursor.expectedArtifacts", () => {
+    it("lists the same command paths install writes", () => {
+      expect(cursor.expectedArtifacts("/home/user")).toEqual([
+        "/home/user/.cursor/commands/grounder-note.md",
+        "/home/user/.cursor/commands/grounder-task-handoff.md",
+        "/home/user/.cursor/commands/grounder-task.md",
+      ]);
+    });
+
+    it("matches keys produced by install", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const result = await cursor.install({ homeDir: env.home });
+      expect(Object.keys(result.artifacts).sort()).toEqual(
+        cursor.expectedArtifacts(env.home).sort(),
+      );
+    });
+  });
+
   describe("cursor.install", () => {
     it("creates note, handoff, and task command files", async () => {
       const env = await createTempEnv({ initGit: false });

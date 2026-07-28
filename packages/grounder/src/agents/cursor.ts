@@ -31,6 +31,10 @@ export function grounderTaskCommandPath(homeDir?: string): string {
   return path.join(cursorCommandsDir(homeDir), "grounder-task.md");
 }
 
+export function expectedArtifacts(homeDir?: string): string[] {
+  return COMMANDS.map((filename) => path.join(cursorCommandsDir(homeDir), filename));
+}
+
 async function installCommand(
   filename: (typeof COMMANDS)[number],
   opts: AgentInstallOptions,
@@ -54,6 +58,8 @@ export const cursor: AgentAdapter = {
   async isInstalled(): Promise<boolean> {
     return fileExists(path.join(resolveHomeDir(), ".cursor"));
   },
+
+  expectedArtifacts,
 
   async install(opts: AgentInstallOptions): Promise<AgentInstallResult> {
     const artifacts: Record<string, ArtifactStatus> = {};

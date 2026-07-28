@@ -140,9 +140,10 @@ Ordered checklist. Each line: `ok` / `fail` / `warn` + message + fix hint when n
 ```text
 packages/grounder/src/
   agents/
-    types.ts              # + listArtifacts() or expectedPaths()
+    types.ts              # + expectedArtifacts(homeDir?) → string[]
     cursor.ts / claude.ts # implement path listing
   commands/
+    check.ts              # CheckResult + ok/fail/warn helpers
     status.ts             # grounder status
     doctor.ts             # grounder doctor [--global]
 test/
@@ -158,9 +159,9 @@ Wire routes + help in `cli.ts`. Prefer small pure helpers for check results (eas
 
 ### Step 1 — Inspect helpers
 
-- [ ] AgentAdapter: add read-only artifact path API (e.g. `expectedArtifacts(homeDir?) → string[]`)
-- [ ] Implement for Cursor + Claude (same paths install uses)
-- [ ] Optional shared check types: `{ id, ok, level, message, fix? }`
+- [x] AgentAdapter: add read-only artifact path API (e.g. `expectedArtifacts(homeDir?) → string[]`)
+- [x] Implement for Cursor + Claude (same paths install uses)
+- [x] Optional shared check types: `{ id, level, message, fix? }`
 
 ### Step 2 — `status`
 
