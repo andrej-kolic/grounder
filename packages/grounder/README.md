@@ -26,6 +26,8 @@ Or run without installing:
 npx grounder --help
 ```
 
+`grounder -h` prints the full reference; `grounder -v` prints the installed version.
+
 ## Quickstart
 
 **1. One-time setup:**
@@ -39,12 +41,14 @@ cd your-project
 grounder init
 ```
 
+Both commands preview what they'll write and ask to confirm; add `--yes` to skip the prompt (e.g. in scripts).
+
 **2. Daily use — from your agent's chat:**
 
 ```text
 > /grounder-task
 
-  Reading latest handoff… (logs/2026-07-21-auth-middleware.md)
+  Reading latest handoff… (logs/2026-07-21-091500-auth-middleware.md)
   Done: mapped middleware order.
   Next: 1. Add tests for 401 path
   Starting on tests for the 401 path now.
@@ -53,7 +57,7 @@ grounder init
 
 > /grounder-task-handoff
 
-  Wrote handoff → <vault>/10-Projects/your-project/logs/2026-07-28-auth-middleware.md
+  Wrote handoff → <vault>/10-Projects/your-project/logs/2026-07-28-143200-auth-middleware.md
 ```
 
 `/grounder-task` hydrates the agent from the newest handoff plus `AGENTS.md`; `/grounder-task-handoff` writes the next checkpoint when you close the session. Behind the scenes these run `grounder handoff list` and `grounder handoff <text>` for you — see [Session loop](#session-loop).
