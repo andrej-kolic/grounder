@@ -33,6 +33,26 @@ describe("agents/claude", () => {
     });
   });
 
+  describe("claude.expectedArtifacts", () => {
+    it("lists the same command paths install writes", () => {
+      expect(claude.expectedArtifacts("/home/user")).toEqual([
+        "/home/user/.claude/commands/grounder-note.md",
+        "/home/user/.claude/commands/grounder-task-handoff.md",
+        "/home/user/.claude/commands/grounder-task.md",
+      ]);
+    });
+
+    it("matches keys produced by install", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const result = await claude.install({ homeDir: env.home });
+      expect(Object.keys(result.artifacts).sort()).toEqual(
+        claude.expectedArtifacts(env.home).sort(),
+      );
+    });
+  });
+
   describe("claude.install", () => {
     it("creates note, handoff, and task command files", async () => {
       const env = await createTempEnv({ initGit: false });

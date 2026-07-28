@@ -26,7 +26,8 @@ describe("grounder cli", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("grounder vault init");
     expect(result.stdout).toContain("grounder note");
-    expect(result.stdout).not.toContain("grounder status");
+    expect(result.stdout).toContain("grounder status");
+    expect(result.stdout).toContain("grounder doctor");
   });
 
   it("requires text for note command", () => {

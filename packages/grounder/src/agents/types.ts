@@ -17,6 +17,8 @@ export interface AgentAdapter {
   readonly name: string;
   /** Returns true when this agent appears to be installed on the machine. */
   isInstalled(): Promise<boolean>;
+  /** Absolute paths of artifacts this adapter installs (read-only inspect). */
+  expectedArtifacts(homeDir?: string): string[];
   /** Install all agent-specific artifacts (commands, rules, etc.). */
   install(opts: AgentInstallOptions): Promise<AgentInstallResult>;
 }

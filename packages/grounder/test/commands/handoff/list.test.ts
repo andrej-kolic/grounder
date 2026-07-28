@@ -2,31 +2,17 @@ import { spawnSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { runHandoffList, runHandoffListWithOptions } from "../../../src/commands/handoff/list.js";
 import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
 import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
-import { createTempEnv, withGroundedHome } from "../../helpers.js";
+import { captureStdout, createTempEnv, withGroundedHome } from "../../helpers.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const cli = path.join(pkgRoot, "dist", "cli.js");
 
 function runCli(args: string[], env: NodeJS.ProcessEnv, cwd?: string) {
   return spawnSync(process.execPath, [cli, ...args], { encoding: "utf8", env, cwd });
-}
-
-async function captureStdout(fn: () => Promise<number>): Promise<{ code: number; out: string }> {
-  const chunks: string[] = [];
-  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-    chunks.push(String(chunk));
-    return true;
-  });
-  try {
-    const code = await fn();
-    return { code, out: chunks.join("") };
-  } finally {
-    spy.mockRestore();
-  }
 }
 
 describe("commands/handoff/list", () => {

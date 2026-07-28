@@ -52,6 +52,10 @@ EOF
 
 # Next session — hydrate from newest handoff (or use /grounder-task)
 grounder handoff list
+
+# Inspect link state / debug setup
+grounder status
+grounder doctor
 ```
 
 Notes land in `<vault>/10-Projects/{projectId}/notes/`.  
@@ -98,6 +102,8 @@ grounder handoff <text>      Write a session handoff to vault logs/
 grounder handoff list        Print recent handoff paths (newest first)
 grounder path notes          Print resolved notes directory
 grounder path logs           Print resolved logs directory
+grounder status              Snapshot of machine + project link + resolved paths
+grounder doctor              Health checks with fix hints
 ```
 
 ### Init flags
@@ -117,7 +123,22 @@ grounder path logs           Print resolved logs directory
 | `--title <slug>` | `note`, `handoff` | Filename slug (default: slugified text / first line) |
 | `--limit <n>` | `handoff list` | Max paths to print (default: 5) |
 
+### Doctor flags
+
+| Flag | Description |
+| --- | --- |
+| `--global` | Machine-only checks (skip project/link checks) |
+
 Run `grounder --help` for the full reference.
+
+### Status vs doctor
+
+| Command | Job | When to use |
+| --- | --- | --- |
+| `grounder status` | Snapshot of Machine (home config + vault path) and Project (link, id, notes/logs, git) | “Am I wired?” — see paths and link state |
+| `grounder doctor` | Health checklist (`ok` / `fail` / `warn`) with fix hints; exit `1` on any fail | “Why isn’t memory working?” — verify setup |
+
+Both are read-only. `status` exits `0` even when unlinked; `doctor` fails when checks fail. Use `doctor --global` to check the machine without a project link.
 
 ## Configuration
 
@@ -164,6 +185,17 @@ grounder vault init ~/Documents/obsidian/dev --agent=cursor --agent=claude
 Slash commands tell the agent to run `npx grounder …` from the linked project folder (no global install required). Re-run with `--force` to refresh existing installs.
 
 Templates live under `templates/agents/{id}/`. Adding another agent means one adapter file + one template directory — `vault init` stays agent-blind.
+
+## Troubleshooting
+
+| Symptom | Try |
+| --- | --- |
+| Not sure if this folder is linked | `grounder status` — check Project `Linked:` and paths |
+| Notes / handoffs fail or slash commands missing | `grounder doctor` — follow fix hints |
+| Machine setup only (no project yet) | `grounder doctor --global` |
+| Home config / vault missing | `grounder vault init <path>` |
+| No `.grounder.json` / notes dirs | `grounder init` |
+| Agent slash commands stale or partial | `grounder vault init <path> --force` (or `--agent=<id>`) |
 
 ## Development
 
