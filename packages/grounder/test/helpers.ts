@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { vi } from "vitest";
 
 export interface TempEnv {
   home: string;
@@ -56,4 +57,20 @@ export function withGroundedHome(home: string): NodeJS.ProcessEnv {
     GROUNDER_HOME: home,
     HOME: home,
   };
+}
+
+export async function captureStdout(
+  fn: () => Promise<number>,
+): Promise<{ code: number; out: string }> {
+  const chunks: string[] = [];
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+    chunks.push(String(chunk));
+    return true;
+  });
+  try {
+    const code = await fn();
+    return { code, out: chunks.join("") };
+  } finally {
+    spy.mockRestore();
+  }
 }

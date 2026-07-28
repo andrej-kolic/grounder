@@ -1,26 +1,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { runRepoInitWithOptions } from "../../src/commands/repo/init.js";
 import { runStatusWithOptions } from "../../src/commands/status.js";
 import { runVaultInitWithOptions } from "../../src/commands/vault/init.js";
 import { homeConfigPath, writeHomeConfig } from "../../src/connector/home.js";
 import { writeRepoConfig } from "../../src/connector/repo.js";
-import { createTempEnv } from "../helpers.js";
-
-async function captureStdout(fn: () => Promise<number>): Promise<{ code: number; out: string }> {
-  const chunks: string[] = [];
-  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-    chunks.push(String(chunk));
-    return true;
-  });
-  try {
-    const code = await fn();
-    return { code, out: chunks.join("") };
-  } finally {
-    spy.mockRestore();
-  }
-}
+import { captureStdout, createTempEnv } from "../helpers.js";
 
 describe("commands/status", () => {
   let cleanup: (() => Promise<void>) | undefined;
