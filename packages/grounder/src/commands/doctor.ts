@@ -221,8 +221,9 @@ async function runProjectChecks(
 
     if (!home || !repo) {
       const reason = !home ? "no home config" : "no valid repo config";
-      checks.push(failCheck("notes-dir", `cannot resolve notes/ (${reason})`, REPO_INIT));
-      checks.push(failCheck("logs-dir", `cannot resolve logs/ (${reason})`, REPO_INIT));
+      const fix = !home ? VAULT_INIT : REPO_INIT;
+      checks.push(failCheck("notes-dir", `cannot resolve notes/ (${reason})`, fix));
+      checks.push(failCheck("logs-dir", `cannot resolve logs/ (${reason})`, fix));
     } else {
       const notes = resolveNotesDir(home, repo);
       const logs = resolveLogsDir(home, repo);

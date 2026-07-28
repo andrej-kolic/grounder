@@ -5,6 +5,7 @@ import { grounderTaskCommandPath } from "../../src/agents/cursor.js";
 import { runDoctorWithOptions } from "../../src/commands/doctor.js";
 import { runRepoInitWithOptions } from "../../src/commands/repo/init.js";
 import { runVaultInitWithOptions } from "../../src/commands/vault/init.js";
+import { writeRepoConfig } from "../../src/connector/repo.js";
 import { createTempEnv } from "../helpers.js";
 
 async function captureStdout(fn: () => Promise<number>): Promise<{ code: number; out: string }> {
@@ -75,6 +76,23 @@ describe("commands/doctor", () => {
     expect(out).toContain("fail  vault");
     expect(out).toContain("Project\n");
     expect(out).toContain("fail  repo-config");
+  });
+
+  it("hints vault init for notes/logs when home is missing but repo config exists", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await writeRepoConfig(env.repo, { version: 1, projectId: "my-app" });
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(1);
+    expect(out).toContain("ok    repo-config");
+    expect(out).toContain("fail  notes-dir");
+    expect(out).toContain("cannot resolve notes/ (no home config) → grounder vault init <path>");
+    expect(out).toContain("cannot resolve logs/ (no home config) → grounder vault init <path>");
   });
 
   it("fails when repo config is missing", async () => {
