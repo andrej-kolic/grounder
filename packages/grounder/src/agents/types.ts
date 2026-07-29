@@ -21,4 +21,8 @@ export interface AgentAdapter {
   expectedArtifacts(homeDir?: string): string[];
   /** Install all agent-specific artifacts (commands, rules, etc.). */
   install(opts: AgentInstallOptions): Promise<AgentInstallResult>;
+  /** Optional: install session hooks (separate from slash-command install). */
+  installHooks?(opts: AgentInstallOptions): Promise<AgentInstallResult>;
+  /** Optional: absolute path(s) of hook config this adapter would touch. */
+  expectedHookArtifacts?(homeDir?: string): string[];
 }
