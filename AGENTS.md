@@ -7,7 +7,6 @@ Grounder is a Node CLI (`packages/grounder`) that wires project folders to perso
 - `packages/grounder/` — publishable package; all implementation lives here
 - `fixtures/minimal-git-repo/` — stable test fixture (automated tests)
 - `fixtures/dev/` — local CLI sandbox (`pnpm fixture:setup`)
-- `.ai/plans/` — product and implementation plans
 
 ### `packages/grounder/src/`
 
@@ -93,10 +92,3 @@ Root scripts are the quality contract — CI and agents should call these entryp
 - Templates ship in `packages/grounder/templates/` (included in npm `files`)
 - Idempotent file generation — never clobber user-edited vault content without `--force`
 - New agents: add `src/agents/<id>.ts` + `templates/agents/<id>/`, register in `agents/index.ts`
-
-## Plan
-
-Phase 1 complete: `.ai/plans/grounder-phase-1-minimal-connector.md`  
-Agent adapters (Option B): `.ai/discussions/pluggable.md` — **implemented**  
-Phase 2 handoff: `.ai/plans/grounder-phase-2-handoff.md`  
-Phase 2+ reference: `.ai/plans/grounder-init-cli.md`

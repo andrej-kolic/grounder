@@ -9,8 +9,7 @@ Monorepo for the [Grounder](https://www.npmjs.com/package/grounder) CLI — conn
 ```text
 grounder/
 ├── packages/grounder/     # publishable npm package (`grounder`)
-├── fixtures/              # test git repos (not published)
-└── .ai/plans/             # implementation plans
+└── fixtures/              # test git repos (not published)
 ```
 
 ## Development
@@ -61,11 +60,3 @@ git push origin v0.1.0
 ## Architecture
 
 Agent-agnostic core (`connector/`, `vault/`, `commands/`) plus a pluggable `agents/` adapter registry for Cursor, Claude Code, and future targets. Templates: `packages/grounder/templates/agents/{id}/`.
-
-## Plan
-
-Phase 1: [.ai/plans/grounder-phase-1-minimal-connector.md](.ai/plans/grounder-phase-1-minimal-connector.md)  
-Agent adapters (implemented): [.ai/discussions/pluggable.md](.ai/discussions/pluggable.md)  
-Phase 2 handoff: [.ai/plans/grounder-phase-2-handoff.md](.ai/plans/grounder-phase-2-handoff.md)  
-Phase 3 status + doctor: [.ai/plans/grounder-phase-3-status-doctor.md](.ai/plans/grounder-phase-3-status-doctor.md)  
-Full roadmap: [.ai/plans/grounder-init-cli.md](.ai/plans/grounder-init-cli.md)
