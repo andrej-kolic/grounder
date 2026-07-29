@@ -28,6 +28,8 @@ describe("grounder cli", () => {
     expect(result.stdout).toContain("grounder note");
     expect(result.stdout).toContain("grounder status");
     expect(result.stdout).toContain("grounder doctor");
+    expect(result.stdout).toContain("grounder handoff peek");
+    expect(result.stdout).toContain("Hook plumbing");
   });
 
   it("requires text for note command", () => {

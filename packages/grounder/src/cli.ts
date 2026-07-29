@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runDoctor } from "./commands/doctor.js";
 import { runHandoffList } from "./commands/handoff/list.js";
+import { runHandoffPeek } from "./commands/handoff/peek.js";
 import { runHandoff } from "./commands/handoff.js";
 import { runNote } from "./commands/note.js";
 import { runPathLogs } from "./commands/path/logs.js";
@@ -30,6 +31,9 @@ Usage:
   grounder path logs           Print resolved logs directory
   grounder status              Snapshot of machine + project link + resolved paths
   grounder doctor              Health checks with fix hints
+
+Hook plumbing:
+  grounder handoff peek        One-line latest-handoff teaser (used by session hooks)
 
 Options:
   -h, --help     Show this help
@@ -95,6 +99,10 @@ async function main(): Promise<void> {
 
   if (command === "handoff" && rest[0] === "list") {
     process.exit(await runHandoffList(rest.slice(1)));
+  }
+
+  if (command === "handoff" && rest[0] === "peek") {
+    process.exit(await runHandoffPeek(rest.slice(1)));
   }
 
   if (command === "handoff") {
