@@ -25,6 +25,7 @@ describe("commands/doctor", () => {
     await runVaultInitWithOptions({
       vaultPath: env.vault,
       yes: true,
+      hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
@@ -40,6 +41,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("ok    vault");
     expect(out).toContain("ok    projects-dir");
     expect(out).toContain("ok    agent-cursor");
+    expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).toContain("Project\n");
     expect(out).toContain("ok    repo-config");
     expect(out).toContain("ok    notes-dir");
@@ -111,6 +113,7 @@ describe("commands/doctor", () => {
     await runVaultInitWithOptions({
       vaultPath: env.vault,
       yes: true,
+      hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
@@ -125,6 +128,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("fail  agent-cursor");
     expect(out).toContain("grounder-task.md");
     expect(out).toContain("grounder vault init <path> --force");
+    expect(out).toContain("ok    agent-cursor-hooks");
   });
 
   it("warns when a detected agent has no command files", async () => {
@@ -146,6 +150,31 @@ describe("commands/doctor", () => {
     expect(code).toBe(0);
     expect(out).toContain("warn  agent-cursor");
     expect(out).toContain("no Grounder command files");
+    expect(out).toContain("warn  agent-cursor-hooks");
+    expect(out).toContain("no Grounder session hook → grounder vault init <path> --hooks");
+    expect(out).toMatch(/^\d+ passed, 0 failed, 2 warned$/m);
+  });
+
+  it("warns (never fails) when session hooks are absent", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("ok    agent-cursor");
+    expect(out).toContain("warn  agent-cursor-hooks");
+    expect(out).toContain("no Grounder session hook → grounder vault init <path> --hooks");
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });
 
@@ -156,6 +185,7 @@ describe("commands/doctor", () => {
     await runVaultInitWithOptions({
       vaultPath: env.vault,
       yes: true,
+      hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
@@ -167,6 +197,7 @@ describe("commands/doctor", () => {
     expect(code).toBe(0);
     expect(out).toContain("Machine\n");
     expect(out).toContain("ok    home-config");
+    expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).not.toContain("Project\n");
     expect(out).not.toContain("repo-config");
     expect(out).toMatch(/^\d+ passed, 0 failed, 0 warned$/m);
