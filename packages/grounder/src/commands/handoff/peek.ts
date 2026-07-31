@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { readCursorHookWorkspaceRoot } from "../../agents/cursor-hook-input.js";
 import { withHomeDir } from "../../connector/home.js";
@@ -6,7 +5,7 @@ import { resolveLinkedProject } from "../../connector/linked.js";
 import { resolveLogsDir } from "../../connector/vault.js";
 import { parseHandoffFrontmatter } from "../../util/frontmatter.js";
 import { flagBool, parseArgs } from "../../util/parse-args.js";
-import { listHandoffs } from "../../vault/list-handoffs.js";
+import { findUsableHandoff } from "../../vault/find-usable-handoff.js";
 
 /** Options for {@link runHandoffPeekWithOptions} (CLI and tests). */
 export interface HandoffPeekOptions {
@@ -89,7 +88,11 @@ export async function runHandoffPeek(argv: string[]): Promise<number> {
 }
 
 /**
- * Resolves the linked project and prints a one-line teaser for the newest handoff, or nothing.
+ * Resolves the linked project and prints a one-line teaser for the newest *usable*
+ * handoff, or nothing. "Usable" (via {@link findUsableHandoff}) skips empty/unreadable
+ * files and falls back to the next-newest — the same selection `grounder handoff list
+ * --head` uses, so the teaser and `/grounder-task` never disagree about which handoff
+ * is current.
  * Uses {@link resolveLinkedProject} directly (not `requireLinkedProject`) so failures stay silent.
  * @returns Always `0`.
  */
@@ -101,22 +104,13 @@ export async function runHandoffPeekWithOptions(options: HandoffPeekOptions = {}
         const resolved = await resolveLinkedProject(options.cwd ?? process.cwd());
         if (resolved.ok) {
           const logsDir = resolveLogsDir(resolved.value.home, resolved.value.repo);
-          const paths = await listHandoffs(logsDir, { limit: 1 });
-          const newest = paths[0];
-          if (newest) {
-            let content = "";
-            try {
-              content = await readFile(newest, "utf8");
-            } catch {
-              content = "";
-            }
-            if (content) {
-              const fm = parseHandoffFrontmatter(content);
-              const label = fm.title?.trim() || labelFromHandoffFilename(newest);
-              const createdDate = formatCreatedDate(fm.created, newest);
-              if (createdDate) {
-                teaser = `[grounder] Latest handoff: "${label}" (${createdDate}). Run /grounder-task to load it, or ignore if unrelated.`;
-              }
+          const usable = await findUsableHandoff(logsDir);
+          if (usable) {
+            const fm = parseHandoffFrontmatter(usable.content);
+            const label = fm.title?.trim() || labelFromHandoffFilename(usable.path);
+            const createdDate = formatCreatedDate(fm.created, usable.path);
+            if (createdDate) {
+              teaser = `[grounder] Latest handoff: "${label}" (${createdDate}). Run /grounder-task to load it, or ignore if unrelated.`;
             }
           }
         }

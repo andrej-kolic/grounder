@@ -23,6 +23,7 @@ vault/                # vault on disk
   write-note.ts       # note file I/O
   write-handoff.ts    # handoff file I/O (frontmatter + body)
   list-handoffs.ts    # list logs/*.md newest-first
+  find-usable-handoff.ts # newest-first, skipping empty/unreadable (peek + list --head)
 commands/             # mirrors CLI structure
   require-linked.ts   # CLI stderr wrapper around resolveLinkedProject
   vault/init.ts       # grounder vault init (agent-blind; uses agents registry)

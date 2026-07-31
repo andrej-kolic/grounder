@@ -61,7 +61,7 @@ Both commands preview what they'll write and ask to confirm; add `--yes` to skip
   Wrote handoff → <vault>/10-Projects/your-project/logs/2026-07-28-143200-auth-middleware.md
 ```
 
-`/grounder-task` hydrates the agent from the newest handoff plus `AGENTS.md`; `/grounder-task-handoff` writes the next checkpoint when you close the session. Behind the scenes these run `grounder handoff list` and `grounder handoff <text>` for you — see [Session loop](#session-loop).
+`/grounder-task` hydrates the agent from the newest *usable* handoff plus `AGENTS.md`; `/grounder-task-handoff` writes the next checkpoint when you close the session. Behind the scenes these run `grounder handoff list --head` and `grounder handoff <text>` for you — see [Session loop](#session-loop).
 
 No agent, or want to write by hand? The same actions are plain CLI commands:
 
@@ -72,7 +72,7 @@ grounder handoff list                            # newest handoffs, for manual h
 ```
 
 Notes land in `<vault>/10-Projects/{projectId}/notes/`.  
-Handoffs land in `<vault>/10-Projects/{projectId}/logs/` (one file per close; newest wins).
+Handoffs land in `<vault>/10-Projects/{projectId}/logs/` (one file per close; newest *usable* file wins — an empty or unreadable newest file falls back to the next one).
 
 Inspect or debug setup any time with `grounder status` / `grounder doctor` — see [Troubleshooting](#troubleshooting).
 
@@ -86,7 +86,7 @@ Inspect or debug setup any time with `grounder status` / `grounder doctor` — s
 | --- | --- | --- |
 | `/grounder-note` | `grounder note` | Ad-hoc vault note |
 | `/grounder-task-handoff` | `grounder handoff` | Write session checkpoint to `logs/` |
-| `/grounder-task` | `grounder handoff list` + read newest | Read-only hydrate from newest handoff + `AGENTS.md` |
+| `/grounder-task` | `grounder handoff list --head` + read it | Read-only hydrate from newest usable handoff + `AGENTS.md` |
 
 With `--hooks` on `vault init`, a new Cursor/Claude session may also print a one-line teaser when a handoff exists — never the full body. See [Session-start hooks](#session-start-hooks).
 
@@ -106,6 +106,7 @@ grounder init                Connect the current folder to your vault
 grounder note <text>         Write a note to the vault
 grounder handoff <text>      Write a session handoff to vault logs/
 grounder handoff list        Print recent handoff paths (newest first)
+grounder handoff list --head Print only the newest usable handoff path
 grounder handoff peek        One-line latest-handoff teaser (used by session hooks)
 grounder path notes          Print resolved notes directory
 grounder path logs           Print resolved logs directory
@@ -130,6 +131,7 @@ grounder doctor              Health checks with fix hints
 | --- | --- | --- |
 | `--title <slug>` | `note`, `handoff` | Filename slug (default: slugified text / first line) |
 | `--limit <n>` | `handoff list` | Max paths to print (default: 5) |
+| `--head` | `handoff list` | Print only the newest *usable* handoff path — skips empty/unreadable files, same pick as `handoff peek` |
 
 ### Doctor flags
 

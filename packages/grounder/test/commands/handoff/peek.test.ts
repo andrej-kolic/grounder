@@ -148,6 +148,40 @@ title: "auth"
     );
   });
 
+  it("falls back to an older handoff when the newest file is empty", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
+    await writeFile(
+      path.join(logsDir, "2026-06-26-143000-auth.md"),
+      `---
+project: "my-app"
+created: "2026-06-26T14:30:00.000Z"
+title: "auth"
+---
+
+old
+`,
+      "utf8",
+    );
+    // Simulates a crashed/interrupted write — same path a real `writeHandoff` call
+    // could leave behind if the process died right after file creation.
+    await writeFile(path.join(logsDir, "2026-06-26-150000-empty.md"), "", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runHandoffPeekWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe(
+      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n',
+    );
+  });
+
   it("reads unquoted legacy frontmatter and minute-precision filenames", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;

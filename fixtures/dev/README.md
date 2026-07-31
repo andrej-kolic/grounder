@@ -61,7 +61,7 @@ In Cursor / Claude Code (from this folder or a linked project):
 
 ```text
 (new session)           → optional one-line teaser if a handoff exists (with --hooks)
-/grounder-task          → list + read newest handoff + AGENTS.md (read-only)
+/grounder-task          → list --head + read newest usable handoff + AGENTS.md (read-only)
 … work …
 /grounder-task-handoff  → summarize → grounder handoff "<body>"
 ```

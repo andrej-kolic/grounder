@@ -27,6 +27,7 @@ Usage:
   grounder note <text>         Write a note to the vault
   grounder handoff <text>      Write a session handoff to vault logs/
   grounder handoff list        Print recent handoff paths (newest first)
+  grounder handoff list --head Print only the newest usable handoff path
   grounder path notes          Print resolved notes directory
   grounder path logs           Print resolved logs directory
   grounder status              Snapshot of machine + project link + resolved paths
@@ -54,6 +55,8 @@ Doctor flags:
 Note / handoff flags:
   --title <slug> Short slug in filename (default: slugified first line)
   --limit <n>    Max paths for handoff list (default: 5)
+  --head         With handoff list, print only the newest usable path
+                 (skips empty/unreadable files; same pick as handoff peek)
 
 Quickstart:
   grounder vault init <path-to-your-vault>
