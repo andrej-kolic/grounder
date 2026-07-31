@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { readCursorHookWorkspaceRoot } from "../../agents/cursor-hook-input.js";
 import { withHomeDir } from "../../connector/home.js";
 import { resolveLinkedProject } from "../../connector/linked.js";
 import { resolveLogsDir } from "../../connector/vault.js";
@@ -55,10 +56,13 @@ function formatCreatedDate(created: string | undefined, filePath: string): strin
  * CLI entry for `grounder handoff peek`.
  * Silent by default: prints nothing and exits 0 when unlinked, empty, or on any error.
  * Used by session-start hooks — must never crash or print noise.
+ * Reads Cursor hook stdin for `workspace_roots[0]` when present (user-level
+ * hooks run with cwd under `~/.cursor`, not the open workspace).
  * @returns Always `0`.
  */
 export async function runHandoffPeek(_argv: string[]): Promise<number> {
-  return runHandoffPeekWithOptions();
+  const stdinWorkspaceRoot = await readCursorHookWorkspaceRoot(process.stdin);
+  return runHandoffPeekWithOptions({ cwd: stdinWorkspaceRoot });
 }
 
 /**

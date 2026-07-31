@@ -14,8 +14,18 @@ import { captureStdout, createTempEnv, withGroundedHome } from "../../helpers.js
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const cli = path.join(pkgRoot, "dist", "cli.js");
 
-function runCli(args: string[], env: NodeJS.ProcessEnv, cwd?: string) {
-  return spawnSync(process.execPath, [cli, ...args], { encoding: "utf8", env, cwd });
+function runCli(
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  cwd?: string,
+  options?: { input?: string },
+) {
+  return spawnSync(process.execPath, [cli, ...args], {
+    encoding: "utf8",
+    env,
+    cwd,
+    input: options?.input,
+  });
 }
 
 describe("labelFromHandoffFilename", () => {
@@ -198,6 +208,41 @@ body
     );
 
     const result = runCli(["handoff", "peek"], withGroundedHome(env.home), env.repo);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe(
+      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n',
+    );
+  });
+
+  it("cli finds linked repo via Cursor hook stdin workspace_roots", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
+    await mkdir(logsDir, { recursive: true });
+    await writeFile(
+      path.join(logsDir, "2026-06-26-150000-auth.md"),
+      `---
+created: "2026-06-26T15:00:00.000Z"
+title: "auth"
+---
+
+body
+`,
+      "utf8",
+    );
+
+    // Simulate Cursor user-level hook cwd (~/.cursor) — unrelated to the linked repo.
+    const unrelatedCwd = path.join(env.home, ".cursor");
+    await mkdir(unrelatedCwd, { recursive: true });
+
+    const result = runCli(["handoff", "peek"], withGroundedHome(env.home), unrelatedCwd, {
+      input: JSON.stringify({ workspace_roots: [env.repo] }),
+    });
+
     expect(result.status).toBe(0);
     expect(result.stdout).toBe(
       '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n',
