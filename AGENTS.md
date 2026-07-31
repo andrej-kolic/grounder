@@ -23,6 +23,7 @@ vault/                # vault on disk
   write-note.ts       # note file I/O
   write-handoff.ts    # handoff file I/O (frontmatter + body)
   list-handoffs.ts    # list logs/*.md newest-first
+  find-usable-handoff.ts # newest-first, skipping empty/unreadable (peek + list --head)
 commands/             # mirrors CLI structure
   require-linked.ts   # CLI stderr wrapper around resolveLinkedProject
   vault/init.ts       # grounder vault init (agent-blind; uses agents registry)
@@ -35,6 +36,7 @@ commands/             # mirrors CLI structure
 agents/               # AgentAdapter registry (pluggable install targets)
   types.ts            # AgentAdapter interface
   index.ts            # resolveAgents(), detect
+  hook-runtime.ts     # ~/.grounder/runtime for session hooks (symlink durable source / copy npx cache)
   cursor.ts           # Cursor adapter
   claude.ts           # Claude Code adapter
 util/                 # shared helpers (fs, parse-args, prompt, slugs, path)

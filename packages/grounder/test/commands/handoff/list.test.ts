@@ -117,6 +117,78 @@ describe("commands/handoff/list", () => {
     expect(await runHandoffList(["--unknown"])).toBe(1);
   });
 
+  it("--head prints only the newest usable path", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
+    await writeFile(path.join(logsDir, "2026-06-26-1400-older.md"), "older", "utf8");
+    await writeFile(path.join(logsDir, "2026-06-26-1500-newer.md"), "newer", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runHandoffListWithOptions({ cwd: env.repo, homeDir: env.home, head: true }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe(`${path.join(logsDir, "2026-06-26-1500-newer.md")}\n`);
+  });
+
+  it("--head falls back past an empty newest handoff", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
+    await writeFile(path.join(logsDir, "2026-06-26-1400-older.md"), "older", "utf8");
+    await writeFile(path.join(logsDir, "2026-06-26-1500-empty.md"), "", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runHandoffListWithOptions({ cwd: env.repo, homeDir: env.home, head: true }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe(`${path.join(logsDir, "2026-06-26-1400-older.md")}\n`);
+  });
+
+  it("--head prints nothing when there are no handoffs", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const { code, out } = await captureStdout(() =>
+      runHandoffListWithOptions({ cwd: env.repo, homeDir: env.home, head: true }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe("");
+  });
+
+  it("cli accepts --head", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
+    await writeFile(path.join(logsDir, "2026-06-26-1500.md"), "content", "utf8");
+
+    const result = runCli(["handoff", "list", "--head"], withGroundedHome(env.home), env.repo);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe(path.join(logsDir, "2026-06-26-1500.md"));
+  });
+
   it("returns usage error for unexpected positionals", async () => {
     const code = await runHandoffList(["remaining", "work"]);
     expect(code).toBe(1);

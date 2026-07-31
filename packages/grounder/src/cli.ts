@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runDoctor } from "./commands/doctor.js";
 import { runHandoffList } from "./commands/handoff/list.js";
+import { runHandoffPeek } from "./commands/handoff/peek.js";
 import { runHandoff } from "./commands/handoff.js";
 import { runNote } from "./commands/note.js";
 import { runPathLogs } from "./commands/path/logs.js";
@@ -26,10 +27,14 @@ Usage:
   grounder note <text>         Write a note to the vault
   grounder handoff <text>      Write a session handoff to vault logs/
   grounder handoff list        Print recent handoff paths (newest first)
+  grounder handoff list --head Print only the newest usable handoff path
   grounder path notes          Print resolved notes directory
   grounder path logs           Print resolved logs directory
   grounder status              Snapshot of machine + project link + resolved paths
   grounder doctor              Health checks with fix hints
+
+Hook plumbing:
+  grounder handoff peek        One-line latest-handoff teaser (used by session hooks)
 
 Options:
   -h, --help     Show this help
@@ -42,6 +47,7 @@ Init flags:
   --vault <path> Override home vault root for this run (grounder init)
   --agent <id>   Install for a specific agent (repeatable; default: auto-detect)
                  Supported: cursor, claude
+  --hooks        Also install session-start teaser hooks (vault init)
 
 Doctor flags:
   --global       Machine-only checks (skip project/link checks)
@@ -49,9 +55,11 @@ Doctor flags:
 Note / handoff flags:
   --title <slug> Short slug in filename (default: slugified first line)
   --limit <n>    Max paths for handoff list (default: 5)
+  --head         With handoff list, print only the newest usable path
+                 (skips empty/unreadable files; same pick as handoff peek)
 
 Quickstart:
-  grounder vault init ~/Documents/obsidian/dev
+  grounder vault init <path-to-your-vault>
   grounder init
   grounder note "my first note"
   grounder handoff "# Handoff\\n\\n## Next\\n1. …"
@@ -95,6 +103,10 @@ async function main(): Promise<void> {
 
   if (command === "handoff" && rest[0] === "list") {
     process.exit(await runHandoffList(rest.slice(1)));
+  }
+
+  if (command === "handoff" && rest[0] === "peek") {
+    process.exit(await runHandoffPeek(rest.slice(1)));
   }
 
   if (command === "handoff") {

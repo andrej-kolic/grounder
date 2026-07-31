@@ -12,7 +12,7 @@ AI coding agents forget everything between sessions. Grounder gives them persist
 
 **Requirements:** Node.js 18+ and an Obsidian vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
 
-**Contents:** [Install](#install) · [Quickstart](#quickstart) · [Setup overview](#setup-overview) · [Commands](#commands) · [Configuration](#configuration) · [Agents](#agents) · [Troubleshooting](#troubleshooting)
+**Contents:** [Install](#install) · [Quickstart](#quickstart) · [Setup overview](#setup-overview) · [Commands](#commands) · [Configuration](#configuration) · [Agents](#agents) · [Session-start hooks](#session-start-hooks) · [Troubleshooting](#troubleshooting)
 
 ## Install
 
@@ -34,7 +34,8 @@ npx grounder --help
 
 ```bash
 # Once per machine — set vault location + install agent slash commands
-grounder vault init <path-to-your-vault>
+# --hooks adds an optional one-line session-start reminder (see Session-start hooks)
+grounder vault init <path-to-your-vault> --hooks
 
 # Once per project folder — link project id to vault notes/ + logs/
 cd your-project
@@ -60,7 +61,7 @@ Both commands preview what they'll write and ask to confirm; add `--yes` to skip
   Wrote handoff → <vault>/10-Projects/your-project/logs/2026-07-28-143200-auth-middleware.md
 ```
 
-`/grounder-task` hydrates the agent from the newest handoff plus `AGENTS.md`; `/grounder-task-handoff` writes the next checkpoint when you close the session. Behind the scenes these run `grounder handoff list` and `grounder handoff <text>` for you — see [Session loop](#session-loop).
+`/grounder-task` hydrates the agent from the newest *usable* handoff plus `AGENTS.md`; `/grounder-task-handoff` writes the next checkpoint when you close the session. Behind the scenes these run `grounder handoff list --head` and `grounder handoff <text>` for you — see [Session loop](#session-loop).
 
 No agent, or want to write by hand? The same actions are plain CLI commands:
 
@@ -71,21 +72,23 @@ grounder handoff list                            # newest handoffs, for manual h
 ```
 
 Notes land in `<vault>/10-Projects/{projectId}/notes/`.  
-Handoffs land in `<vault>/10-Projects/{projectId}/logs/` (one file per close; newest wins).
+Handoffs land in `<vault>/10-Projects/{projectId}/logs/` (one file per close; newest *usable* file wins — an empty or unreadable newest file falls back to the next one).
 
 Inspect or debug setup any time with `grounder status` / `grounder doctor` — see [Troubleshooting](#troubleshooting).
 
 ### Session loop
 
 ```text
-/grounder-task → work → /grounder-task-handoff → next /grounder-task
+(optional teaser) → /grounder-task → work → /grounder-task-handoff → next session
 ```
 
 | Slash command | CLI | Role |
 | --- | --- | --- |
 | `/grounder-note` | `grounder note` | Ad-hoc vault note |
 | `/grounder-task-handoff` | `grounder handoff` | Write session checkpoint to `logs/` |
-| `/grounder-task` | `grounder handoff list` + read newest | Read-only hydrate from newest handoff + `AGENTS.md` |
+| `/grounder-task` | `grounder handoff list --head` + read it | Read-only hydrate from newest usable handoff + `AGENTS.md` |
+
+With `--hooks` on `vault init`, a new Cursor/Claude session may also print a one-line teaser when a handoff exists — never the full body. See [Session-start hooks](#session-start-hooks).
 
 ## Setup overview
 
@@ -103,6 +106,8 @@ grounder init                Connect the current folder to your vault
 grounder note <text>         Write a note to the vault
 grounder handoff <text>      Write a session handoff to vault logs/
 grounder handoff list        Print recent handoff paths (newest first)
+grounder handoff list --head Print only the newest usable handoff path
+grounder handoff peek        One-line latest-handoff teaser (used by session hooks)
 grounder path notes          Print resolved notes directory
 grounder path logs           Print resolved logs directory
 grounder status              Snapshot of machine + project link + resolved paths
@@ -118,6 +123,7 @@ grounder doctor              Health checks with fix hints
 | `--id <id>` | `init` | Override detected project id |
 | `--vault <path>` | `init` | Override home vault root for this run |
 | `--agent <id>` | `vault init` | Install for a specific agent (repeatable; default: auto-detect). Supported: `cursor`, `claude` |
+| `--hooks` | `vault init` | Also install session-start teaser hooks (opt-in; see [Session-start hooks](#session-start-hooks)) |
 
 ### Note / handoff flags
 
@@ -125,6 +131,7 @@ grounder doctor              Health checks with fix hints
 | --- | --- | --- |
 | `--title <slug>` | `note`, `handoff` | Filename slug (default: slugified text / first line) |
 | `--limit <n>` | `handoff list` | Max paths to print (default: 5) |
+| `--head` | `handoff list` | Print only the newest *usable* handoff path — skips empty/unreadable files, same pick as `handoff peek` |
 
 ### Doctor flags
 
@@ -189,6 +196,35 @@ Slash commands tell the agent to run `npx grounder …` from the linked project 
 
 Templates live under `templates/agents/{id}/`. Adding another agent means one adapter file + one template directory — `vault init` stays agent-blind.
 
+## Session-start hooks
+
+Opt-in safety net for the session loop: when a Cursor or Claude Code session starts in a linked project that already has a handoff, Grounder prints **one line** reminding you it exists. You (or the agent) still decide whether to run `/grounder-task`.
+
+```bash
+grounder vault init <path-to-your-vault> --hooks
+```
+
+Example teaser:
+
+```text
+[grounder] Latest handoff: "auth middleware" (2026-07-28). Run /grounder-task to load it, or ignore if unrelated.
+```
+
+What hooks do **not** do:
+
+- They never auto-load the full handoff body into context
+- They never block or delay a session from starting
+- Unlinked folders and projects with no handoffs print nothing (exit 0, silent)
+
+`doctor` reports a `warn` (never a `fail`) when a detected agent has no Grounder hook installed, and when hooks are installed but `~/.grounder/runtime` is stale or missing.
+
+Hooks run `~/.grounder/runtime/dist/cli.js` directly (not `npx`), materialized on install:
+
+- **Real install** (`npm i -g grounder`, `pnpm add -g grounder`, or a monorepo checkout) → symlinked. Upgrading overwrites the same path in place, so hooks stay current with **no re-run needed**.
+- **Bare `npx grounder vault init --hooks`** (nothing installed) → copied, since each `npx` invocation resolves to a disposable, version-pinned cache dir that can't be symlinked durably. Re-run the same command after upgrading grounder to refresh (no `--force` needed).
+
+If you want hooks that stay current with zero maintenance, install grounder rather than using bare `npx` for this step.
+
 ## Troubleshooting
 
 | Symptom | Try |
@@ -199,6 +235,8 @@ Templates live under `templates/agents/{id}/`. Adding another agent means one ad
 | Home config / vault missing | `grounder vault init <path>` |
 | No `.grounder.json` / notes dirs | `grounder init` |
 | Agent slash commands stale or partial | `grounder vault init <path> --force` (or `--agent=<id>`) |
+| Session-start teaser missing (optional) | `grounder vault init <path> --hooks` — `doctor` warns when absent |
+| Session-start teaser stale after upgrade (bare npx) | `grounder vault init <path> --hooks` — `doctor` warns when `hook-runtime` is stale |
 
 ## Development
 

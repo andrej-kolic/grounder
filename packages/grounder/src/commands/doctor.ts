@@ -1,5 +1,6 @@
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { isGrounderPeekHookCommand, isHookRuntimeStale } from "../agents/hook-runtime.js";
 import { resolveAgents } from "../agents/index.js";
 import { findGitRoot } from "../connector/git.js";
 import { homeConfigPath, readHomeConfig, withHomeDir } from "../connector/home.js";
@@ -19,6 +20,7 @@ export interface DoctorOptions {
 
 const VAULT_INIT = "grounder vault init <path>";
 const VAULT_INIT_FORCE = "grounder vault init <path> --force";
+const VAULT_INIT_HOOKS = "grounder vault init <path> --hooks";
 const REPO_INIT = "grounder init";
 
 async function isDirectory(dirPath: string): Promise<boolean> {
@@ -159,6 +161,82 @@ async function checkAgentArtifacts(homeDir?: string): Promise<CheckResult[]> {
   return checks;
 }
 
+/** True when any nested `command` field is Grounder's peek hook (Cursor or Claude shape). */
+function jsonContainsGrounderPeekCommand(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(jsonContainsGrounderPeekCommand);
+  }
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if (isGrounderPeekHookCommand(obj.command)) {
+      return true;
+    }
+    return Object.values(obj).some(jsonContainsGrounderPeekCommand);
+  }
+  return false;
+}
+
+async function hookFileHasGrounderEntry(filePath: string): Promise<boolean> {
+  try {
+    if (!(await fileExists(filePath))) {
+      return false;
+    }
+    const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
+    return jsonContainsGrounderPeekCommand(parsed);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Warn-only: session hooks are opt-in. Missing entry never fails doctor.
+ * One check per detected agent that declares `expectedHookArtifacts`.
+ *
+ * When at least one agent has a Grounder hook installed, also check the shared
+ * `~/.grounder/runtime` materialization — stale mainly for bare-npx copy installs
+ * after an upgrade (symlink installs stay current without re-init).
+ */
+async function checkAgentHooks(homeDir?: string): Promise<CheckResult[]> {
+  const agents = await resolveAgents();
+  const checks: CheckResult[] = [];
+  let anyHooksInstalled = false;
+
+  for (const agent of agents) {
+    if (!agent.expectedHookArtifacts) {
+      continue;
+    }
+
+    const expected = agent.expectedHookArtifacts(homeDir);
+    const present = await Promise.all(expected.map((p) => hookFileHasGrounderEntry(p)));
+    const id = `agent-${agent.id}-hooks`;
+
+    if (present.every(Boolean) && expected.length > 0) {
+      anyHooksInstalled = true;
+      checks.push(okCheck(id, `${agent.name} session hook installed`));
+    } else {
+      checks.push(
+        warnCheck(id, `${agent.name} detected but no Grounder session hook`, VAULT_INIT_HOOKS),
+      );
+    }
+  }
+
+  if (anyHooksInstalled) {
+    if (await isHookRuntimeStale(homeDir)) {
+      checks.push(
+        warnCheck(
+          "hook-runtime",
+          "hook runtime stale or missing (re-run after upgrading, especially bare npx)",
+          VAULT_INIT_HOOKS,
+        ),
+      );
+    } else {
+      checks.push(okCheck("hook-runtime", "hook runtime current"));
+    }
+  }
+
+  return checks;
+}
+
 async function runMachineChecks(homeDir?: string): Promise<{
   checks: CheckResult[];
   home: Awaited<ReturnType<typeof readHomeConfig>>;
@@ -167,9 +245,10 @@ async function runMachineChecks(homeDir?: string): Promise<{
   const { check: vaultCheck, vaultRoot } = await checkVault(home);
   const projectsCheck = await checkProjectsDir(vaultRoot);
   const agentChecks = await checkAgentArtifacts(homeDir);
+  const hookChecks = await checkAgentHooks(homeDir);
 
   return {
-    checks: [homeCheck, vaultCheck, projectsCheck, ...agentChecks],
+    checks: [homeCheck, vaultCheck, projectsCheck, ...agentChecks, ...hookChecks],
     home,
   };
 }

@@ -1,4 +1,5 @@
 import { mkdir } from "node:fs/promises";
+import { installHookRuntime, runtimeCliPath } from "../../agents/hook-runtime.js";
 import { resolveAgents } from "../../agents/index.js";
 import {
   homeConfigPath,
@@ -15,6 +16,8 @@ export interface VaultInitOptions {
   vaultPath: string;
   yes?: boolean;
   force?: boolean;
+  /** Also install session-start teaser hooks for adapters that support them. */
+  hooks?: boolean;
   homeDir?: string;
   /** Agent ids to install for. Defaults to auto-detecting installed agents. */
   agents?: string[];
@@ -25,6 +28,7 @@ export async function runVaultInit(argv: string[]): Promise<number> {
   const vaultPathArg = positional[0];
   const yes = flagBool(flags, "yes", "y");
   const force = flagBool(flags, "force", "f");
+  const hooks = flagBool(flags, "hooks");
   const agents = flagStrings(repeated, "agent");
 
   if (!vaultPathArg) {
@@ -36,6 +40,7 @@ export async function runVaultInit(argv: string[]): Promise<number> {
     vaultPath: vaultPathArg,
     yes,
     force,
+    hooks,
     agents: agents.length > 0 ? agents : undefined,
   });
 }
@@ -45,6 +50,7 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
     const vaultRoot = resolveUserPath(options.vaultPath);
     const yes = options.yes ?? false;
     const force = options.force ?? false;
+    const hooks = options.hooks ?? false;
     const homeDir = options.homeDir;
 
     const existingHome = await readHomeConfig();
@@ -62,8 +68,18 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
     process.stdout.write("Will write:\n");
     process.stdout.write(`  home   ${homeConfigPath(homeDir)}\n`);
     process.stdout.write("  vault  10-Projects/ (if missing)\n");
+    const hookAgents = hooks ? agents.filter((agent) => agent.installHooks) : [];
+    if (hookAgents.length > 0) {
+      // Shared across agents — list once (not under each adapter).
+      process.stdout.write(`  grounder runtime ${runtimeCliPath(homeDir)}\n`);
+    }
     for (const agent of agents) {
       process.stdout.write(`  ${agent.id.padEnd(8)} (${agent.name} artifacts)\n`);
+      if (hooks && agent.expectedHookArtifacts) {
+        for (const hookPath of agent.expectedHookArtifacts(homeDir)) {
+          process.stdout.write(`  ${agent.id.padEnd(8)} hook ${hookPath}\n`);
+        }
+      }
     }
     if (agents.length === 0) {
       process.stdout.write("  (no supported agents detected — skipping agent artifacts)\n");
@@ -84,6 +100,15 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
     process.stdout.write("✓ Wrote home config\n");
     process.stdout.write(`✓ Vault scaffold: ${projectsDir}\n`);
 
+    if (hookAgents.length > 0) {
+      const runtime = await installHookRuntime({ homeDir });
+      const runtimeLabel =
+        runtime.status === "skipped"
+          ? "already exists (skipped)"
+          : `installed (${runtime.mode}): ${runtime.cliPath}`;
+      process.stdout.write(`✓ Grounder hook runtime ${runtimeLabel}\n`);
+    }
+
     for (const agent of agents) {
       const result = await agent.install({ force, homeDir });
       for (const [artifactPath, status] of Object.entries(result.artifacts)) {
@@ -93,6 +118,15 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
       }
       if (Object.keys(result.artifacts).length === 0) {
         process.stdout.write(`✓ ${agent.name}: no artifacts to install yet\n`);
+      }
+
+      if (hooks && agent.installHooks) {
+        const hookResult = await agent.installHooks({ force, homeDir });
+        for (const [artifactPath, status] of Object.entries(hookResult.artifacts)) {
+          const label =
+            status === "skipped" ? "already exists (skipped)" : `installed: ${artifactPath}`;
+          process.stdout.write(`✓ ${agent.name} hook ${label}\n`);
+        }
       }
     }
 

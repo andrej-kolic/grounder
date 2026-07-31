@@ -1,6 +1,7 @@
 import { withHomeDir } from "../../connector/home.js";
 import { resolveLogsDir } from "../../connector/vault.js";
-import { parseArgs } from "../../util/parse-args.js";
+import { flagBool, parseArgs } from "../../util/parse-args.js";
+import { findUsableHandoff } from "../../vault/find-usable-handoff.js";
 import { listHandoffs } from "../../vault/list-handoffs.js";
 import { requireLinkedProject } from "../require-linked.js";
 
@@ -12,11 +13,17 @@ export interface HandoffListOptions {
   cwd?: string;
   /** Max paths to print, newest first (default: 5). */
   limit?: number;
+  /**
+   * Print only the single newest *usable* handoff path (skips empty/unreadable
+   * files), same selection `grounder handoff peek` uses. Ignores `limit` for
+   * output count but still bounds the fallback scan.
+   */
+  head?: boolean;
   /** Override home dir / `GROUNDER_HOME` (tests). */
   homeDir?: string;
 }
 
-const USAGE = "Usage: grounder handoff list [--limit <n>]\n";
+const USAGE = "Usage: grounder handoff list [--limit <n>] [--head]\n";
 
 function usageError(): number {
   process.stderr.write(USAGE);
@@ -35,7 +42,7 @@ export async function runHandoffList(argv: string[]): Promise<number> {
   }
 
   for (const key of flags.keys()) {
-    if (key !== "limit") {
+    if (key !== "limit" && key !== "head") {
       return usageError();
     }
   }
@@ -54,13 +61,16 @@ export async function runHandoffList(argv: string[]): Promise<number> {
     limit = parsed;
   }
 
-  return runHandoffListWithOptions({ limit });
+  return runHandoffListWithOptions({ limit, head: flagBool(flags, "head") });
 }
 
 /**
  * Resolves the linked project, lists recent handoff paths under `logs/` (newest first).
  * Prints one absolute path per line; empty when no handoffs. Same vault/link
  * prerequisites as `grounder handoff`.
+ * With `head: true`, prints only the single newest *usable* handoff path — see
+ * {@link findUsableHandoff}. This is the selection `/grounder-task` should read,
+ * matching what `grounder handoff peek` teases.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runHandoffListWithOptions(options: HandoffListOptions = {}): Promise<number> {
@@ -71,6 +81,15 @@ export async function runHandoffListWithOptions(options: HandoffListOptions = {}
     }
 
     const logsDir = resolveLogsDir(linked.home, linked.repo);
+
+    if (options.head) {
+      const usable = await findUsableHandoff(logsDir, { limit: options.limit ?? DEFAULT_LIMIT });
+      if (usable) {
+        process.stdout.write(`${usable.path}\n`);
+      }
+      return 0;
+    }
+
     const paths = await listHandoffs(logsDir, {
       limit: options.limit ?? DEFAULT_LIMIT,
     });
