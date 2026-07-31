@@ -216,7 +216,7 @@ What hooks do **not** do:
 - They never block or delay a session from starting
 - Unlinked folders and projects with no handoffs print nothing (exit 0, silent)
 
-`doctor` reports a `warn` (never a `fail`) when a detected agent has no Grounder hook installed.
+`doctor` reports a `warn` (never a `fail`) when a detected agent has no Grounder hook installed, and when hooks are installed but `~/.grounder/runtime` is stale or missing.
 
 Hooks run `~/.grounder/runtime/dist/cli.js` directly (not `npx`), materialized on install:
 
@@ -236,6 +236,7 @@ If you want hooks that stay current with zero maintenance, install grounder rath
 | No `.grounder.json` / notes dirs | `grounder init` |
 | Agent slash commands stale or partial | `grounder vault init <path> --force` (or `--agent=<id>`) |
 | Session-start teaser missing (optional) | `grounder vault init <path> --hooks` — `doctor` warns when absent |
+| Session-start teaser stale after upgrade (bare npx) | `grounder vault init <path> --hooks` — `doctor` warns when `hook-runtime` is stale |
 
 ## Development
 

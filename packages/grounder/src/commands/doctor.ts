@@ -1,6 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { isGrounderPeekHookCommand } from "../agents/hook-runtime.js";
+import { isGrounderPeekHookCommand, isHookRuntimeStale } from "../agents/hook-runtime.js";
 import { resolveAgents } from "../agents/index.js";
 import { findGitRoot } from "../connector/git.js";
 import { homeConfigPath, readHomeConfig, withHomeDir } from "../connector/home.js";
@@ -191,10 +191,15 @@ async function hookFileHasGrounderEntry(filePath: string): Promise<boolean> {
 /**
  * Warn-only: session hooks are opt-in. Missing entry never fails doctor.
  * One check per detected agent that declares `expectedHookArtifacts`.
+ *
+ * When at least one agent has a Grounder hook installed, also check the shared
+ * `~/.grounder/runtime` materialization — stale mainly for bare-npx copy installs
+ * after an upgrade (symlink installs stay current without re-init).
  */
 async function checkAgentHooks(homeDir?: string): Promise<CheckResult[]> {
   const agents = await resolveAgents();
   const checks: CheckResult[] = [];
+  let anyHooksInstalled = false;
 
   for (const agent of agents) {
     if (!agent.expectedHookArtifacts) {
@@ -206,11 +211,26 @@ async function checkAgentHooks(homeDir?: string): Promise<CheckResult[]> {
     const id = `agent-${agent.id}-hooks`;
 
     if (present.every(Boolean) && expected.length > 0) {
+      anyHooksInstalled = true;
       checks.push(okCheck(id, `${agent.name} session hook installed`));
     } else {
       checks.push(
         warnCheck(id, `${agent.name} detected but no Grounder session hook`, VAULT_INIT_HOOKS),
       );
+    }
+  }
+
+  if (anyHooksInstalled) {
+    if (await isHookRuntimeStale(homeDir)) {
+      checks.push(
+        warnCheck(
+          "hook-runtime",
+          "hook runtime stale or missing (re-run after upgrading, especially bare npx)",
+          VAULT_INIT_HOOKS,
+        ),
+      );
+    } else {
+      checks.push(okCheck("hook-runtime", "hook runtime current"));
     }
   }
 
