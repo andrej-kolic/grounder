@@ -283,6 +283,42 @@ body
     );
   });
 
+  it("cli finds linked repo via CURSOR_PROJECT_DIR when stdin has no workspace", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
+    await mkdir(logsDir, { recursive: true });
+    await writeFile(
+      path.join(logsDir, "2026-06-26-150000-auth.md"),
+      `---
+created: "2026-06-26T15:00:00.000Z"
+title: "auth"
+---
+
+body
+`,
+      "utf8",
+    );
+
+    const unrelatedCwd = path.join(env.home, ".cursor");
+    await mkdir(unrelatedCwd, { recursive: true });
+
+    const result = runCli(
+      ["handoff", "peek"],
+      { ...withGroundedHome(env.home), CURSOR_PROJECT_DIR: env.repo },
+      unrelatedCwd,
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe(
+      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n',
+    );
+  });
+
   it("--json prints additional_context when a teaser is present", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;

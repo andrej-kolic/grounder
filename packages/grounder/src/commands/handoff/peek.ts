@@ -70,11 +70,24 @@ function writePeekOutput(teaser: string | undefined, json: boolean | undefined):
 }
 
 /**
+ * Resolve the workspace root for a Cursor sessionStart hook.
+ * Prefer stdin `workspace_roots[0]`, then `CURSOR_PROJECT_DIR` (always set for
+ * Cursor hook scripts), else leave undefined so callers fall back to `cwd`.
+ */
+function resolveCursorHookCwd(stdinWorkspaceRoot: string | undefined): string | undefined {
+  if (stdinWorkspaceRoot !== undefined) {
+    return stdinWorkspaceRoot;
+  }
+  const fromEnv = process.env.CURSOR_PROJECT_DIR?.trim();
+  return fromEnv || undefined;
+}
+
+/**
  * CLI entry for `grounder handoff peek`.
  * Silent by default: prints nothing and exits 0 when unlinked, empty, or on any error.
  * Used by session-start hooks — must never crash or print noise.
- * Reads Cursor hook stdin for `workspace_roots[0]` when present (user-level
- * hooks run with cwd under `~/.cursor`, not the open workspace).
+ * Reads Cursor hook stdin for `workspace_roots[0]` when present; falls back to
+ * `CURSOR_PROJECT_DIR` (user-level hooks often run with cwd under `~/.cursor`).
  * Pass `--json` for Cursor's `additional_context` stdout contract.
  * @returns Always `0`.
  */
@@ -82,7 +95,7 @@ export async function runHandoffPeek(argv: string[]): Promise<number> {
   const { flags } = parseArgs(argv);
   const stdinWorkspaceRoot = await readCursorHookWorkspaceRoot(process.stdin);
   return runHandoffPeekWithOptions({
-    cwd: stdinWorkspaceRoot,
+    cwd: resolveCursorHookCwd(stdinWorkspaceRoot),
     json: flagBool(flags, "json"),
   });
 }

@@ -1,4 +1,4 @@
-import { Readable } from "node:stream";
+import { PassThrough, Readable } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { readCursorHookWorkspaceRoot } from "../../src/agents/cursor-hook-input.js";
 
@@ -63,8 +63,15 @@ describe("agents/cursor-hook-input", () => {
     await expect(readCursorHookWorkspaceRoot(stdin)).resolves.toBeUndefined();
   });
 
-  it("returns undefined when stdin never ends (timeout)", async () => {
+  it("returns undefined when stdin never ends and has no data (timeout)", async () => {
     const stdin = streamFrom(null);
     await expect(readCursorHookWorkspaceRoot(stdin)).resolves.toBeUndefined();
+  });
+
+  it("parses buffered JSON when data arrives but stdin never ends (timeout)", async () => {
+    const stdin = new PassThrough();
+    stdin.write(JSON.stringify({ workspace_roots: ["/Users/me/dev/my-app"] }));
+    // Deliberately never end — timeout must parse the buffered payload.
+    await expect(readCursorHookWorkspaceRoot(stdin)).resolves.toBe("/Users/me/dev/my-app");
   });
 });

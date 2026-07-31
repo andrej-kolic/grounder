@@ -11,8 +11,9 @@ const STDIN_TIMEOUT_MS = 200;
  * user-level hooks, whose `cwd` is `~/.cursor` — not the open project.
  *
  * Never throws. Returns `undefined` for TTY stdin, empty/malformed input,
- * missing `workspace_roots`, or when the stream does not end within the
- * timeout (so interactive/`grounder handoff peek` runs never hang).
+ * missing `workspace_roots`, or when no data arrives within the timeout
+ * (so interactive/`grounder handoff peek` runs never hang). If data arrived
+ * but stdin has not ended yet, the buffered payload is still parsed.
  */
 export async function readCursorHookWorkspaceRoot(
   stdin: NodeJS.ReadableStream = process.stdin,
@@ -68,16 +69,19 @@ function readStdinWithTimeout(
     const onData = (chunk: Buffer | string) => {
       chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
     };
-    const onEnd = () => {
+    const buffered = (): string | undefined => {
       if (chunks.length === 0) {
-        settle(undefined);
-        return;
+        return undefined;
       }
-      settle(Buffer.concat(chunks).toString("utf8"));
+      return Buffer.concat(chunks).toString("utf8");
     };
+
+    const onEnd = () => settle(buffered());
     const onError = () => settle(undefined);
 
-    const timer = setTimeout(() => settle(undefined), timeoutMs);
+    // On timeout, still use whatever arrived — Cursor may flush the JSON
+    // payload before closing stdin; discarding it would lose workspace_roots.
+    const timer = setTimeout(() => settle(buffered()), timeoutMs);
     timer.unref?.();
 
     stdin.on("data", onData);

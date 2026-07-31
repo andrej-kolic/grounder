@@ -1,4 +1,4 @@
-import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
@@ -12,6 +12,7 @@ import {
   runtimeManifestPath,
   shellQuote,
 } from "../../src/agents/hook-runtime.js";
+import { fileExists } from "../../src/util/fs.js";
 import { createTempEnv } from "../helpers.js";
 
 /** `packages/grounder` — real checkout root, always outside the OS temp dir. */
@@ -156,6 +157,30 @@ describe("agents/hook-runtime", () => {
       expect(second.mode).toBe("symlink");
       const destDist = path.join(grounderRuntimeDir(env.home), "dist");
       expect((await lstat(destDist)).isSymbolicLink()).toBe(true);
+    });
+
+    it("keeps the previous runtime when staging the replacement fails", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+      const fakeRoot = await writeFakePackage(path.join(env.repo, "fake-pkg"), "1.0.0");
+
+      await installHookRuntime({ homeDir: env.home, packageRoot: fakeRoot });
+      const previous = await readFile(runtimeCliPath(env.home), "utf8");
+
+      // Read-only runtime dir: staging cannot be created, so install must fail
+      // without removing the live dist/ hooks already point at.
+      const runtimeDir = grounderRuntimeDir(env.home);
+      await chmod(runtimeDir, 0o555);
+      try {
+        await expect(
+          installHookRuntime({ homeDir: env.home, packageRoot: fakeRoot }),
+        ).rejects.toThrow();
+        expect(await readFile(runtimeCliPath(env.home), "utf8")).toBe(previous);
+        expect(await fileExists(path.join(runtimeDir, "dist.staging"))).toBe(false);
+        expect(await fileExists(path.join(runtimeDir, "dist.bak"))).toBe(false);
+      } finally {
+        await chmod(runtimeDir, 0o755);
+      }
     });
   });
 

@@ -41,7 +41,17 @@
  *    `~/.grounder/runtime`.
  */
 
-import { cp, lstat, mkdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  cp,
+  lstat,
+  mkdir,
+  readFile,
+  realpath,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -219,7 +229,8 @@ export async function isHookRuntimeStale(
  * write a manifest recording how.
  *
  * Callers should gate on {@link isHookRuntimeStale} (or `force`) before calling —
- * this always replaces whatever is currently at the destination.
+ * this always replaces whatever is currently at the destination, staging the
+ * new materialization first so a failed symlink/cp leaves the live runtime intact.
  *
  * @param options.packageRoot - Source package root to materialize (defaults to
  *   the currently running package — override only in tests)
@@ -242,17 +253,46 @@ export async function installHookRuntime(options: {
   }
 
   await mkdir(runtimeDir, { recursive: true });
-  // Always replace: handles copy→symlink / symlink→copy transitions (e.g. a
-  // dev checkout that used to be an npx cache, or vice versa) cleanly. `rm`
-  // on a symlink removes the link itself, never the target's contents.
-  await rm(destDist, { recursive: true, force: true });
+
+  // Stage into a sibling path first, then swap. If symlink/cp fails, the live
+  // `dist/` (and any hooks pointing at it) stay intact.
+  const stagingDist = `${destDist}.staging`;
+  const backupDist = `${destDist}.bak`;
+  await rm(stagingDist, { recursive: true, force: true });
+  await rm(backupDist, { recursive: true, force: true });
 
   const mode: "symlink" | "copy" = isEphemeralSource(packageRoot) ? "copy" : "symlink";
-  if (mode === "symlink") {
-    const resolvedSource = await realpath(sourceDistDir).catch(() => path.resolve(sourceDistDir));
-    await symlink(resolvedSource, destDist, process.platform === "win32" ? "junction" : "dir");
-  } else {
-    await cp(sourceDistDir, destDist, { recursive: true, force: true });
+  try {
+    if (mode === "symlink") {
+      const resolvedSource = await realpath(sourceDistDir).catch(() => path.resolve(sourceDistDir));
+      await symlink(resolvedSource, stagingDist, process.platform === "win32" ? "junction" : "dir");
+    } else {
+      await cp(sourceDistDir, stagingDist, { recursive: true, force: true });
+    }
+
+    // Move the live dest aside (if any), then promote staging. On promote
+    // failure, restore the backup so hooks keep a working cli.js.
+    try {
+      await rename(destDist, backupDist);
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
+    }
+    try {
+      await rename(stagingDist, destDist);
+    } catch (error: unknown) {
+      try {
+        await rename(backupDist, destDist);
+      } catch {
+        // Best-effort restore; rethrow the promote failure below.
+      }
+      throw error;
+    }
+    await rm(backupDist, { recursive: true, force: true });
+  } catch (error: unknown) {
+    await rm(stagingDist, { recursive: true, force: true }).catch(() => undefined);
+    throw error;
   }
 
   const manifest: HookRuntimeManifest = {
