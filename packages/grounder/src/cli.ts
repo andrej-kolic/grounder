@@ -56,7 +56,7 @@ Note / handoff flags:
   --limit <n>    Max paths for handoff list (default: 5)
 
 Quickstart:
-  grounder vault init ~/Documents/obsidian/dev
+  grounder vault init <path-to-your-vault>
   grounder init
   grounder note "my first note"
   grounder handoff "# Handoff\\n\\n## Next\\n1. …"

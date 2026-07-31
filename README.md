@@ -27,18 +27,19 @@ Use `fixtures/dev/` as a workspace sandbox (not the test fixture):
 
 ```bash
 pnpm fixture:setup
-pnpm grounder vault init ~/Documents/obsidian/dev --yes   # once per machine
+pnpm grounder vault init <path-to-your-vault> --yes --hooks   # once per machine; --hooks = session-start teaser
 cd fixtures/dev
 pnpm grounder init --yes
 pnpm grounder note "hello from dev fixture"
 pnpm grounder handoff "# Handoff"$'\n\n'"## Next"$'\n'"1. Try /grounder-task next session"
 pnpm grounder handoff list
+pnpm grounder handoff peek   # one-line teaser (same as the session hook)
 pnpm grounder path logs
 pnpm grounder status
 pnpm grounder doctor
 ```
 
-Session loop in the agent: `/grounder-task` → work → `/grounder-task-handoff`.
+Session loop in the agent: (optional teaser on session start) → `/grounder-task` → work → `/grounder-task-handoff`.
 
 See [fixtures/dev/README.md](fixtures/dev/README.md).
 

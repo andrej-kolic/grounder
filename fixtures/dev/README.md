@@ -10,7 +10,7 @@ From the monorepo root:
 
 ```bash
 pnpm fixture:setup
-pnpm grounder vault init ~/Documents/obsidian/dev --yes --hooks   # once per machine
+pnpm grounder vault init <path-to-your-vault> --yes --hooks   # once per machine
 cd fixtures/dev
 pnpm grounder init --yes
 pnpm grounder note "hello from dev fixture"
@@ -60,14 +60,23 @@ pnpm grounder path logs
 In Cursor / Claude Code (from this folder or a linked project):
 
 ```text
+(new session)           → optional one-line teaser if a handoff exists (with --hooks)
 /grounder-task          → list + read newest handoff + AGENTS.md (read-only)
 … work …
 /grounder-task-handoff  → summarize → grounder handoff "<body>"
 ```
 
+Verify the teaser without starting an agent session:
+
+```bash
+pnpm grounder handoff peek          # linked + handoff → one line; else silent
+```
+
+The teaser never auto-loads the full handoff and never blocks a session — run `/grounder-task` only when you want the body.
+
 `/grounder-note` uses `npx grounder note`. Re-install agent artifacts after template changes:
 
 ```bash
-pnpm grounder vault init ~/Documents/obsidian/dev --force --yes
+pnpm grounder vault init <path-to-your-vault> --force --yes --hooks
 # or pin agents: --agent=cursor --agent=claude
 ```
