@@ -34,8 +34,8 @@ npx grounder --help
 
 ```bash
 # Once per machine — set vault location + install agent slash commands
-# Add --hooks for an optional one-line session-start reminder (see Session-start hooks)
-grounder vault init <path-to-your-vault>
+# --hooks adds an optional one-line session-start reminder (see Session-start hooks)
+grounder vault init <path-to-your-vault> --hooks
 
 # Once per project folder — link project id to vault notes/ + logs/
 cd your-project
