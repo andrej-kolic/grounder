@@ -4,6 +4,12 @@ import { fileURLToPath } from "node:url";
 import { resolveHomeDir } from "../connector/home.js";
 import { fileExists } from "../util/fs.js";
 import { mergeJsonFile } from "../util/merge-json.js";
+import {
+  installHookRuntime,
+  isGrounderPeekHookCommand,
+  isHookRuntimeStale,
+  peekHookCommand,
+} from "./hook-runtime.js";
 import type {
   AgentAdapter,
   AgentInstallOptions,
@@ -17,10 +23,12 @@ const templateDir = path.join(pkgRoot, "templates", "agents", "cursor", "command
 const COMMANDS = ["grounder-note.md", "grounder-task-handoff.md", "grounder-task.md"] as const;
 
 /**
- * Command string written into Cursor's sessionStart hook entry.
- * Used as the idempotency key when scanning/merging `hooks.sessionStart`.
+ * Canonical sessionStart command for Cursor (home-local runtime, not `npx`).
+ * @see {@link peekHookCommand} — REVERT: restore `"npx grounder handoff peek"` and drop runtime.
  */
-export const CURSOR_PEEK_HOOK_COMMAND = "npx grounder handoff peek";
+export function cursorPeekHookCommand(homeDir?: string): string {
+  return peekHookCommand(homeDir);
+}
 
 export function cursorCommandsDir(homeDir?: string): string {
   return path.join(resolveHomeDir(homeDir), ".cursor", "commands");
@@ -73,13 +81,13 @@ async function installCommand(
 //
 // Cursor hooks.json is a shared JSON object. Grounder only owns one entry in
 // `hooks.sessionStart`; unrelated keys (other hook events, version, etc.) must
-// survive merge. Relevant shape after install:
+// survive merge. Relevant shape after install (path varies by home / Node):
 //
 //   {
 //     "version": 1,
 //     "hooks": {
 //       "sessionStart": [
-//         { "command": "npx grounder handoff peek" }
+//         { "command": "'/path/to/node' '/path/to/.grounder/runtime/dist/cli.js' handoff peek" }
 //       ]
 //     }
 //   }
@@ -91,37 +99,48 @@ async function installCommand(
 //   - hook entry     → { command: string }
 //
 // Unlike Claude Code, Cursor has no matcher groups — sessionStart is a flat
-// array. Idempotency: locate Grounder's entry by matching
-// `command === CURSOR_PEEK_HOOK_COMMAND`.
+// array. Idempotency: {@link isGrounderPeekHookCommand} (runtime path or legacy npx).
 // ---------------------------------------------------------------------------
 
-/**
- * @param hooks - `hooksRoot.hooks` object (may be missing or malformed)
- * @returns Whether `hooks.sessionStart` already contains Grounder's command
- */
-function sessionStartHasPeekCommand(hooks: unknown): boolean {
-  if (!hooks || typeof hooks !== "object" || Array.isArray(hooks)) {
-    return false;
-  }
-  const sessionStart = (hooks as Record<string, unknown>).sessionStart;
-  if (!Array.isArray(sessionStart)) {
-    return false;
-  }
-  return sessionStart.some(
+function findPeekHookIndex(sessionStart: unknown[]): number {
+  return sessionStart.findIndex(
     (item) =>
       item &&
       typeof item === "object" &&
       !Array.isArray(item) &&
-      (item as { command?: unknown }).command === CURSOR_PEEK_HOOK_COMMAND,
+      isGrounderPeekHookCommand((item as { command?: unknown }).command),
   );
 }
 
+/** Whether `hooks.json` already lists any Grounder peek command (for status labeling). */
+async function peekHookHadGrounderEntry(filePath: string): Promise<boolean> {
+  try {
+    const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return false;
+    }
+    const hooks = (parsed as Record<string, unknown>).hooks;
+    if (!hooks || typeof hooks !== "object" || Array.isArray(hooks)) {
+      return false;
+    }
+    const sessionStart = (hooks as Record<string, unknown>).sessionStart;
+    return Array.isArray(sessionStart) && findPeekHookIndex(sessionStart) >= 0;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Read `hooks.json` and report whether Grounder's sessionStart hook is present.
- * Parse / shape failures return `false` (caller may still attempt merge, which backs off).
+ * Skip only when the canonical command is already present *and* the runtime is
+ * current for the running grounder version/source. Legacy `npx` entries or a
+ * stale runtime (missing, or symlinked/copied from a different source) always
+ * refresh — no `--force` required to migrate or to pick up an upgrade.
  */
-async function peekHookAlreadyInstalled(filePath: string): Promise<boolean> {
+async function peekHookUpToDate(filePath: string, homeDir?: string): Promise<boolean> {
   if (!(await fileExists(filePath))) {
+    return false;
+  }
+  if (await isHookRuntimeStale(homeDir)) {
     return false;
   }
   try {
@@ -129,7 +148,20 @@ async function peekHookAlreadyInstalled(filePath: string): Promise<boolean> {
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
       return false;
     }
-    return sessionStartHasPeekCommand((parsed as Record<string, unknown>).hooks);
+    const hooks = (parsed as Record<string, unknown>).hooks;
+    if (!hooks || typeof hooks !== "object" || Array.isArray(hooks)) {
+      return false;
+    }
+    const sessionStart = (hooks as Record<string, unknown>).sessionStart;
+    if (!Array.isArray(sessionStart)) {
+      return false;
+    }
+    const idx = findPeekHookIndex(sessionStart);
+    if (idx < 0) {
+      return false;
+    }
+    const command = (sessionStart[idx] as { command?: unknown }).command;
+    return command === cursorPeekHookCommand(homeDir);
   } catch {
     return false;
   }
@@ -139,8 +171,7 @@ async function peekHookAlreadyInstalled(filePath: string): Promise<boolean> {
  * Deep-merge Grounder's sessionStart hook into an existing hooks.json object.
  *
  * Preserves every key except the nested path it owns. Strategy:
- * 1. If a hook with `command === CURSOR_PEEK_HOOK_COMMAND` already exists → replace
- *    that entry in place (refresh to the canonical `{ command }` shape).
+ * 1. If a Grounder peek hook already exists (runtime or legacy npx) → replace in place.
  * 2. Else → append Grounder's entry to `hooks.sessionStart`.
  *
  * On a brand-new file (`isFreshFile`), also sets `version: 1` when absent.
@@ -148,11 +179,13 @@ async function peekHookAlreadyInstalled(filePath: string): Promise<boolean> {
  *
  * @param current - Parsed hooks.json root (object). Other top-level keys untouched.
  * @param isFreshFile - True when the file did not exist before this write
+ * @param homeDir - Home override for the canonical command path
  * @returns New hooks object with `hooks.sessionStart` updated
  */
 function mergeCursorHooks(
   current: Record<string, unknown>,
   isFreshFile: boolean,
+  homeDir?: string,
 ): Record<string, unknown> {
   const next: Record<string, unknown> = { ...current };
   if (isFreshFile && next.version === undefined) {
@@ -164,14 +197,8 @@ function mergeCursorHooks(
       ? { ...(next.hooks as Record<string, unknown>) }
       : {};
   const existing = Array.isArray(hooks.sessionStart) ? [...hooks.sessionStart] : [];
-  const entry = { command: CURSOR_PEEK_HOOK_COMMAND };
-  const idx = existing.findIndex(
-    (item) =>
-      item &&
-      typeof item === "object" &&
-      !Array.isArray(item) &&
-      (item as { command?: unknown }).command === CURSOR_PEEK_HOOK_COMMAND,
-  );
+  const entry = { command: cursorPeekHookCommand(homeDir) };
+  const idx = findPeekHookIndex(existing);
   if (idx >= 0) {
     // Path 1: refresh existing Grounder hook entry in place
     existing[idx] = entry;
@@ -187,29 +214,34 @@ function mergeCursorHooks(
 /**
  * Install (or refresh) Grounder's sessionStart teaser hook into `~/.cursor/hooks.json`.
  *
- * Force semantics match slash-command install:
- * - Grounder entry missing → merge in, status `created`
- * - Grounder entry present and `force` false → leave file untouched, status `skipped`
- * - Grounder entry present and `force` true → re-merge canonical entry, status `overwritten`
+ * Also materializes `~/.grounder/runtime` (see {@link installHookRuntime}).
+ *
+ * Force semantics:
+ * - Up-to-date canonical entry + fresh runtime and `force` false → skip
+ * - Otherwise → refresh runtime + merge host config
  *
  * Unparseable hooks.json: {@link mergeJsonFile} backs off and this throws (never clobbers).
  */
 async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResult> {
   const dest = cursorHooksJsonPath(opts.homeDir);
-  const alreadyHas = await peekHookAlreadyInstalled(dest);
+  const upToDate = await peekHookUpToDate(dest, opts.homeDir);
 
-  if (alreadyHas && !opts.force) {
+  if (upToDate && !opts.force) {
     return { artifacts: { [dest]: "skipped" } };
   }
 
+  await installHookRuntime({ homeDir: opts.homeDir });
   const fileExisted = await fileExists(dest);
-  const result = await mergeJsonFile(dest, (current) => mergeCursorHooks(current, !fileExisted));
+  const hadGrounderEntry = fileExisted && (await peekHookHadGrounderEntry(dest));
+  const result = await mergeJsonFile(dest, (current) =>
+    mergeCursorHooks(current, !fileExisted, opts.homeDir),
+  );
 
   if (!result.ok) {
     throw new Error(result.message);
   }
 
-  const status: ArtifactStatus = alreadyHas ? "overwritten" : "created";
+  const status: ArtifactStatus = hadGrounderEntry ? "overwritten" : "created";
   return { artifacts: { [dest]: status } };
 }
 

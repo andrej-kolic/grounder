@@ -2,11 +2,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  CURSOR_PEEK_HOOK_COMMAND,
   cursor,
   cursorHooksJsonPath,
+  cursorPeekHookCommand,
   expectedHookArtifacts,
 } from "../../src/agents/cursor.js";
+import { runtimeCliPath } from "../../src/agents/hook-runtime.js";
 import { createTempEnv } from "../helpers.js";
 
 describe("agents/cursor hooks", () => {
@@ -40,7 +41,7 @@ describe("agents/cursor hooks", () => {
   });
 
   describe("installHooks", () => {
-    it("creates a fresh hooks.json with sessionStart entry", async () => {
+    it("creates a fresh hooks.json with sessionStart entry pointing at the home runtime", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
 
@@ -51,12 +52,13 @@ describe("agents/cursor hooks", () => {
       expect(JSON.parse(await readFile(dest, "utf8"))).toEqual({
         version: 1,
         hooks: {
-          sessionStart: [{ command: CURSOR_PEEK_HOOK_COMMAND }],
+          sessionStart: [{ command: cursorPeekHookCommand(env.home) }],
         },
       });
+      expect(await readFile(runtimeCliPath(env.home), "utf8")).toContain("handoff");
     });
 
-    it("skips when Grounder entry already exists and force is false", async () => {
+    it("skips when Grounder entry already exists, runtime is fresh, and force is false", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
 
@@ -82,7 +84,7 @@ describe("agents/cursor hooks", () => {
           {
             version: 1,
             hooks: {
-              sessionStart: [{ command: CURSOR_PEEK_HOOK_COMMAND, stale: true }],
+              sessionStart: [{ command: cursorPeekHookCommand(env.home), stale: true }],
             },
           },
           null,
@@ -97,7 +99,36 @@ describe("agents/cursor hooks", () => {
         hooks: { sessionStart: unknown[] };
       };
       expect(written.hooks.sessionStart).toHaveLength(1);
-      expect(written.hooks.sessionStart[0]).toEqual({ command: CURSOR_PEEK_HOOK_COMMAND });
+      expect(written.hooks.sessionStart[0]).toEqual({ command: cursorPeekHookCommand(env.home) });
+    });
+
+    it("migrates a legacy npx command without requiring force", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = cursorHooksJsonPath(env.home);
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(
+        dest,
+        `${JSON.stringify(
+          {
+            version: 1,
+            hooks: {
+              sessionStart: [{ command: "npx grounder handoff peek" }],
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const result = await cursor.installHooks?.({ homeDir: env.home });
+
+      expect(result?.artifacts[dest]).toBe("overwritten");
+      const written = JSON.parse(await readFile(dest, "utf8")) as {
+        hooks: { sessionStart: Array<{ command: string }> };
+      };
+      expect(written.hooks.sessionStart).toEqual([{ command: cursorPeekHookCommand(env.home) }]);
     });
 
     it("preserves unrelated hooks and top-level keys", async () => {
@@ -128,7 +159,7 @@ describe("agents/cursor hooks", () => {
         version: 1,
         hooks: {
           beforeSubmitPrompt: [{ command: "echo other" }],
-          sessionStart: [{ command: CURSOR_PEEK_HOOK_COMMAND }],
+          sessionStart: [{ command: cursorPeekHookCommand(env.home) }],
         },
         theme: "dark",
       });
@@ -146,7 +177,7 @@ describe("agents/cursor hooks", () => {
       const written = JSON.parse(await readFile(dest, "utf8")) as {
         hooks: { sessionStart: unknown[] };
       };
-      expect(written.hooks.sessionStart).toEqual([{ command: CURSOR_PEEK_HOOK_COMMAND }]);
+      expect(written.hooks.sessionStart).toEqual([{ command: cursorPeekHookCommand(env.home) }]);
     });
 
     it("backs off without clobbering malformed hooks.json", async () => {

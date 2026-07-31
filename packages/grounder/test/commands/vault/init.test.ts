@@ -1,10 +1,10 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { CLAUDE_PEEK_HOOK_COMMAND, claudeSettingsJsonPath } from "../../../src/agents/claude.js";
+import { claudePeekHookCommand, claudeSettingsJsonPath } from "../../../src/agents/claude.js";
 import {
-  CURSOR_PEEK_HOOK_COMMAND,
   cursorHooksJsonPath,
+  cursorPeekHookCommand,
   grounderNoteCommandPath,
   grounderTaskHandoffCommandPath,
 } from "../../../src/agents/cursor.js";
@@ -131,11 +131,12 @@ describe("commands/vault/init", () => {
       expect(out).toContain(`hook ${claudeSettingsJsonPath(env.home)}`);
       expect(out).toContain(`Cursor hook installed: ${cursorHooksJsonPath(env.home)}`);
       expect(out).toContain(`Claude Code hook installed: ${claudeSettingsJsonPath(env.home)}`);
+      expect(out).toMatch(/Grounder hook runtime installed \((symlink|copy)\):/);
 
       expect(JSON.parse(await readFile(cursorHooksJsonPath(env.home), "utf8"))).toEqual({
         version: 1,
         hooks: {
-          sessionStart: [{ command: CURSOR_PEEK_HOOK_COMMAND }],
+          sessionStart: [{ command: cursorPeekHookCommand(env.home) }],
         },
       });
       expect(JSON.parse(await readFile(claudeSettingsJsonPath(env.home), "utf8"))).toMatchObject({
@@ -143,7 +144,7 @@ describe("commands/vault/init", () => {
           SessionStart: [
             {
               matcher: "startup|clear|compact",
-              hooks: [{ type: "command", command: CLAUDE_PEEK_HOOK_COMMAND }],
+              hooks: [{ type: "command", command: claudePeekHookCommand(env.home) }],
             },
           ],
         },

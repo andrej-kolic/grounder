@@ -187,6 +187,13 @@ grounder vault init <path-to-your-vault> --agent=cursor --agent=claude
 
 Slash commands tell the agent to run `npx grounder …` from the linked project folder (no global install required). Re-run with `--force` to refresh existing installs.
 
+`vault init --hooks` additionally installs a Cursor/Claude session-start hook that surfaces your latest handoff automatically. Hooks never invoke `npx` — they run `~/.grounder/runtime/dist/cli.js` directly (materialized on install):
+
+- **Real install** (`npm i -g grounder`, `pnpm add -g grounder`, or a monorepo checkout) → symlinked. Upgrading overwrites the same path in place, so hooks stay current with **no re-run needed**.
+- **Bare `npx grounder vault init --hooks`** (nothing installed) → copied, since each `npx` invocation resolves to a disposable, version-pinned cache dir that can't be symlinked durably. Re-run the same command after upgrading grounder to refresh (no `--force` needed).
+
+If you want hooks that stay current with zero maintenance, install grounder rather than using bare `npx` for this step.
+
 Templates live under `templates/agents/{id}/`. Adding another agent means one adapter file + one template directory — `vault init` stays agent-blind.
 
 ## Troubleshooting

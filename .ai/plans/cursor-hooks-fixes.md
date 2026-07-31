@@ -20,12 +20,17 @@ Relevant source today:
 
 - `packages/grounder/src/commands/handoff/peek.ts` — `runHandoffPeek` /
   `runHandoffPeekWithOptions`, the hook entry point.
+- `packages/grounder/src/agents/hook-runtime.ts` — materializes this
+  package's `dist/` at `~/.grounder/runtime/dist/` (symlink for a durable
+  source, copy for an ephemeral `npx` cache) and builds the canonical
+  `node <runtime cli.js> handoff peek` hook command. See Issue 2.
 - `packages/grounder/src/agents/cursor.ts` — installs
-  `CURSOR_PEEK_HOOK_COMMAND = "npx grounder handoff peek"` into
+  `cursorPeekHookCommand()` (home-runtime, not `npx`) into
   `~/.cursor/hooks.json` (`hooks.sessionStart`).
-- `packages/grounder/src/agents/claude.ts` — installs the *same* command
-  string `"npx grounder handoff peek"` into `~/.claude/settings.json`
-  (`hooks.SessionStart`). **Do not change Claude's behavior** — see Issue 3.
+- `packages/grounder/src/agents/claude.ts` — installs
+  `claudePeekHookCommand()` (home-runtime, not `npx`) into
+  `~/.claude/settings.json` (`hooks.SessionStart`). **Do not change Claude's
+  output contract** — see Issue 3.
 - `packages/grounder/src/cli.ts` — dispatches `handoff peek` to
   `runHandoffPeek(rest.slice(1))`, ignoring argv today.
 - `packages/grounder/src/util/parse-args.ts` — `parseArgs` / `flagBool` /
@@ -91,7 +96,7 @@ it's just unused today.
 
 ## Issue 2 — Wrong `grounder` binary resolves in dev
 
-**Root cause:** the installed hook command is bare `npx grounder handoff
+**Root cause:** the installed hook command was bare `npx grounder handoff
 peek`. `grounder` **is published to npm** (confirmed: versions `0.0.1`,
 `0.0.2`, `0.1.0`; `latest` = `0.1.0`), but `handoff peek` was added to the
 CLI (commit `ecb5d82`, "hooks step 1 - peek command") **after** the last
@@ -99,64 +104,142 @@ version bump/publish (commit `9ce87b9`, "bump version to 0.1.0"). Confirmed
 by unpacking the published tarball: `dist/commands/handoff/` only contains
 `list.js`, no `peek.js`, and `cli.js` has zero references to `"peek"`.
 
-When `npx` runs from a directory with no locally-linked `grounder` on
-`$PATH` (e.g. `~/.cursor`, per Issue 1), it fetches `grounder@latest` from
-the registry. That binary has no `peek` subcommand, so `handoff peek` falls
-through to the generic `handoff <text>` command, treats `"peek"` as handoff
-body text, fails `requireLinkedProject`, and exits 1 with
-`"Folder not linked. Run: grounder init"` — a completely different code path
-than the real (silent, exit-0) `handoff peek`.
+`npx` fetches `grounder@latest` from the registry unless a package is
+actually **installed** (global install, or a project dependency — it does
+**not** consult global `pnpm link`/`pnpm add -g`, confirmed by testing:
+`pnpm --filter grounder add -g .` leaves `npx grounder --version` printing
+the stale registry version). That binary has no `peek` subcommand, so
+`handoff peek` falls through to the generic `handoff <text>` command,
+treats `"peek"` as handoff body text, fails `requireLinkedProject`, and
+exits 1 with `"Folder not linked. Run: grounder init"` — a completely
+different code path than the real (silent, exit-0) `handoff peek`.
 
-This specifically affects **contributors developing against the monorepo**
-(local `src/` is always ahead of the last publish) — not a fix for the
-published package itself.
+This affects **contributors developing against the monorepo** (local `src/`
+is always ahead of the last publish) and, more generally, **any end user**
+whose hook was installed via bare `npx` — upgrading `grounder` never
+changes what the hook actually runs.
+
+### Design
+
+Stop invoking `npx`/`grounder` from the hook config at all. Instead,
+`vault init --hooks` materializes a private copy of the CLI at
+`~/.grounder/runtime/dist/` and points the hook straight at it:
+`process.execPath` + `~/.grounder/runtime/dist/cli.js` + `handoff peek`.
+No PATH lookup, no npx, no registry fetch at hook time — for any host
+(Cursor's `~/.cursor`, Claude's arbitrary cwd) or Node version.
+
+How it's materialized depends on where `grounder` is running **from** when
+`vault init --hooks` is invoked (`packages/grounder/src/agents/hook-runtime.ts`):
+
+- **Durable source** — running from a monorepo checkout (`pnpm grounder …`
+  → `node packages/grounder/dist/cli.js`) or a real install (`npm i -g
+  grounder` / `pnpm add -g grounder` / project devDependency). These live
+  at a path that persists and gets overwritten in place on
+  rebuild/upgrade. → **Symlink** `~/.grounder/runtime/dist` straight to
+  that source's `dist/`. `pnpm build`, or upgrading the global install,
+  changes what the symlink resolves to immediately — the hook picks up new
+  code with **zero re-run of `vault init` ever needed**. This is the
+  primary fix for dogfooding (`fixtures/dev/`) and for any real install.
+- **Ephemeral source** — bare `npx grounder …` with no install. Each
+  invocation resolves to an immutable, version-keyed npx cache directory
+  that npm can evict or replace with a *different* version at any time —
+  symlinking to it would be actively wrong. → **Copy** `dist/` instead.
+  Staying current requires re-running `grounder vault init <vault> --hooks`
+  after upgrading (no `--force` needed — see staleness check below); this
+  is an inherent limitation of using `npx` with nothing installed to back a
+  persistent hook, not something to engineer around. Every other tool with
+  install-time shims (husky, pre-commit) has the equivalent limitation for
+  their zero-install invocation path.
+
+Detection (`isEphemeralSource`): best-effort — is the source package root
+inside `os.tmpdir()`, or does its path look like an `npx`/`pnpm dlx` cache
+dir (`_npx`, `.npm/_npx`, `pnpm-dlx-*`)? Anything else counts as durable.
+
+Idempotency / staleness (`isHookRuntimeStale`, checked by both adapters'
+`installHooks` before touching anything):
+- Symlink mode: stale iff `~/.grounder/runtime/dist` isn't currently a
+  symlink resolving (`realpath`) to the running source's `dist/` — a
+  cheap comparison with **no staleness window** (a matching symlink is
+  always current, since there's no copy to go stale).
+- Copy mode: stale iff the runtime's `manifest.json` is missing/unreadable
+  or its recorded `version` differs from the source `package.json`
+  version.
+
+No mtime polling, no version checks, no re-exec **inside** `handoff peek`
+itself — that logic only runs as part of `vault init --hooks`, which stays
+an explicit, idempotent, already-documented command (matches how
+husky/pre-commit shims work). Session hooks stay fast and side-effect-free.
+
+Legacy migration: `isGrounderPeekHookCommand()` recognizes both the new
+runtime-path command and the old bare `npx grounder handoff peek`, so an
+existing install upgrades in place (no `--force`, no duplicate entries)
+the next time `vault init --hooks` runs.
 
 ### Implementation
 
-Add a one-time local-link step so `npx grounder` (and bare `grounder`)
-resolve to the monorepo's build instead of the npm registry, for anyone
-who has run it:
-
-1. In `fixtures/dev/README.md`, add a step to the **Setup** section (after
-   `pnpm fixture:setup`, before `pnpm grounder vault init …`):
-   ```bash
-   pnpm --filter grounder build
-   pnpm --filter grounder link --global
-   ```
-   Document that this only needs to be run once per machine, and that
-   `pnpm build` afterward keeps `dist/cli.js` fresh without re-linking
-   (the global bin is a symlink to `dist/cli.js`).
-2. Extend `scripts/fixture-setup.mjs` to print this as an explicit step in
-   its "Next steps" output (do **not** run `pnpm link --global` for the
-   contributor automatically — it mutates global machine state / could
-   clobber an existing global `grounder` install, so keep it an explicit,
-   documented, opt-in command).
-3. Optionally add a convenience root script to `package.json`:
-   ```json
-   "link:global": "pnpm --filter grounder build && pnpm --filter grounder link --global"
-   ```
-   and reference it from the README instead of the raw two-line command.
-4. Update `AGENTS.md` "Commands" section to mention `pnpm link:global` (or
-   the two-command sequence) alongside `pnpm fixture:setup`.
+1. New `packages/grounder/src/agents/hook-runtime.ts`:
+   - `grounderRuntimeDir` / `runtimeCliPath` / `runtimeManifestPath` (paths).
+   - `shellQuote` — POSIX-safe single-quoting for embedding paths in a
+     shell `command` string (Cursor/Claude run hooks via a shell).
+   - `peekHookCommand(homeDir?, extraArgs?)` → the canonical command string.
+   - `isGrounderPeekHookCommand(command)` → matches runtime-path or legacy
+     `npx` form.
+   - `isHookRuntimeStale(homeDir?, packageRoot?)` → see staleness rules
+     above. `packageRoot` defaults to the currently running package;
+     override only in tests.
+   - `installHookRuntime({ homeDir?, packageRoot? })` → symlinks or copies
+     per `isEphemeralSource`, writes `manifest.json` (`{ mode, version,
+     nodePath, sourcePackageRoot, installedAt }`), returns
+     `{ cliPath, status, mode }`. Always replaces whatever's currently at
+     the destination (handles copy↔symlink transitions cleanly — `rm` on a
+     symlink removes the link, never the target's contents).
+2. `cursor.ts` / `claude.ts`:
+   - `cursorPeekHookCommand()` / `claudePeekHookCommand()` replace the old
+     `*_PEEK_HOOK_COMMAND` string constants, delegating to
+     `peekHookCommand`.
+   - `installHooks` calls `installHookRuntime` (after the up-to-date gate)
+     and uses `isGrounderPeekHookCommand` for idempotent find/replace
+     instead of exact string equality — so a legacy `npx` entry migrates
+     in place rather than duplicating.
+   - Skip only when the canonical command is present **and**
+     `isHookRuntimeStale()` is false; otherwise refresh (covers first
+     install, legacy migration, and picking up an upgrade — all without
+     `--force`).
+3. `vault/init.ts`: calls `installHookRuntime` once up front (for shared
+   status output — printed once as `grounder runtime …`, not duplicated
+   per agent) before per-agent `install`/`installHooks`.
+4. Docs (`AGENTS.md`, package README, `fixtures/dev/README.md`): describe
+   the runtime, and recommend a real install (global or devDependency) —
+   not bare `npx` — as the way to set up hooks if you want upgrades to
+   apply with zero extra steps. Bare `npx` remains fully supported for
+   everything else (slash commands, one-off setup); it just keeps the
+   "re-run `vault init --hooks` to update" limitation described above.
 
 ### Notes / out of scope
 
-- A more robust long-term fix (not required now) is to have `grounder
-  init`/`vault init --hooks` install hook commands that reference an
-  absolute path to the resolved `cli.js` (or `process.execPath` + resolved
-  path) instead of `npx grounder …`, removing the `npx`/registry dependency
-  entirely for end users too. Track as a follow-up; do not implement as
-  part of this plan.
-- Publishing a `0.1.1` would also mask this specific symptom but doesn't
-  solve the general problem (any future unreleased CLI change tested via
-  hooks hits the same bug) — not part of this plan.
+- Publishing a `0.1.1` would mask today's specific symptom but not the
+  general problem (any future unreleased CLI change tested via hooks hits
+  the same bug) — not part of this plan.
+- No attempt to make ephemeral `npx` sources auto-update — see Design.
 
 ### Tests
 
-- No unit test possible for global `pnpm link` (machine-level side effect).
-  Verify manually: run the link step, then from a directory outside the
-  monorepo run `npx grounder --version` and confirm it prints the
-  monorepo's current `package.json` version instantly (no network fetch).
+- `test/agents/hook-runtime.test.ts`: `installHookRuntime` symlinks for the
+  real package checkout (durable) and copies for a fake package root under
+  `os.tmpdir()` (ephemeral); overwrites on re-install; transitions
+  copy→symlink cleanly. `isHookRuntimeStale` true when never installed,
+  when a symlink resolves to a different source, when a copy's version no
+  longer matches, or when the manifest is missing/unreadable; false right
+  after a matching install.
+- `test/agents/cursor.hooks.test.ts` / `claude.hooks.test.ts` — fresh
+  install uses the runtime command (no `npx`) and materializes the
+  runtime; skip when up to date; migrate legacy `npx` without `--force`;
+  idempotent; malformed host JSON unchanged.
+- Manual check (symlink tracks a rebuild with zero re-run) isn't practical
+  to unit test meaningfully — verify by hand: run `vault init --hooks`,
+  append a marker to `packages/grounder/dist/cli.js`, and confirm
+  `~/.grounder/runtime/dist/cli.js` shows the marker immediately (it's a
+  symlink to the same file).
 
 ---
 
@@ -226,24 +309,16 @@ surfaces the context every time.
    }
    ```
 3. In `packages/grounder/src/agents/cursor.ts`:
-   - Change `CURSOR_PEEK_HOOK_COMMAND` from `"npx grounder handoff peek"` to
-     `"npx grounder handoff peek --json"`.
+   - Pass `["--json"]` as `extraArgs` to `peekHookCommand`/`cursorPeekHookCommand`
+     (already supports this — see Issue 2) instead of the bare command, so the
+     installed hook becomes `... handoff peek --json`.
    - Update the doc comment block above `installHooks` describing the
      installed hook shape to show `--json` in the example.
-   - Existing installs need to pick up the new command string on next
-     `grounder vault init --hooks --force` (the "refresh existing entry in
-     place" path in `mergeCursorHooks` already handles this — matching is
-     currently keyed on exact `command` string equality, so a stale
-     `"npx grounder handoff peek"` entry from a prior install will no
-     longer match `CURSOR_PEEK_HOOK_COMMAND` and will be **appended** as a
-     duplicate rather than replaced. Handle this: either match on a stable
-     prefix (`command.startsWith("npx grounder handoff peek")`) instead of
-     exact equality in `sessionStartHasPeekCommand` / the `findIndex` in
-     `mergeCursorHooks`, or accept the duplicate-on-upgrade edge case and
-     document that users should run `--force` once. **Prefer the
-     prefix-match fix** — it's small and avoids silently accumulating
-     duplicate hook entries across upgrades).
-4. Do **not** change `CLAUDE_PEEK_HOOK_COMMAND` in `agents/claude.ts` —
+   - No extra migration work needed: `isGrounderPeekHookCommand` already
+     matches on the runtime path + `handoff peek` regardless of trailing
+     flags (see Issue 2), so a stale entry without `--json` is replaced in
+     place, not duplicated.
+4. Do **not** change `claudePeekHookCommand()` in `agents/claude.ts` —
    plain text remains correct there.
 
 ### Tests
@@ -258,15 +333,12 @@ surfaces the context every time.
   - Non-`--json` (existing tests) must be untouched and still pass.
 - `packages/grounder/test/agents/cursor.hooks.test.ts`:
   - Update fresh-install assertion to expect
-    `{ command: CURSOR_PEEK_HOOK_COMMAND }` where
-    `CURSOR_PEEK_HOOK_COMMAND` now includes `--json` (test already imports
-    the constant, so only the constant's value needs to change under the
-    hood — but re-check the "backs off / preserves unrelated hooks" cases
-    for any hardcoded raw command strings).
-  - Add a case: installing over a stale hooks.json containing the **old**
-    command string (`"npx grounder handoff peek"`, no `--json`) results in
-    it being replaced in place (not duplicated) once the prefix-match fix
-    from step 3 lands.
+    `{ command: cursorPeekHookCommand(home, ["--json"]) }` (test already
+    imports the helper, so only the call site needs the extra arg).
+  - Add a case: installing over a stale hooks.json containing the command
+    **without** `--json` results in it being replaced in place (not
+    duplicated) — already covered by `isGrounderPeekHookCommand` matching
+    on trailing-flag-agnostic prefix, confirm with a test.
 
 ---
 
@@ -280,10 +352,16 @@ surfaces the context every time.
   project via the stdin-provided root and prints valid
   `{"additional_context": "..."}` JSON, or `{}` when there's nothing to
   report.
-- `agents/cursor.ts` installs `"npx grounder handoff peek --json"`; upgrading
-  from a prior install replaces the old entry rather than duplicating it.
-- `agents/claude.ts` is unchanged (`"npx grounder handoff peek"`, plain
-  text).
-- `fixtures/dev/README.md` (and `AGENTS.md`) document the one-time
-  `pnpm --filter grounder link --global` step so contributors' installed
-  hooks resolve to the monorepo build, not the published npm package.
+- `agents/cursor.ts` installs the home-runtime command with `--json`
+  (`cursorPeekHookCommand(homeDir, ["--json"])`, never `npx`); upgrading
+  from a prior install (with or without `--json`) replaces the old entry
+  rather than duplicating it.
+- `agents/claude.ts` installs the home-runtime command with plain-text
+  output (unchanged output contract).
+- Neither hook depends on `npx`, a global install, or the npm registry at
+  hook-run time — `~/.grounder/runtime/dist/cli.js` is invoked directly.
+- `fixtures/dev/README.md` (and `AGENTS.md`, package README) document that
+  `vault init --hooks` symlinks the runtime to the monorepo checkout for
+  contributors (`pnpm build` alone keeps hooks current, no re-run needed),
+  and that a real install (not bare `npx`) gets end users the same
+  zero-re-run behavior.

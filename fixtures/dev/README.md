@@ -10,7 +10,7 @@ From the monorepo root:
 
 ```bash
 pnpm fixture:setup
-pnpm grounder vault init ~/Documents/obsidian/dev --yes   # once per machine
+pnpm grounder vault init ~/Documents/obsidian/dev --yes --hooks   # once per machine
 cd fixtures/dev
 pnpm grounder init --yes
 pnpm grounder note "hello from dev fixture"
@@ -26,6 +26,8 @@ Project id comes from `package.json` → **`grounder-dev`**. Paths:
 Run `init` from this folder — it writes `.grounder.json` here (not at the monorepo root). Run `note` / `handoff` from here or any subfolder; the CLI walks up to find the marker. The `grounder` CLI is a workspace dependency (`workspace:*`).
 
 After editing `packages/grounder/src`, run `pnpm build` from the repo root — the bin runs `dist/cli.js`.
+
+`--hooks` installs Cursor/Claude session-start hooks. Because `pnpm grounder` here runs straight from this checkout (`node packages/grounder/dist/cli.js`, no `npx`), `vault init --hooks` **symlinks** `~/.grounder/runtime/dist` to this checkout's `dist/` — after that one-time run, `pnpm build` alone keeps both agents' hooks current. No need to re-run `vault init` after every change.
 
 ## Session handoff loop
 

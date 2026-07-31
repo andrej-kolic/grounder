@@ -2,18 +2,13 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  CLAUDE_PEEK_HOOK_COMMAND,
   CLAUDE_SESSION_START_MATCHER,
   claude,
+  claudePeekHookCommand,
   claudeSettingsJsonPath,
   expectedHookArtifacts,
 } from "../../src/agents/claude.js";
 import { createTempEnv } from "../helpers.js";
-
-const grounderSessionStart = {
-  matcher: CLAUDE_SESSION_START_MATCHER,
-  hooks: [{ type: "command", command: CLAUDE_PEEK_HOOK_COMMAND }],
-};
 
 describe("agents/claude hooks", () => {
   let cleanup: (() => Promise<void>) | undefined;
@@ -46,7 +41,7 @@ describe("agents/claude hooks", () => {
   });
 
   describe("installHooks", () => {
-    it("creates a fresh settings.json with SessionStart entry", async () => {
+    it("creates a fresh settings.json with SessionStart entry pointing at the home runtime", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
 
@@ -56,12 +51,17 @@ describe("agents/claude hooks", () => {
       expect(result?.artifacts[dest]).toBe("created");
       expect(JSON.parse(await readFile(dest, "utf8"))).toEqual({
         hooks: {
-          SessionStart: [grounderSessionStart],
+          SessionStart: [
+            {
+              matcher: CLAUDE_SESSION_START_MATCHER,
+              hooks: [{ type: "command", command: claudePeekHookCommand(env.home) }],
+            },
+          ],
         },
       });
     });
 
-    it("skips when Grounder entry already exists and force is false", async () => {
+    it("skips when Grounder entry already exists, runtime is fresh, and force is false", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
 
@@ -92,7 +92,7 @@ describe("agents/claude hooks", () => {
                   hooks: [
                     {
                       type: "command",
-                      command: CLAUDE_PEEK_HOOK_COMMAND,
+                      command: claudePeekHookCommand(env.home),
                       stale: true,
                     },
                   ],
@@ -110,7 +110,51 @@ describe("agents/claude hooks", () => {
       expect(result?.artifacts[dest]).toBe("overwritten");
       expect(JSON.parse(await readFile(dest, "utf8"))).toEqual({
         hooks: {
-          SessionStart: [grounderSessionStart],
+          SessionStart: [
+            {
+              matcher: CLAUDE_SESSION_START_MATCHER,
+              hooks: [{ type: "command", command: claudePeekHookCommand(env.home) }],
+            },
+          ],
+        },
+      });
+    });
+
+    it("migrates a legacy npx command without requiring force", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(
+        dest,
+        `${JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                {
+                  matcher: CLAUDE_SESSION_START_MATCHER,
+                  hooks: [{ type: "command", command: "npx grounder handoff peek" }],
+                },
+              ],
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const result = await claude.installHooks?.({ homeDir: env.home });
+
+      expect(result?.artifacts[dest]).toBe("overwritten");
+      expect(JSON.parse(await readFile(dest, "utf8"))).toEqual({
+        hooks: {
+          SessionStart: [
+            {
+              matcher: CLAUDE_SESSION_START_MATCHER,
+              hooks: [{ type: "command", command: claudePeekHookCommand(env.home) }],
+            },
+          ],
         },
       });
     });
@@ -152,7 +196,12 @@ describe("agents/claude hooks", () => {
               hooks: [{ type: "command", command: "echo audit" }],
             },
           ],
-          SessionStart: [grounderSessionStart],
+          SessionStart: [
+            {
+              matcher: CLAUDE_SESSION_START_MATCHER,
+              hooks: [{ type: "command", command: claudePeekHookCommand(env.home) }],
+            },
+          ],
         },
       });
     });
@@ -191,7 +240,7 @@ describe("agents/claude hooks", () => {
               matcher: CLAUDE_SESSION_START_MATCHER,
               hooks: [
                 { type: "command", command: "echo other-startup" },
-                { type: "command", command: CLAUDE_PEEK_HOOK_COMMAND },
+                { type: "command", command: claudePeekHookCommand(env.home) },
               ],
             },
           ],
@@ -213,7 +262,7 @@ describe("agents/claude hooks", () => {
       };
       expect(written.hooks.SessionStart).toHaveLength(1);
       expect(written.hooks.SessionStart[0]?.hooks).toEqual([
-        { type: "command", command: CLAUDE_PEEK_HOOK_COMMAND },
+        { type: "command", command: claudePeekHookCommand(env.home) },
       ]);
     });
 

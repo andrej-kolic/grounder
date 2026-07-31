@@ -35,6 +35,7 @@ commands/             # mirrors CLI structure
 agents/               # AgentAdapter registry (pluggable install targets)
   types.ts            # AgentAdapter interface
   index.ts            # resolveAgents(), detect
+  hook-runtime.ts     # ~/.grounder/runtime for session hooks (symlink durable source / copy npx cache)
   cursor.ts           # Cursor adapter
   claude.ts           # Claude Code adapter
 util/                 # shared helpers (fs, parse-args, prompt, slugs, path)
