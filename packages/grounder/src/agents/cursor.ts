@@ -24,10 +24,14 @@ const COMMANDS = ["grounder-note.md", "grounder-task-handoff.md", "grounder-task
 
 /**
  * Canonical sessionStart command for Cursor (home-local runtime, not `npx`).
- * @see {@link peekHookCommand} — REVERT: restore `"npx grounder handoff peek"` and drop runtime.
+ * Always includes `--json` so stdout matches Cursor's `additional_context` contract.
+ * @see {@link peekHookCommand}
  */
-export function cursorPeekHookCommand(homeDir?: string): string {
-  return peekHookCommand(homeDir);
+export function cursorPeekHookCommand(
+  homeDir?: string,
+  extraArgs: readonly string[] = ["--json"],
+): string {
+  return peekHookCommand(homeDir, extraArgs);
 }
 
 export function cursorCommandsDir(homeDir?: string): string {
@@ -87,7 +91,7 @@ async function installCommand(
 //     "version": 1,
 //     "hooks": {
 //       "sessionStart": [
-//         { "command": "'/path/to/node' '/path/to/.grounder/runtime/dist/cli.js' handoff peek" }
+//         { "command": "'/path/to/node' '/path/to/.grounder/runtime/dist/cli.js' handoff peek --json" }
 //       ]
 //     }
 //   }

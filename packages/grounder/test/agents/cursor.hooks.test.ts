@@ -131,6 +131,40 @@ describe("agents/cursor hooks", () => {
       expect(written.hooks.sessionStart).toEqual([{ command: cursorPeekHookCommand(env.home) }]);
     });
 
+    it("replaces a runtime command missing --json in place (no duplicate)", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = cursorHooksJsonPath(env.home);
+      // Install once so the runtime exists, then rewrite hooks without --json.
+      await cursor.installHooks?.({ homeDir: env.home });
+      const withoutJson = cursorPeekHookCommand(env.home, []);
+      expect(withoutJson).not.toContain("--json");
+      await writeFile(
+        dest,
+        `${JSON.stringify(
+          {
+            version: 1,
+            hooks: {
+              sessionStart: [{ command: withoutJson }],
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const result = await cursor.installHooks?.({ homeDir: env.home });
+
+      expect(result?.artifacts[dest]).toBe("overwritten");
+      const written = JSON.parse(await readFile(dest, "utf8")) as {
+        hooks: { sessionStart: Array<{ command: string }> };
+      };
+      expect(written.hooks.sessionStart).toEqual([{ command: cursorPeekHookCommand(env.home) }]);
+      expect(written.hooks.sessionStart).toHaveLength(1);
+      expect(cursorPeekHookCommand(env.home)).toContain("--json");
+    });
+
     it("preserves unrelated hooks and top-level keys", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;

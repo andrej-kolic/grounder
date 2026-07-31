@@ -5,6 +5,7 @@ import { withHomeDir } from "../../connector/home.js";
 import { resolveLinkedProject } from "../../connector/linked.js";
 import { resolveLogsDir } from "../../connector/vault.js";
 import { parseHandoffFrontmatter } from "../../util/frontmatter.js";
+import { flagBool, parseArgs } from "../../util/parse-args.js";
 import { listHandoffs } from "../../vault/list-handoffs.js";
 
 /** Options for {@link runHandoffPeekWithOptions} (CLI and tests). */
@@ -13,6 +14,11 @@ export interface HandoffPeekOptions {
   cwd?: string;
   /** Override home dir / `GROUNDER_HOME` (tests). */
   homeDir?: string;
+  /**
+   * When true, always emit one JSON line for Cursor's `sessionStart` contract
+   * (`{ additional_context }` or `{}`). Default plain-text output is for Claude.
+   */
+  json?: boolean;
 }
 
 /** `YYYY-MM-DD-HHmm` or `YYYY-MM-DD-HHmmss`, optionally followed by `-slug`. */
@@ -52,17 +58,34 @@ function formatCreatedDate(created: string | undefined, filePath: string): strin
   return createdDateFromFilename(filePath);
 }
 
+function writePeekOutput(teaser: string | undefined, json: boolean | undefined): void {
+  if (json) {
+    process.stdout.write(
+      teaser === undefined ? "{}\n" : `${JSON.stringify({ additional_context: teaser })}\n`,
+    );
+    return;
+  }
+  if (teaser !== undefined) {
+    process.stdout.write(`${teaser}\n`);
+  }
+}
+
 /**
  * CLI entry for `grounder handoff peek`.
  * Silent by default: prints nothing and exits 0 when unlinked, empty, or on any error.
  * Used by session-start hooks — must never crash or print noise.
  * Reads Cursor hook stdin for `workspace_roots[0]` when present (user-level
  * hooks run with cwd under `~/.cursor`, not the open workspace).
+ * Pass `--json` for Cursor's `additional_context` stdout contract.
  * @returns Always `0`.
  */
-export async function runHandoffPeek(_argv: string[]): Promise<number> {
+export async function runHandoffPeek(argv: string[]): Promise<number> {
+  const { flags } = parseArgs(argv);
   const stdinWorkspaceRoot = await readCursorHookWorkspaceRoot(process.stdin);
-  return runHandoffPeekWithOptions({ cwd: stdinWorkspaceRoot });
+  return runHandoffPeekWithOptions({
+    cwd: stdinWorkspaceRoot,
+    json: flagBool(flags, "json"),
+  });
 }
 
 /**
@@ -73,42 +96,38 @@ export async function runHandoffPeek(_argv: string[]): Promise<number> {
 export async function runHandoffPeekWithOptions(options: HandoffPeekOptions = {}): Promise<number> {
   try {
     return await withHomeDir(options.homeDir, async () => {
+      let teaser: string | undefined;
       try {
         const resolved = await resolveLinkedProject(options.cwd ?? process.cwd());
-        if (!resolved.ok) {
-          return 0;
+        if (resolved.ok) {
+          const logsDir = resolveLogsDir(resolved.value.home, resolved.value.repo);
+          const paths = await listHandoffs(logsDir, { limit: 1 });
+          const newest = paths[0];
+          if (newest) {
+            let content = "";
+            try {
+              content = await readFile(newest, "utf8");
+            } catch {
+              content = "";
+            }
+            if (content) {
+              const fm = parseHandoffFrontmatter(content);
+              const label = fm.title?.trim() || labelFromHandoffFilename(newest);
+              const createdDate = formatCreatedDate(fm.created, newest);
+              if (createdDate) {
+                teaser = `[grounder] Latest handoff: "${label}" (${createdDate}). Run /grounder-task to load it, or ignore if unrelated.`;
+              }
+            }
+          }
         }
-
-        const logsDir = resolveLogsDir(resolved.value.home, resolved.value.repo);
-        const paths = await listHandoffs(logsDir, { limit: 1 });
-        const newest = paths[0];
-        if (!newest) {
-          return 0;
-        }
-
-        let content = "";
-        try {
-          content = await readFile(newest, "utf8");
-        } catch {
-          return 0;
-        }
-
-        const fm = parseHandoffFrontmatter(content);
-        const label = fm.title?.trim() || labelFromHandoffFilename(newest);
-        const createdDate = formatCreatedDate(fm.created, newest);
-        if (!createdDate) {
-          return 0;
-        }
-
-        process.stdout.write(
-          `[grounder] Latest handoff: "${label}" (${createdDate}). Run /grounder-task to load it, or ignore if unrelated.\n`,
-        );
-        return 0;
       } catch {
-        return 0;
+        teaser = undefined;
       }
+      writePeekOutput(teaser, options.json);
+      return 0;
     });
   } catch {
+    writePeekOutput(undefined, options.json);
     return 0;
   }
 }
