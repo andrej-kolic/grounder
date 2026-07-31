@@ -46,6 +46,7 @@ Init flags:
   --vault <path> Override home vault root for this run (grounder init)
   --agent <id>   Install for a specific agent (repeatable; default: auto-detect)
                  Supported: cursor, claude
+  --hooks        Also install session-start teaser hooks (vault init)
 
 Doctor flags:
   --global       Machine-only checks (skip project/link checks)

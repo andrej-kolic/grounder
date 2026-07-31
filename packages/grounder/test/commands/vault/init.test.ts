@@ -1,18 +1,34 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { CLAUDE_PEEK_HOOK_COMMAND, claudeSettingsJsonPath } from "../../../src/agents/claude.js";
 import {
+  CURSOR_PEEK_HOOK_COMMAND,
+  cursorHooksJsonPath,
   grounderNoteCommandPath,
   grounderTaskHandoffCommandPath,
 } from "../../../src/agents/cursor.js";
-import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
+import { runVaultInit, runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
 import { homeConfigPath } from "../../../src/connector/home.js";
-import { createTempEnv } from "../../helpers.js";
+import { fileExists } from "../../../src/util/fs.js";
+import { captureStdout, createTempEnv } from "../../helpers.js";
 
 describe("commands/vault/init", () => {
   let cleanup: (() => Promise<void>) | undefined;
+  let previousGrounderHome: string | undefined;
+  let restoredGrounderHome = false;
 
   afterEach(async () => {
+    if (restoredGrounderHome) {
+      if (previousGrounderHome === undefined) {
+        delete process.env.GROUNDER_HOME;
+      } else {
+        process.env.GROUNDER_HOME = previousGrounderHome;
+      }
+      previousGrounderHome = undefined;
+      restoredGrounderHome = false;
+    }
+
     if (cleanup) {
       await cleanup();
       cleanup = undefined;
@@ -93,5 +109,96 @@ describe("commands/vault/init", () => {
     });
 
     expect(code).toBe(1);
+  });
+
+  describe("--hooks", () => {
+    it("installs session hooks for selected agents", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const { code, out } = await captureStdout(() =>
+        runVaultInitWithOptions({
+          vaultPath: env.vault,
+          yes: true,
+          hooks: true,
+          homeDir: env.home,
+          agents: ["cursor", "claude"],
+        }),
+      );
+
+      expect(code).toBe(0);
+      expect(out).toContain(`hook ${cursorHooksJsonPath(env.home)}`);
+      expect(out).toContain(`hook ${claudeSettingsJsonPath(env.home)}`);
+      expect(out).toContain(`Cursor hook installed: ${cursorHooksJsonPath(env.home)}`);
+      expect(out).toContain(`Claude Code hook installed: ${claudeSettingsJsonPath(env.home)}`);
+
+      expect(JSON.parse(await readFile(cursorHooksJsonPath(env.home), "utf8"))).toEqual({
+        version: 1,
+        hooks: {
+          sessionStart: [{ command: CURSOR_PEEK_HOOK_COMMAND }],
+        },
+      });
+      expect(JSON.parse(await readFile(claudeSettingsJsonPath(env.home), "utf8"))).toMatchObject({
+        hooks: {
+          SessionStart: [
+            {
+              matcher: "startup|clear|compact",
+              hooks: [{ type: "command", command: CLAUDE_PEEK_HOOK_COMMAND }],
+            },
+          ],
+        },
+      });
+    });
+
+    it("omits hook artifacts when --hooks is not set", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const { code, out } = await captureStdout(() =>
+        runVaultInitWithOptions({
+          vaultPath: env.vault,
+          yes: true,
+          homeDir: env.home,
+          agents: ["cursor", "claude"],
+        }),
+      );
+
+      expect(code).toBe(0);
+      expect(out).not.toMatch(/\bhook\b/);
+      expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(false);
+      expect(await fileExists(claudeSettingsJsonPath(env.home))).toBe(false);
+      await access(grounderNoteCommandPath(env.home));
+    });
+
+    it("scopes hooks to --agent when set", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const code = await runVaultInitWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        hooks: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      });
+
+      expect(code).toBe(0);
+      expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(true);
+      expect(await fileExists(claudeSettingsJsonPath(env.home))).toBe(false);
+    });
+
+    it("parses --hooks from argv", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+      previousGrounderHome = process.env.GROUNDER_HOME;
+      process.env.GROUNDER_HOME = env.home;
+      restoredGrounderHome = true;
+
+      const code = await runVaultInit([env.vault, "--yes", "--hooks", "--agent", "cursor"]);
+
+      expect(code).toBe(0);
+      expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(true);
+      expect(await fileExists(claudeSettingsJsonPath(env.home))).toBe(false);
+    });
   });
 });
