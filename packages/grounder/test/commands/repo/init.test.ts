@@ -24,7 +24,7 @@ describe("commands/repo/init", () => {
     return env;
   }
 
-  it("writes repo marker and creates notes and logs folders", async () => {
+  it("writes repo marker and creates notes, logs, and plans folders", async () => {
     const env = await setupLinkedEnv();
     cleanup = env.cleanup;
 
@@ -39,6 +39,7 @@ describe("commands/repo/init", () => {
     const { access } = await import("node:fs/promises");
     await access(path.join(env.vault, "10-Projects", "my-app", "notes"));
     await access(path.join(env.vault, "10-Projects", "my-app", "logs"));
+    await access(path.join(env.vault, "10-Projects", "my-app", "plans"));
   });
 
   it("is safe to run twice", async () => {

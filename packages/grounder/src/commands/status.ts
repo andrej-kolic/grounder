@@ -7,7 +7,12 @@ import {
   readRepoConfig,
   repoConfigPath,
 } from "../connector/repo.js";
-import { resolveLogsDir, resolveNotesDir, resolveVaultRoot } from "../connector/vault.js";
+import {
+  resolveLogsDir,
+  resolveNotesDir,
+  resolvePlansDir,
+  resolveVaultRoot,
+} from "../connector/vault.js";
 
 export interface StatusOptions {
   cwd?: string;
@@ -122,6 +127,7 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
     process.stdout.write(statusLine("Id:", repo.projectId));
     process.stdout.write(statusLine("Notes:", resolveNotesDir(home, repo)));
     process.stdout.write(statusLine("Logs:", resolveLogsDir(home, repo)));
+    process.stdout.write(statusLine("Plans:", resolvePlansDir(home, repo)));
     await writeGitLine(gitRoot);
 
     return 0;

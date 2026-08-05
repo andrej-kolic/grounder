@@ -5,7 +5,12 @@ import { resolveAgents } from "../agents/index.js";
 import { findGitRoot } from "../connector/git.js";
 import { homeConfigPath, readHomeConfig, withHomeDir } from "../connector/home.js";
 import { findLinkedRepoRoot, readRepoConfig } from "../connector/repo.js";
-import { resolveLogsDir, resolveNotesDir, resolveVaultRoot } from "../connector/vault.js";
+import {
+  resolveLogsDir,
+  resolveNotesDir,
+  resolvePlansDir,
+  resolveVaultRoot,
+} from "../connector/vault.js";
 import { fileExists } from "../util/fs.js";
 import { flagBool, parseArgs } from "../util/parse-args.js";
 import { projectsParent } from "../vault/layout.js";
@@ -268,6 +273,7 @@ async function runProjectChecks(
     );
     checks.push(failCheck("notes-dir", "cannot resolve notes/ (no repo config)", REPO_INIT));
     checks.push(failCheck("logs-dir", "cannot resolve logs/ (no repo config)", REPO_INIT));
+    checks.push(failCheck("plans-dir", "cannot resolve plans/ (no repo config)", REPO_INIT));
   } else {
     checks.push(
       okCheck("repo-config", `repo config present (${path.join(linkedRoot, ".grounder.json")})`),
@@ -303,9 +309,11 @@ async function runProjectChecks(
       const fix = !home ? VAULT_INIT : REPO_INIT;
       checks.push(failCheck("notes-dir", `cannot resolve notes/ (${reason})`, fix));
       checks.push(failCheck("logs-dir", `cannot resolve logs/ (${reason})`, fix));
+      checks.push(failCheck("plans-dir", `cannot resolve plans/ (${reason})`, fix));
     } else {
       const notes = resolveNotesDir(home, repo);
       const logs = resolveLogsDir(home, repo);
+      const plans = resolvePlansDir(home, repo);
 
       checks.push(
         (await isDirectory(notes))
@@ -316,6 +324,11 @@ async function runProjectChecks(
         (await isDirectory(logs))
           ? okCheck("logs-dir", `logs/ present (${logs})`)
           : failCheck("logs-dir", `${logs} missing`, REPO_INIT),
+      );
+      checks.push(
+        (await isDirectory(plans))
+          ? okCheck("plans-dir", `plans/ present (${plans})`)
+          : failCheck("plans-dir", `${plans} missing`, REPO_INIT),
       );
     }
   }

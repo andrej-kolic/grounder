@@ -48,6 +48,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("ok    repo-config");
     expect(out).toContain("ok    notes-dir");
     expect(out).toContain("ok    logs-dir");
+    expect(out).toContain("ok    plans-dir");
     expect(out).toContain("ok    git");
     expect(out).toMatch(/^\d+ passed, 0 failed, 0 warned$/m);
   });
@@ -68,7 +69,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("fail  repo-config");
   });
 
-  it("hints vault init for notes/logs when home is missing but repo config exists", async () => {
+  it("hints vault init for notes/logs/plans when home is missing but repo config exists", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -83,6 +84,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("fail  notes-dir");
     expect(out).toContain("cannot resolve notes/ (no home config) → grounder vault init <path>");
     expect(out).toContain("cannot resolve logs/ (no home config) → grounder vault init <path>");
+    expect(out).toContain("cannot resolve plans/ (no home config) → grounder vault init <path>");
   });
 
   it("fails when repo config is missing", async () => {
@@ -106,6 +108,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("no .grounder.json uptree → grounder init");
     expect(out).toContain("fail  notes-dir");
     expect(out).toContain("fail  logs-dir");
+    expect(out).toContain("fail  plans-dir");
   });
 
   it("fails when a detected agent is missing a command file", async () => {
