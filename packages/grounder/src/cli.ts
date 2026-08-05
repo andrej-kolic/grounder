@@ -10,6 +10,8 @@ import { runHandoff } from "./commands/handoff.js";
 import { runNote } from "./commands/note.js";
 import { runPathLogs } from "./commands/path/logs.js";
 import { runPathNotes } from "./commands/path/notes.js";
+import { runPathPlans } from "./commands/path/plans.js";
+import { runPlan } from "./commands/plan.js";
 import { runRepoInit } from "./commands/repo/init.js";
 import { runStatus } from "./commands/status.js";
 import { runVaultInit } from "./commands/vault/init.js";
@@ -28,8 +30,10 @@ Usage:
   grounder handoff <text>      Write a session handoff to vault logs/
   grounder handoff list        Print recent handoff paths (newest first)
   grounder handoff list --head Print only the newest usable handoff path
+  grounder plan <text>         Write/update a named plan under vault plans/
   grounder path notes          Print resolved notes directory
   grounder path logs           Print resolved logs directory
+  grounder path plans          Print resolved plans directory
   grounder status              Snapshot of machine + project link + resolved paths
   grounder doctor              Health checks with fix hints
 
@@ -58,12 +62,17 @@ Note / handoff flags:
   --head         With handoff list, print only the newest usable path
                  (skips empty/unreadable files; same pick as handoff peek)
 
+Plan flags:
+  --title <name> Required plan filename (trailing .md ok; no auto-slug)
+  --force        Overwrite an existing plan (preserves original created)
+
 Quickstart:
   grounder vault init <path-to-your-vault>
   grounder init
   grounder note "my first note"
   grounder handoff "# Handoff\\n\\n## Next\\n1. …"
   grounder handoff list
+  grounder plan "# Goal\\n\\nShip it" --title phase-1
 `;
 
 function printHelp(): void {
@@ -113,12 +122,20 @@ async function main(): Promise<void> {
     process.exit(await runHandoff(rest));
   }
 
+  if (command === "plan") {
+    process.exit(await runPlan(rest));
+  }
+
   if (command === "path" && rest[0] === "notes") {
     process.exit(await runPathNotes(rest.slice(1)));
   }
 
   if (command === "path" && rest[0] === "logs") {
     process.exit(await runPathLogs(rest.slice(1)));
+  }
+
+  if (command === "path" && rest[0] === "plans") {
+    process.exit(await runPathPlans(rest.slice(1)));
   }
 
   if (command === "status") {
