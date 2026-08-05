@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   claude,
   grounderNoteCommandPath,
+  grounderPlanCommandPath,
   grounderTaskCommandPath,
   grounderTaskHandoffCommandPath,
 } from "../../src/agents/claude.js";
@@ -24,6 +25,9 @@ describe("agents/claude", () => {
       expect(grounderNoteCommandPath("/home/user")).toBe(
         "/home/user/.claude/commands/grounder-note.md",
       );
+      expect(grounderPlanCommandPath("/home/user")).toBe(
+        "/home/user/.claude/commands/grounder-plan.md",
+      );
       expect(grounderTaskHandoffCommandPath("/home/user")).toBe(
         "/home/user/.claude/commands/grounder-task-handoff.md",
       );
@@ -37,6 +41,7 @@ describe("agents/claude", () => {
     it("lists the same command paths install writes", () => {
       expect(claude.expectedArtifacts("/home/user")).toEqual([
         "/home/user/.claude/commands/grounder-note.md",
+        "/home/user/.claude/commands/grounder-plan.md",
         "/home/user/.claude/commands/grounder-task-handoff.md",
         "/home/user/.claude/commands/grounder-task.md",
       ]);
@@ -54,22 +59,26 @@ describe("agents/claude", () => {
   });
 
   describe("claude.install", () => {
-    it("creates note, handoff, and task command files", async () => {
+    it("creates note, plan, handoff, and task command files", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
 
       const result = await claude.install({ homeDir: env.home });
       const noteDest = grounderNoteCommandPath(env.home);
+      const planDest = grounderPlanCommandPath(env.home);
       const handoffDest = grounderTaskHandoffCommandPath(env.home);
       const taskDest = grounderTaskCommandPath(env.home);
 
       expect(result.artifacts[noteDest]).toBe("created");
+      expect(result.artifacts[planDest]).toBe("created");
       expect(result.artifacts[handoffDest]).toBe("created");
       expect(result.artifacts[taskDest]).toBe("created");
       await access(noteDest);
+      await access(planDest);
       await access(handoffDest);
       await access(taskDest);
       expect(await readFile(noteDest, "utf8")).toContain("npx grounder note");
+      expect(await readFile(planDest, "utf8")).toContain("npx grounder plan");
       expect(await readFile(handoffDest, "utf8")).toContain("npx grounder handoff");
       expect(await readFile(taskDest, "utf8")).toContain("npx grounder handoff list");
     });
@@ -83,13 +92,16 @@ describe("agents/claude", () => {
       await writeFile(noteDest, "custom note command\n", "utf8");
 
       const result = await claude.install({ homeDir: env.home });
+      const planDest = grounderPlanCommandPath(env.home);
       const handoffDest = grounderTaskHandoffCommandPath(env.home);
       const taskDest = grounderTaskCommandPath(env.home);
 
       expect(result.artifacts[noteDest]).toBe("skipped");
+      expect(result.artifacts[planDest]).toBe("created");
       expect(result.artifacts[handoffDest]).toBe("created");
       expect(result.artifacts[taskDest]).toBe("created");
       expect(await readFile(noteDest, "utf8")).toBe("custom note command\n");
+      expect(await readFile(planDest, "utf8")).toContain("npx grounder plan");
       expect(await readFile(handoffDest, "utf8")).toContain("npx grounder handoff");
       expect(await readFile(taskDest, "utf8")).toContain("npx grounder handoff list");
     });
@@ -101,10 +113,12 @@ describe("agents/claude", () => {
       await claude.install({ homeDir: env.home });
       const result = await claude.install({ homeDir: env.home });
       const noteDest = grounderNoteCommandPath(env.home);
+      const planDest = grounderPlanCommandPath(env.home);
       const handoffDest = grounderTaskHandoffCommandPath(env.home);
       const taskDest = grounderTaskCommandPath(env.home);
 
       expect(result.artifacts[noteDest]).toBe("skipped");
+      expect(result.artifacts[planDest]).toBe("skipped");
       expect(result.artifacts[handoffDest]).toBe("skipped");
       expect(result.artifacts[taskDest]).toBe("skipped");
     });
@@ -116,10 +130,12 @@ describe("agents/claude", () => {
       await claude.install({ homeDir: env.home });
       const result = await claude.install({ homeDir: env.home, force: true });
       const noteDest = grounderNoteCommandPath(env.home);
+      const planDest = grounderPlanCommandPath(env.home);
       const handoffDest = grounderTaskHandoffCommandPath(env.home);
       const taskDest = grounderTaskCommandPath(env.home);
 
       expect(result.artifacts[noteDest]).toBe("overwritten");
+      expect(result.artifacts[planDest]).toBe("overwritten");
       expect(result.artifacts[handoffDest]).toBe("overwritten");
       expect(result.artifacts[taskDest]).toBe("overwritten");
     });
