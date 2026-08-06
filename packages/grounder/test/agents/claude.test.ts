@@ -8,6 +8,7 @@ import {
   grounderTaskCommandPath,
   grounderTaskHandoffCommandPath,
 } from "../../src/agents/claude.js";
+import { runtimeInvocation } from "../../src/agents/hook-runtime.js";
 import { createTempEnv } from "../helpers.js";
 
 describe("agents/claude", () => {
@@ -77,10 +78,13 @@ describe("agents/claude", () => {
       await access(planDest);
       await access(handoffDest);
       await access(taskDest);
-      expect(await readFile(noteDest, "utf8")).toContain("npx grounder note");
-      expect(await readFile(planDest, "utf8")).toContain("npx grounder plan");
-      expect(await readFile(handoffDest, "utf8")).toContain("npx grounder handoff");
-      expect(await readFile(taskDest, "utf8")).toContain("npx grounder handoff list");
+      const cli = runtimeInvocation(env.home);
+      expect(await readFile(noteDest, "utf8")).toContain(`${cli} note`);
+      expect(await readFile(planDest, "utf8")).toContain(`${cli} plan`);
+      expect(await readFile(handoffDest, "utf8")).toContain(`${cli} handoff`);
+      expect(await readFile(taskDest, "utf8")).toContain(`${cli} handoff list`);
+      expect(await readFile(noteDest, "utf8")).not.toContain("npx");
+      expect(await readFile(noteDest, "utf8")).not.toContain("{{GROUNDER_CLI}}");
     });
 
     it("skips existing files and creates missing ones", async () => {
@@ -101,9 +105,10 @@ describe("agents/claude", () => {
       expect(result.artifacts[handoffDest]).toBe("created");
       expect(result.artifacts[taskDest]).toBe("created");
       expect(await readFile(noteDest, "utf8")).toBe("custom note command\n");
-      expect(await readFile(planDest, "utf8")).toContain("npx grounder plan");
-      expect(await readFile(handoffDest, "utf8")).toContain("npx grounder handoff");
-      expect(await readFile(taskDest, "utf8")).toContain("npx grounder handoff list");
+      const cli = runtimeInvocation(env.home);
+      expect(await readFile(planDest, "utf8")).toContain(`${cli} plan`);
+      expect(await readFile(handoffDest, "utf8")).toContain(`${cli} handoff`);
+      expect(await readFile(taskDest, "utf8")).toContain(`${cli} handoff list`);
     });
 
     it("skips if already exists and force is false", async () => {

@@ -2,7 +2,7 @@ Save a note to the Obsidian vault for this project.
 
 Run from the linked project folder or any subdirectory beneath it:
 
-  npx grounder note "<user text>"
+  {{GROUNDER_CLI}} note "<user text>"
 
 The vault is outside the workspace — grant shell permissions if Claude Code prompts you.
 

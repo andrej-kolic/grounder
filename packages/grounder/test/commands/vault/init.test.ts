@@ -9,6 +9,7 @@ import {
   grounderPlanCommandPath,
   grounderTaskHandoffCommandPath,
 } from "../../../src/agents/cursor.js";
+import { runtimeInvocation } from "../../../src/agents/hook-runtime.js";
 import { runVaultInit, runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
 import { homeConfigPath } from "../../../src/connector/home.js";
 import { fileExists } from "../../../src/util/fs.js";
@@ -58,14 +59,13 @@ describe("commands/vault/init", () => {
       vaultRoot: env.vault,
     });
     await access(path.join(env.vault, "10-Projects"));
-    expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain(
-      "npx grounder note",
-    );
+    const cli = runtimeInvocation(env.home);
+    expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain(`${cli} note`);
     expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain(
       "approve shell permissions",
     );
     expect(await readFile(grounderTaskHandoffCommandPath(env.home), "utf8")).toContain(
-      "npx grounder handoff",
+      `${cli} handoff`,
     );
   });
 
@@ -138,7 +138,7 @@ describe("commands/vault/init", () => {
       expect(out).toContain(`hook ${claudeSettingsJsonPath(env.home)}`);
       expect(out).toContain(`Cursor hook installed: ${cursorHooksJsonPath(env.home)}`);
       expect(out).toContain(`Claude Code hook installed: ${claudeSettingsJsonPath(env.home)}`);
-      expect(out).toMatch(/Grounder hook runtime installed \((symlink|copy)\):/);
+      expect(out).toMatch(/Grounder runtime installed \((symlink|copy)\):/);
 
       expect(JSON.parse(await readFile(cursorHooksJsonPath(env.home), "utf8"))).toEqual({
         version: 1,

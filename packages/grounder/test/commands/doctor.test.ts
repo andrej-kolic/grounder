@@ -181,7 +181,9 @@ describe("commands/doctor", () => {
     expect(out).toContain("ok    agent-cursor");
     expect(out).toContain("warn  agent-cursor-hooks");
     expect(out).toContain("no Grounder session hook → grounder vault init <path> --hooks");
-    expect(out).not.toContain("hook-runtime");
+    // Slash commands were installed (hooks were not), so the shared runtime is
+    // still checked — it just doesn't depend on hooks being installed.
+    expect(out).toContain("ok    hook-runtime");
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });
 
@@ -207,7 +209,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).toContain("warn  hook-runtime");
     expect(out).toContain(
-      "hook runtime stale or missing (re-run after upgrading, especially bare npx) → grounder vault init <path> --hooks",
+      "hook runtime stale or missing (re-run after upgrading, especially bare npx) → grounder vault init <path>",
     );
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });

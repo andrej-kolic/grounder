@@ -9,7 +9,7 @@ AI coding agents forget everything between sessions. Grounder gives them persist
 - **Built for agents** — installs `/grounder-note`, `/grounder-task`, `/grounder-task-handoff`, `/grounder-plan` slash commands in Cursor and Claude Code
 - **Structured handoffs** — end a session with a Done/Next/Blockers/Decisions checkpoint; resume next time by hydrating from it
 - **Named plans** — living docs under `plans/` you update in place (`--force` to overwrite; unlike dated notes/handoffs)
-- **Zero per-project install** — slash commands shell out via `npx`; nothing to add to the repo besides the marker file
+- **Zero per-project install** — slash commands run through a small per-machine runtime that `vault init` keeps current; nothing to add to the repo besides the marker file
 
 **Requirements:** Node.js 18+ and an Obsidian vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
 
@@ -62,7 +62,7 @@ Both commands preview what they'll write and ask to confirm; add `--yes` to skip
   Wrote handoff → <vault>/10-Projects/your-project/logs/2026-07-28-143200-auth-middleware.md
 ```
 
-`/grounder-task` hydrates the agent from the newest *usable* handoff plus `AGENTS.md`; `/grounder-task-handoff` writes the next checkpoint when you close the session. Behind the scenes these run `npx grounder handoff list --head` and `npx grounder handoff <text>` for you — see [Session loop](#session-loop).
+`/grounder-task` hydrates the agent from the newest *usable* handoff plus `AGENTS.md`; `/grounder-task-handoff` writes the next checkpoint when you close the session. Behind the scenes these run `grounder handoff list --head` and `grounder handoff <text>` for you — see [Session loop](#session-loop).
 
 No agent, or want to write by hand? The same actions are plain CLI commands:
 
@@ -94,7 +94,7 @@ Inspect or debug setup any time with `grounder status` / `grounder doctor` — s
 | `/grounder-task` | `grounder handoff list --head` + read it | Read-only hydrate from newest usable handoff + `AGENTS.md` |
 | `/grounder-plan` | `grounder plan` | Named living plan under `plans/` |
 
-The "Equivalent CLI" column is what you'd type by hand — under the hood, slash commands invoke it via `npx grounder …` (see [Agents](#agents)), not whatever `grounder` binary happens to be on your `PATH`.
+The "Equivalent CLI" column is what you'd type by hand — under the hood, slash commands invoke a small runtime `vault init` maintains at `~/.grounder/runtime` (see [Agents](#agents)), not whatever `grounder` binary happens to be on your `PATH`.
 
 With `--hooks` on `vault init`, a new Cursor/Claude session may also print a one-line teaser when a handoff exists — never the full body. See [Session-start hooks](#session-start-hooks).
 
@@ -211,7 +211,7 @@ No `--agent` flag: auto-detect installed agents. Explicit install:
 grounder vault init <path-to-your-vault> --agent=cursor --agent=claude
 ```
 
-Slash commands tell the agent to run `npx grounder …` from the linked project folder (no global install required). Re-run with `--force` to refresh existing installs. This always runs the current published release, not a global install — contributors, see `fixtures/dev/README.md`.
+Slash commands invoke `~/.grounder/runtime/dist/cli.js` directly (not `npx`) — see [Session-start hooks](#session-start-hooks) for how that runtime stays current. Re-run `vault init --force` to refresh existing command files (rarely needed — the runtime path itself doesn't change).
 
 Templates live under `templates/agents/{id}/`. Adding another agent means one adapter file + one template directory — `vault init` stays agent-blind.
 
@@ -235,14 +235,14 @@ What hooks do **not** do:
 - They never block or delay a session from starting
 - Unlinked folders and projects with no handoffs print nothing (exit 0, silent)
 
-`doctor` reports a `warn` (never a `fail`) when a detected agent has no Grounder hook installed, and when hooks are installed but `~/.grounder/runtime` is stale or missing.
+`doctor` reports a `warn` (never a `fail`) when a detected agent has no Grounder hook installed, and when `~/.grounder/runtime` is stale or missing.
 
-Hooks run `~/.grounder/runtime/dist/cli.js` directly (not `npx`), materialized on install:
+Hooks *and* slash commands both run `~/.grounder/runtime/dist/cli.js` directly (never `npx`) — `vault init` materializes it, regardless of whether `--hooks` is passed:
 
-- **Real install** (`npm i -g grounder`, `pnpm add -g grounder`, or a monorepo checkout) → symlinked. Upgrading overwrites the same path in place, so hooks stay current with **no re-run needed**.
-- **Bare `npx grounder vault init --hooks`** (nothing installed) → copied, since each `npx` invocation resolves to a disposable, version-pinned cache dir that can't be symlinked durably. Re-run the same command after upgrading grounder to refresh (no `--force` needed).
+- **Real install** (`npm i -g grounder`, `pnpm add -g grounder`, or a monorepo checkout) → symlinked. Upgrading overwrites the same path in place, so both stay current with **no re-run needed**.
+- **Bare `npx grounder vault init …`** (nothing installed) → copied, since each `npx` invocation resolves to a disposable, version-pinned cache dir that can't be symlinked durably. Re-run `grounder vault init <vault>` after upgrading grounder to refresh (no `--force` needed).
 
-If you want hooks that stay current with zero maintenance, install grounder rather than using bare `npx` for this step.
+If you want the runtime to stay current with zero maintenance, install grounder rather than using bare `npx` for this step.
 
 ## Troubleshooting
 
@@ -255,7 +255,7 @@ If you want hooks that stay current with zero maintenance, install grounder rath
 | No `.grounder.json` / notes / logs / plans dirs | `grounder init` |
 | Agent slash commands stale or partial | `grounder vault init <path> --force` (or `--agent=<id>`) |
 | Session-start teaser missing (optional) | `grounder vault init <path> --hooks` — `doctor` warns when absent |
-| Session-start teaser stale after upgrade (bare npx) | `grounder vault init <path> --hooks` — `doctor` warns when `hook-runtime` is stale |
+| Slash commands or teaser stale after upgrade (bare npx install) | `grounder vault init <path>` — `doctor` warns when `hook-runtime` is stale |
 
 ## Development
 

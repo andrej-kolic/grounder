@@ -1,48 +1,59 @@
 /**
- * Home-local hook runtime (Issue 2 — replace `npx grounder` in session hooks).
+ * Home-local runtime shared by session hooks *and* slash commands (originally
+ * "Issue 2 — replace `npx grounder` in session hooks"; later extended to cover
+ * slash-command templates too, since they had the identical problem).
  *
  * ## Why
- * Cursor/Claude session hooks previously used `npx grounder handoff peek`.
- * `npx <pkg>` (no version specifier) matches against whatever `grounder` version
- * exists in the *current project's own dependencies*; only when the project
- * doesn't declare `grounder` as a dependency does it fall back to fetching
- * `grounder@latest` from the registry. Hooks run from arbitrary linked
- * projects, which normally have no reason to depend on `grounder` themselves,
- * so contributors (and anyone ahead of the last publish) get the wrong binary.
- * Global `pnpm link` / `pnpm add -g` does not change this fallback.
+ * Both surfaces used to shell out via `npx grounder …`. `npx <pkg>` (no
+ * version specifier) matches against whatever `grounder` version exists in
+ * the *current project's own dependencies*; only when the project doesn't
+ * declare `grounder` as a dependency does it fall back to fetching
+ * `grounder@latest` from the registry. Session hooks and slash commands both
+ * run from arbitrary linked projects, which normally have no reason to depend
+ * on `grounder` themselves, so contributors (and anyone ahead of the last
+ * publish, or deliberately pinned to an older version) get the wrong binary.
+ * Global `pnpm link` / `pnpm add -g` does not change this fallback — see
+ * [npm/cli#9244](https://github.com/npm/cli/issues/9244).
  *
  * ## Design
- * On `vault init --hooks`, materialize this package's `dist/` at
- * `~/.grounder/runtime/dist/` and point host hook configs at:
- *   `process.execPath` + `~/.grounder/runtime/dist/cli.js` + `handoff peek …`
- * No global install and no registry fetch at hook time.
+ * On `vault init`, materialize this package's `dist/` at
+ * `~/.grounder/runtime/dist/` and point both host hook configs *and* the
+ * commands copied into `~/.cursor/commands/` / `~/.claude/commands/` at:
+ *   `process.execPath` + `~/.grounder/runtime/dist/cli.js` + `<subcommand> …`
+ * No global install and no registry fetch at invocation time, for either
+ * surface. This mirrors how Corepack (packageManager shims) and Husky/lint-staged
+ * (moved off bare `npx` for the same reason, see the strapi/strapi#27006 fix)
+ * solve the identical "ambient resolution isn't stable" problem.
  *
  * How it's materialized depends on where grounder is running from:
  * - **Durable source** (monorepo checkout, global install, linked devDependency) →
  *   **symlink** `dist/` straight to the source. `pnpm build` / upgrading the
- *   global install overwrites that same path in place, so the hook picks up
- *   new code immediately — no re-run of `vault init` ever needed.
+ *   global install overwrites that same path in place, so hooks and commands
+ *   pick up new code immediately — no re-run of `vault init` ever needed.
  * - **Ephemeral source** (bare `npx grounder …`, no install — each invocation
  *   resolves to an immutable, version-keyed npx cache dir that can be evicted
  *   or swapped out from under a symlink) → **copy** `dist/`. Re-run
- *   `grounder vault init <vault> --hooks` after upgrading to refresh; this is
- *   an inherent limitation of using npx with no install for something that
- *   must persist, not something we can engineer around.
+ *   `grounder vault init <vault>` after upgrading to refresh; this is an
+ *   inherent limitation of using npx with no install for something that must
+ *   persist, not something we can engineer around.
  *
  * This mirrors husky/pre-commit hook shims: staying current is an explicit,
- * idempotent step (never silent self-healing inside the hook itself — session
+ * idempotent step (never silent self-healing inside a hook itself — session
  * hooks must stay fast and side-effect-free), and the step is a no-op unless
  * something has actually changed.
  *
  * ## REVERT
- * To restore the previous `npx grounder handoff peek` behavior:
+ * To restore the previous `npx grounder …` behavior for hooks and/or commands:
  * 1. Delete this file and its tests (`test/agents/hook-runtime.test.ts`).
  * 2. In `cursor.ts` / `claude.ts`, set `*_PEEK_HOOK_COMMAND` back to
- *    `"npx grounder handoff peek"` (and drop calls to
- *    {@link installHookRuntime} / {@link peekHookCommand} /
- *    {@link isGrounderPeekHookCommand} / {@link isHookRuntimeStale}).
+ *    `"npx grounder handoff peek"` and `installCommand` back to a plain
+ *    `copyFile` (drop the `{{GROUNDER_CLI}}` template substitution), dropping
+ *    calls to {@link installHookRuntime} / {@link peekHookCommand} /
+ *    {@link runtimeInvocation} / {@link isGrounderPeekHookCommand} /
+ *    {@link isHookRuntimeStale}.
  * 3. Remove runtime paths from `expectedHookArtifacts` and docs that mention
- *    `~/.grounder/runtime`.
+ *    `~/.grounder/runtime`, and revert templates' `{{GROUNDER_CLI}}` back to
+ *    literal `npx grounder`.
  */
 
 import {
@@ -98,20 +109,22 @@ export function shellQuote(value: string): string {
 }
 
 /**
+ * Quoted `<node> <runtime cli.js>` prefix, shared by every home-runtime
+ * invocation (session hooks and slash-command templates alike). Append
+ * subcommand args to build a full command string.
+ */
+export function runtimeInvocation(homeDir?: string): string {
+  return `${shellQuote(process.execPath)} ${shellQuote(runtimeCliPath(homeDir))}`;
+}
+
+/**
  * Build the sessionStart / SessionStart hook command for the home runtime.
  *
  * @param homeDir - Override home (tests / `GROUNDER_HOME`)
  * @param extraArgs - Extra CLI args after `handoff peek` (e.g. `--json` for Cursor)
  */
 export function peekHookCommand(homeDir?: string, extraArgs: readonly string[] = []): string {
-  const parts = [
-    shellQuote(process.execPath),
-    shellQuote(runtimeCliPath(homeDir)),
-    "handoff",
-    "peek",
-    ...extraArgs,
-  ];
-  return parts.join(" ");
+  return [runtimeInvocation(homeDir), "handoff", "peek", ...extraArgs].join(" ");
 }
 
 /**
@@ -252,7 +265,7 @@ export async function installHookRuntime(options: {
 
   if (!(await fileExists(path.join(sourceDistDir, "cli.js")))) {
     throw new Error(
-      `Grounder dist missing at ${sourceDistDir}. Run \`pnpm build\` (or install a published package) before vault init --hooks.`,
+      `Grounder dist missing at ${sourceDistDir}. Run \`pnpm build\` (or install a published package) before vault init.`,
     );
   }
 

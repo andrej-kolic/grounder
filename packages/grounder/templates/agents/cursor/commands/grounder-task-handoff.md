@@ -32,16 +32,16 @@ Rules:
 
 Then run from the linked project folder or any subdirectory beneath it:
 
-  npx grounder handoff "<body>"
+  {{GROUNDER_CLI}} handoff "<body>"
 
 Optional short title slug (filename + frontmatter):
 
-  npx grounder handoff --title <slug> "<body>"
+  {{GROUNDER_CLI}} handoff --title <slug> "<body>"
 
 For multi-line bodies, prefer a shell heredoc so quoting does not break:
 
 ```bash
-npx grounder handoff "$(cat <<'EOF'
+{{GROUNDER_CLI}} handoff "$(cat <<'EOF'
 # Handoff: …
 …
 EOF

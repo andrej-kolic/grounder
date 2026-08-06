@@ -193,13 +193,27 @@ async function hookFileHasGrounderEntry(filePath: string): Promise<boolean> {
   }
 }
 
+/** True when any detected agent has at least one Grounder command file on disk. */
+async function anyAgentCommandsInstalled(homeDir?: string): Promise<boolean> {
+  const agents = await resolveAgents();
+  for (const agent of agents) {
+    for (const artifactPath of agent.expectedArtifacts(homeDir)) {
+      if (await fileExists(artifactPath)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * Warn-only: session hooks are opt-in. Missing entry never fails doctor.
  * One check per detected agent that declares `expectedHookArtifacts`.
  *
- * When at least one agent has a Grounder hook installed, also check the shared
- * `~/.grounder/runtime` materialization — stale mainly for bare-npx copy installs
- * after an upgrade (symlink installs stay current without re-init).
+ * Slash commands and session hooks both depend on the shared
+ * `~/.grounder/runtime` materialization, so it's checked whenever *either* is
+ * installed — stale mainly for bare-npx copy installs after an upgrade
+ * (symlink installs stay current without re-init).
  */
 async function checkAgentHooks(homeDir?: string): Promise<CheckResult[]> {
   const agents = await resolveAgents();
@@ -225,13 +239,13 @@ async function checkAgentHooks(homeDir?: string): Promise<CheckResult[]> {
     }
   }
 
-  if (anyHooksInstalled) {
+  if (anyHooksInstalled || (await anyAgentCommandsInstalled(homeDir))) {
     if (await isHookRuntimeStale(homeDir)) {
       checks.push(
         warnCheck(
           "hook-runtime",
           "hook runtime stale or missing (re-run after upgrading, especially bare npx)",
-          VAULT_INIT_HOOKS,
+          VAULT_INIT,
         ),
       );
     } else {

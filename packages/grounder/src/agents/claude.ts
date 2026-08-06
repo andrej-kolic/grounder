@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveHomeDir } from "../connector/home.js";
@@ -9,6 +9,7 @@ import {
   isGrounderPeekHookCommand,
   isHookRuntimeStale,
   peekHookCommand,
+  runtimeInvocation,
 } from "./hook-runtime.js";
 import type {
   AgentAdapter,
@@ -75,6 +76,11 @@ export function expectedHookArtifacts(homeDir?: string): string[] {
   return [claudeSettingsJsonPath(homeDir)];
 }
 
+/**
+ * Templates reference the CLI via a `{{GROUNDER_CLI}}` placeholder (not a
+ * literal `npx grounder`) so the installed command always points at the home
+ * runtime — see {@link runtimeInvocation}.
+ */
 async function installCommand(
   filename: (typeof COMMANDS)[number],
   opts: AgentInstallOptions,
@@ -87,7 +93,9 @@ async function installCommand(
   }
 
   await mkdir(path.dirname(dest), { recursive: true });
-  await copyFile(path.join(templateDir, filename), dest);
+  const template = await readFile(path.join(templateDir, filename), "utf8");
+  const rendered = template.replaceAll("{{GROUNDER_CLI}}", runtimeInvocation(opts.homeDir));
+  await writeFile(dest, rendered);
   return { dest, status: existed ? "overwritten" : "created" };
 }
 
