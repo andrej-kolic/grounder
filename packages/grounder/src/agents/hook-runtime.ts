@@ -3,9 +3,13 @@
  *
  * ## Why
  * Cursor/Claude session hooks previously used `npx grounder handoff peek`.
- * Modern `npx` ignores a global/local install and fetches `grounder@latest` from
- * the registry, so contributors (and anyone ahead of the last publish) get the
- * wrong binary. Global `pnpm link` / `pnpm add -g` does not fix `npx`.
+ * `npx <pkg>` (no version specifier) matches against whatever `grounder` version
+ * exists in the *current project's own dependencies*; only when the project
+ * doesn't declare `grounder` as a dependency does it fall back to fetching
+ * `grounder@latest` from the registry. Hooks run from arbitrary linked
+ * projects, which normally have no reason to depend on `grounder` themselves,
+ * so contributors (and anyone ahead of the last publish) get the wrong binary.
+ * Global `pnpm link` / `pnpm add -g` does not change this fallback.
  *
  * ## Design
  * On `vault init --hooks`, materialize this package's `dist/` at

@@ -85,8 +85,8 @@ In Cursor / Claude Code (from this folder or a linked project):
 (new session)           → optional one-line teaser if a handoff exists (with --hooks)
 /grounder-task          → list --head + read newest usable handoff + AGENTS.md (read-only)
 … work …
-/grounder-task-handoff  → summarize → grounder handoff "<body>"
-/grounder-plan          → write/update named plan → grounder plan "<body>" --title <name>
+/grounder-task-handoff  → summarize → npx grounder handoff "<body>"
+/grounder-plan          → write/update named plan → npx grounder plan "<body>" --title <name>
 ```
 
 Verify the teaser without starting an agent session:
@@ -97,7 +97,9 @@ pnpm grounder handoff peek          # linked + handoff → one line; else silent
 
 The teaser never auto-loads the full handoff and never blocks a session — run `/grounder-task` only when you want the body.
 
-`/grounder-note` and `/grounder-plan` shell out via `npx grounder …`. Re-install agent artifacts after template changes:
+All four slash commands shell out via `npx grounder …`. Run from this fixture (or anywhere under it), that resolves to **this checkout's build**, not the npm registry — `grounder` is declared as a real `workspace:*` dependency in `fixtures/dev/package.json`, and `npx` matches an unversioned package name against the local project's own dependencies before ever considering the registry (see `npm help npx`). `pnpm build` after editing `src/` is enough to pick up changes; no re-run of `vault init` needed.
+
+This is specific to this fixture. A typical linked project (the real target of `grounder init`) does **not** declare `grounder` as a dependency, so `npx grounder …` there falls through to the registry and fetches `grounder@latest` — ignoring any global install elsewhere on the machine. Re-install agent artifacts after template changes:
 
 ```bash
 pnpm grounder vault init <path-to-your-vault> --force --yes --hooks

@@ -62,7 +62,7 @@ Both commands preview what they'll write and ask to confirm; add `--yes` to skip
   Wrote handoff → <vault>/10-Projects/your-project/logs/2026-07-28-143200-auth-middleware.md
 ```
 
-`/grounder-task` hydrates the agent from the newest *usable* handoff plus `AGENTS.md`; `/grounder-task-handoff` writes the next checkpoint when you close the session. Behind the scenes these run `grounder handoff list --head` and `grounder handoff <text>` for you — see [Session loop](#session-loop).
+`/grounder-task` hydrates the agent from the newest *usable* handoff plus `AGENTS.md`; `/grounder-task-handoff` writes the next checkpoint when you close the session. Behind the scenes these run `npx grounder handoff list --head` and `npx grounder handoff <text>` for you — see [Session loop](#session-loop).
 
 No agent, or want to write by hand? The same actions are plain CLI commands:
 
@@ -87,12 +87,14 @@ Inspect or debug setup any time with `grounder status` / `grounder doctor` — s
 (optional teaser) → /grounder-task → work → /grounder-task-handoff → next session
 ```
 
-| Slash command | CLI | Role |
+| Slash command | Equivalent CLI | Role |
 | --- | --- | --- |
 | `/grounder-note` | `grounder note` | Ad-hoc vault note |
 | `/grounder-task-handoff` | `grounder handoff` | Write session checkpoint to `logs/` |
 | `/grounder-task` | `grounder handoff list --head` + read it | Read-only hydrate from newest usable handoff + `AGENTS.md` |
 | `/grounder-plan` | `grounder plan` | Named living plan under `plans/` |
+
+The "Equivalent CLI" column is what you'd type by hand — under the hood, slash commands invoke it via `npx grounder …` (see [Agents](#agents)), not whatever `grounder` binary happens to be on your `PATH`.
 
 With `--hooks` on `vault init`, a new Cursor/Claude session may also print a one-line teaser when a handoff exists — never the full body. See [Session-start hooks](#session-start-hooks).
 
@@ -209,7 +211,7 @@ No `--agent` flag: auto-detect installed agents. Explicit install:
 grounder vault init <path-to-your-vault> --agent=cursor --agent=claude
 ```
 
-Slash commands tell the agent to run `npx grounder …` from the linked project folder (no global install required). Re-run with `--force` to refresh existing installs.
+Slash commands tell the agent to run `npx grounder …` from the linked project folder (no global install required). Re-run with `--force` to refresh existing installs. This always runs the current published release, not a global install — contributors, see `fixtures/dev/README.md`.
 
 Templates live under `templates/agents/{id}/`. Adding another agent means one adapter file + one template directory — `vault init` stays agent-blind.
 
