@@ -20,7 +20,12 @@ import type {
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const templateDir = path.join(pkgRoot, "templates", "agents", "cursor", "commands");
 
-const COMMANDS = ["grounder-note.md", "grounder-task-handoff.md", "grounder-task.md"] as const;
+const COMMANDS = [
+  "grounder-note.md",
+  "grounder-plan.md",
+  "grounder-task-handoff.md",
+  "grounder-task.md",
+] as const;
 
 /**
  * Canonical sessionStart command for Cursor (home-local runtime, not `npx`).
@@ -45,6 +50,10 @@ export function cursorHooksJsonPath(homeDir?: string): string {
 
 export function grounderNoteCommandPath(homeDir?: string): string {
   return path.join(cursorCommandsDir(homeDir), "grounder-note.md");
+}
+
+export function grounderPlanCommandPath(homeDir?: string): string {
+  return path.join(cursorCommandsDir(homeDir), "grounder-plan.md");
 }
 
 export function grounderTaskHandoffCommandPath(homeDir?: string): string {

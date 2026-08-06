@@ -6,6 +6,7 @@ import {
   cursorHooksJsonPath,
   cursorPeekHookCommand,
   grounderNoteCommandPath,
+  grounderPlanCommandPath,
   grounderTaskHandoffCommandPath,
 } from "../../../src/agents/cursor.js";
 import { runVaultInit, runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
@@ -39,14 +40,20 @@ describe("commands/vault/init", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    const code = await runVaultInitWithOptions({
-      vaultPath: env.vault,
-      yes: true,
-      homeDir: env.home,
-      agents: ["cursor"],
-    });
+    const { code, out } = await captureStdout(() =>
+      runVaultInitWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      }),
+    );
 
     expect(code).toBe(0);
+    expect(out).toContain(`cursor   ${grounderNoteCommandPath(env.home)}`);
+    expect(out).toContain(`cursor   ${grounderPlanCommandPath(env.home)}`);
+    expect(out).toContain(`cursor   ${grounderTaskHandoffCommandPath(env.home)}`);
+    expect(out).not.toContain("(Cursor artifacts)");
     expect(JSON.parse(await readFile(homeConfigPath(env.home), "utf8"))).toEqual({
       vaultRoot: env.vault,
     });

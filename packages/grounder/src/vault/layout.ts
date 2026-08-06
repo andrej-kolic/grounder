@@ -25,3 +25,8 @@ export function notesDir(vaultRoot: string, projectId: string): string {
 export function logsDir(vaultRoot: string, projectId: string): string {
   return path.join(vaultRoot, PROJECTS_DIR, projectId, "logs");
 }
+
+/** `<vault>/10-Projects/{projectId}/plans` — named, updatable plan docs. */
+export function plansDir(vaultRoot: string, projectId: string): string {
+  return path.join(vaultRoot, PROJECTS_DIR, projectId, "plans");
+}

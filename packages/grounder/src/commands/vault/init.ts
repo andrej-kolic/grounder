@@ -74,7 +74,9 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
       process.stdout.write(`  grounder runtime ${runtimeCliPath(homeDir)}\n`);
     }
     for (const agent of agents) {
-      process.stdout.write(`  ${agent.id.padEnd(8)} (${agent.name} artifacts)\n`);
+      for (const artifactPath of agent.expectedArtifacts(homeDir)) {
+        process.stdout.write(`  ${agent.id.padEnd(8)} ${artifactPath}\n`);
+      }
       if (hooks && agent.expectedHookArtifacts) {
         for (const hookPath of agent.expectedHookArtifacts(homeDir)) {
           process.stdout.write(`  ${agent.id.padEnd(8)} hook ${hookPath}\n`);

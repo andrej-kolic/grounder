@@ -42,6 +42,9 @@ describe("commands/status", () => {
       `  Notes:      ${path.join(env.vault, "10-Projects", "my-app", "notes")}`,
     );
     expect(out).toContain(`  Logs:       ${path.join(env.vault, "10-Projects", "my-app", "logs")}`);
+    expect(out).toContain(
+      `  Plans:      ${path.join(env.vault, "10-Projects", "my-app", "plans")}`,
+    );
     expect(out).toContain(`  Git:        ${env.repo}`);
   });
 
@@ -80,6 +83,7 @@ describe("commands/status", () => {
     expect(out).toContain("  Id:         my-app");
     expect(out).not.toContain("Notes:");
     expect(out).not.toContain("Logs:");
+    expect(out).not.toContain("Plans:");
   });
 
   it("reports missing project config when vault exists but not linked", async () => {
@@ -140,6 +144,7 @@ describe("commands/status", () => {
     expect(out).toContain(`  Folder:     ${env.repo}`);
     expect(out).toContain("  Config:     invalid → run: grounder init --force");
     expect(out).not.toContain("Notes:");
+    expect(out).not.toContain("Plans:");
     expect(out).not.toContain("Id:");
   });
 });

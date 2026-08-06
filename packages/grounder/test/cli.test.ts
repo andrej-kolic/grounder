@@ -26,6 +26,8 @@ describe("grounder cli", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("grounder vault init");
     expect(result.stdout).toContain("grounder note");
+    expect(result.stdout).toContain("grounder plan");
+    expect(result.stdout).toContain("grounder path plans");
     expect(result.stdout).toContain("grounder status");
     expect(result.stdout).toContain("grounder doctor");
     expect(result.stdout).toContain("grounder handoff peek");
@@ -37,5 +39,15 @@ describe("grounder cli", () => {
     const result = run(["note"]);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("Usage: grounder note");
+  });
+
+  it("requires text and title for plan command", () => {
+    const missingText = run(["plan"]);
+    expect(missingText.status).toBe(1);
+    expect(missingText.stderr).toContain("Usage: grounder plan <text> --title <name>");
+
+    const missingTitle = run(["plan", "body only"]);
+    expect(missingTitle.status).toBe(1);
+    expect(missingTitle.stderr).toContain("Usage: grounder plan <text> --title <name>");
   });
 });

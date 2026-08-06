@@ -20,7 +20,12 @@ import type {
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const templateDir = path.join(pkgRoot, "templates", "agents", "claude", "commands");
 
-const COMMANDS = ["grounder-note.md", "grounder-task-handoff.md", "grounder-task.md"] as const;
+const COMMANDS = [
+  "grounder-note.md",
+  "grounder-plan.md",
+  "grounder-task-handoff.md",
+  "grounder-task.md",
+] as const;
 
 /**
  * Canonical SessionStart command for Claude Code (home-local runtime, not `npx`).
@@ -47,6 +52,10 @@ export function claudeSettingsJsonPath(homeDir?: string): string {
 
 export function grounderNoteCommandPath(homeDir?: string): string {
   return path.join(claudeCommandsDir(homeDir), "grounder-note.md");
+}
+
+export function grounderPlanCommandPath(homeDir?: string): string {
+  return path.join(claudeCommandsDir(homeDir), "grounder-plan.md");
 }
 
 export function grounderTaskHandoffCommandPath(homeDir?: string): string {

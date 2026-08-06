@@ -1,0 +1,16 @@
+<!-- Reference shape for /grounder-plan. Not installed or filled by the CLI — slash commands embed this structure. -->
+
+# Plan: <title>
+
+## Goal
+…
+
+## Steps
+1. …
+2. …
+
+## Decisions / open questions
+- …
+
+## Status
+…
