@@ -21,9 +21,10 @@ Project id comes from `package.json` → **`grounder-dev`**. Paths:
 ```text
 <vault>/10-Projects/grounder-dev/notes/
 <vault>/10-Projects/grounder-dev/logs/
+<vault>/10-Projects/grounder-dev/plans/
 ```
 
-Run `init` from this folder — it writes `.grounder.json` here (not at the monorepo root). Run `note` / `handoff` from here or any subfolder; the CLI walks up to find the marker. The `grounder` CLI is a workspace dependency (`workspace:*`).
+Run `init` from this folder — it writes `.grounder.json` here (not at the monorepo root). Run `note` / `handoff` / `plan` from here or any subfolder; the CLI walks up to find the marker. The `grounder` CLI is a workspace dependency (`workspace:*`).
 
 After editing `packages/grounder/src`, run `pnpm build` from the repo root — the bin runs `dist/cli.js`.
 
@@ -55,6 +56,27 @@ EOF
 
 pnpm grounder handoff list
 pnpm grounder path logs
+
+# Named living plan (update in place with --force)
+pnpm grounder plan "$(cat <<'EOF'
+# Plan: phase-2 dogfood
+
+## Goal
+Exercise named plans in the dev fixture
+
+## Steps
+1. Write this plan
+2. Re-run with --force after changes
+
+## Decisions / open questions
+- None
+
+## Status
+Draft
+EOF
+)" --title phase-2
+
+pnpm grounder path plans
 ```
 
 In Cursor / Claude Code (from this folder or a linked project):
@@ -64,6 +86,7 @@ In Cursor / Claude Code (from this folder or a linked project):
 /grounder-task          → list --head + read newest usable handoff + AGENTS.md (read-only)
 … work …
 /grounder-task-handoff  → summarize → grounder handoff "<body>"
+/grounder-plan          → write/update named plan → grounder plan "<body>" --title <name>
 ```
 
 Verify the teaser without starting an agent session:
@@ -74,7 +97,7 @@ pnpm grounder handoff peek          # linked + handoff → one line; else silent
 
 The teaser never auto-loads the full handoff and never blocks a session — run `/grounder-task` only when you want the body.
 
-`/grounder-note` uses `npx grounder note`. Re-install agent artifacts after template changes:
+`/grounder-note` and `/grounder-plan` shell out via `npx grounder …`. Re-install agent artifacts after template changes:
 
 ```bash
 pnpm grounder vault init <path-to-your-vault> --force --yes --hooks

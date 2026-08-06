@@ -63,7 +63,7 @@ Note / handoff flags:
                  (skips empty/unreadable files; same pick as handoff peek)
 
 Plan flags:
-  --title <name> Required plan filename (trailing .md ok; no auto-slug)
+  --title <name> Required filename (trailing .md ok; sanitized, max 80 chars)
   --force        Overwrite an existing plan (preserves original created)
 
 Quickstart:

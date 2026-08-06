@@ -15,24 +15,27 @@ connector/          # repo ↔ vault wiring (config stores + resolution)
   home.ts             # ~/.grounder/config.json
   repo.ts             # .grounder.json marker, findLinkedRepoRoot
   linked.ts           # resolveLinkedProject (home + marker Result)
-  vault.ts            # resolveVaultRoot, resolveNotesDir/LogsDir (config-aware)
+  vault.ts            # resolveVaultRoot, resolveNotesDir/LogsDir/PlansDir (config-aware)
   git.ts              # findGitRoot, currentBranch (best-effort)
   project-id.ts       # detectProjectId
 vault/                # vault on disk
-  layout.ts           # pure path conventions (10-Projects/… notes/ + logs/)
+  layout.ts           # pure path conventions (10-Projects/… notes/ + logs/ + plans/)
   write-note.ts       # note file I/O
   write-handoff.ts    # handoff file I/O (frontmatter + body)
+  write-plan.ts       # plan file I/O (named, updatable; --force)
   list-handoffs.ts    # list logs/*.md newest-first
   find-usable-handoff.ts # newest-first, skipping empty/unreadable (peek + list --head)
 commands/             # mirrors CLI structure
   require-linked.ts   # CLI stderr wrapper around resolveLinkedProject
   vault/init.ts       # grounder vault init (agent-blind; uses agents registry)
-  repo/init.ts        # grounder init (creates notes/ + logs/)
+  repo/init.ts        # grounder init (creates notes/ + logs/ + plans/)
   note.ts             # grounder note
   handoff.ts          # grounder handoff
   handoff/list.ts     # grounder handoff list
+  plan.ts             # grounder plan
   path/notes.ts       # grounder path notes
   path/logs.ts        # grounder path logs
+  path/plans.ts       # grounder path plans
 agents/               # AgentAdapter registry (pluggable install targets)
   types.ts            # AgentAdapter interface
   index.ts            # resolveAgents(), detect
@@ -55,12 +58,15 @@ packages/grounder/templates/
       grounder-note.md
       grounder-task.md            # recall — read-only hydrate
       grounder-task-handoff.md    # write session checkpoint
+      grounder-plan.md            # named living plan
     claude/commands/
       grounder-note.md
       grounder-task.md
       grounder-task-handoff.md
+      grounder-plan.md
   vault/
     session-handoff.md            # lean section reference for slash commands
+    plan.md                       # section reference for /grounder-plan
   bridge/                         # deferred (Phase 2+)
 ```
 
