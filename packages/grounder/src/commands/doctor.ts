@@ -220,6 +220,11 @@ async function checkAgentHooks(homeDir?: string): Promise<CheckResult[]> {
   const checks: CheckResult[] = [];
   let anyHooksInstalled = false;
 
+  const commandsPresent = await Promise.all(
+    agents.map((agent) => Promise.all(agent.expectedArtifacts(homeDir).map((p) => fileExists(p)))),
+  );
+  const anyCommandsInstalled = commandsPresent.some((present) => present.some(Boolean));
+
   for (const agent of agents) {
     if (!agent.expectedHookArtifacts) {
       continue;
@@ -239,7 +244,7 @@ async function checkAgentHooks(homeDir?: string): Promise<CheckResult[]> {
     }
   }
 
-  if (anyHooksInstalled || (await anyAgentCommandsInstalled(homeDir))) {
+  if (anyHooksInstalled || anyCommandsInstalled) {
     if (await isHookRuntimeStale(homeDir)) {
       checks.push(
         warnCheck(
