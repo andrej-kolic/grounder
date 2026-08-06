@@ -211,7 +211,10 @@ No `--agent` flag: auto-detect installed agents. Explicit install:
 grounder vault init <path-to-your-vault> --agent=cursor --agent=claude
 ```
 
-Slash commands invoke `~/.grounder/runtime/dist/cli.js` directly (not `npx`) — see [Session-start hooks](#session-start-hooks) for how that runtime stays current. Re-run `vault init --force` to refresh existing command files (rarely needed — the runtime path itself doesn't change).
+Slash commands invoke `~/.grounder/runtime/dist/cli.js` directly (not `npx`) — see [Session-start hooks](#session-start-hooks) for how that runtime stays current. `vault init` never rewrites an existing command file without `--force`, so:
+
+- Editing a template and re-running `vault init` — rarely needed; the runtime path itself doesn't change.
+- **Upgrading from a grounder version older than this mechanism** — command files installed back then still contain a literal `npx grounder …` call and are *not* rewritten by a plain re-run. Run `grounder vault init <path> --force` once to migrate them; `grounder doctor` flags any agent with a command file still invoking `npx grounder`.
 
 Templates live under `templates/agents/{id}/`. Adding another agent means one adapter file + one template directory — `vault init` stays agent-blind.
 
@@ -244,6 +247,8 @@ Hooks *and* slash commands both run `~/.grounder/runtime/dist/cli.js` directly (
 
 If you want the runtime to stay current with zero maintenance, install grounder rather than using bare `npx` for this step.
 
+That refresh only touches the shared runtime, not installed command files — see the migration note in [Agents](#agents) if `doctor` flags a command file still invoking `npx grounder` literally.
+
 ## Troubleshooting
 
 | Symptom | Try |
@@ -255,7 +260,9 @@ If you want the runtime to stay current with zero maintenance, install grounder 
 | No `.grounder.json` / notes / logs / plans dirs | `grounder init` |
 | Agent slash commands stale or partial | `grounder vault init <path> --force` (or `--agent=<id>`) |
 | Session-start teaser missing (optional) | `grounder vault init <path> --hooks` — `doctor` warns when absent |
-| Slash commands or teaser stale after upgrade (bare npx install) | `grounder vault init <path>` — `doctor` warns when `hook-runtime` is stale |
+| Shared runtime stale after upgrade (bare npx install) | `grounder vault init <path>` — `doctor` warns when `hook-runtime` is stale |
+| Command file still literally invokes `npx grounder` (installed before this release) | `grounder vault init <path> --force` — `doctor` warns per agent when detected |
+| Switched Node version / nvm environment (command files invoke the old `node`) | `grounder vault init <path> --force` — command files bake in the `node` path at install time; session hooks self-heal on the next `vault init` without `--force` |
 
 ## Development
 

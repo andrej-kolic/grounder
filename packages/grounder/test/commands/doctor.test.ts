@@ -1,7 +1,7 @@
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { grounderTaskCommandPath } from "../../src/agents/cursor.js";
+import { grounderNoteCommandPath, grounderTaskCommandPath } from "../../src/agents/cursor.js";
 import { grounderRuntimeDir } from "../../src/agents/hook-runtime.js";
 import { runDoctorWithOptions } from "../../src/commands/doctor.js";
 import { runRepoInitWithOptions } from "../../src/commands/repo/init.js";
@@ -135,6 +135,35 @@ describe("commands/doctor", () => {
     expect(out).toContain("grounder vault init <path> --force");
     expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).toContain("ok    hook-runtime");
+  });
+
+  it("warns when a command file still invokes npx grounder (pre-runtime install)", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    // Simulate a command file installed before templates dropped literal npx.
+    await writeFile(
+      grounderNoteCommandPath(env.home),
+      'Run:\n\n  npx grounder note "<user text>"\n',
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("warn  agent-cursor");
+    expect(out).toContain("still invoke npx grounder (pre-runtime) — migrate");
+    expect(out).toContain("grounder vault init <path> --force");
+    expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });
 
   it("warns when a detected agent has no command files", async () => {
