@@ -43,8 +43,8 @@ We do **not** pin a per-project Grounder version (Corepack-style). Install state
 
 1. **Owned fragments** (hooks entry, runtime, ledger): always refresh on `vault init` / `migrate`. No `--force` required.
 2. **Command markdown**: chezmoi-style drift detection.
-   - On write, record `sha256` of the exact bytes Grounder wrote (rendered template, including machine-specific CLI path — **not** the raw template).
-   - Later: on-disk hash == recorded hash → file untouched → safe auto-update to the new template without `--force`.
+   - On write, record per file: `hash` (exact rendered bytes Grounder wrote — not the raw template) and `schema` (that file’s schema at write time).
+   - Later: on-disk hash == recorded hash → file untouched → safe auto-update without `--force`.
    - On-disk hash != recorded (or no recorded hash) → treat as user-edited / legacy → leave alone; report; require `--force` to overwrite.
 
 Missing ledger or missing per-file hash is **schema 0 / legacy**: same protective path as “user edited,” which is why a one-time `migrate --force` is needed when upgrading from pre-ledger installs.
@@ -82,11 +82,22 @@ Module: [`connector/state.ts`](../../packages/grounder/src/connector/state.ts).
 }
 ```
 
+#### Per-file `schema` vs `hash`
+
+Each entry under `files` has two fields. Do not confuse them:
+
+| Field | Means |
+| --- | --- |
+| `hash` | Bytes Grounder last wrote. Used to detect local edits. |
+| `schema` | **This file’s** schema when it was last written — not the agent’s latest. Files can differ after a partial migrate. |
+
+Agent-level `commandsSchema` / `hooksSchema` are the rollup used by peek, doctor “stale?”, and most migrate decisions. Per-file `schema` is stored so each file keeps its own version; today it is also checked on forward-compat (file newer than this binary understands).
+
 Invariants:
 
 - Missing file or missing agent entry → treat recorded schema as **0** (legacy).
-- Recorded schema **less than** this binary’s adapter → stale → user should `grounder migrate`.
-- Recorded schema **greater than** this binary’s adapter → **forward-compat hard stop** (`UnsupportedSchemaError`: upgrade grounder). Same idea for `.grounder.json`’s `version` vs `SUPPORTED_REPO_VERSION` in [`connector/repo.ts`](../../packages/grounder/src/connector/repo.ts).
+- Agent schema **less than** this binary’s adapter → stale → user should `grounder migrate`.
+- Agent schema **greater than** this binary’s adapter (or a per-file `schema` greater than this binary supports) → **forward-compat hard stop** (`UnsupportedSchemaError`: upgrade grounder). Same idea for `.grounder.json`’s `version` vs `SUPPORTED_REPO_VERSION` in [`connector/repo.ts`](../../packages/grounder/src/connector/repo.ts).
 - Ledger agent ids this binary does not know → skip with a stderr warning on `migrate` (still refresh known agents); explicit `--agent=<unknown>` still errors.
 - Corrupt ledger → fail with a clear “fix or remove, then migrate” message (distinct from “newer than me”).
 - `migrate` / vault init **must not** advance `commandsSchema` when every command artifact was left as `modified` (legacy or local edits). Runtime/`grounderVersion` (and hooks, when refreshed) may still update; doctor keeps the schema-stale / `--force` hint until a real command write lands.
@@ -109,18 +120,31 @@ Three channels, no new product surface:
 
 | Channel | Role |
 | --- | --- |
-| **`grounder doctor` / `status`** | Pull: install-state check, schema stale → warn + migrate hint; schema ahead → fail / upgrade; `status` shows State path |
-| **Session hook / `handoff peek`** | Push: cheap integer stale check; one-line teaser (`Install outdated — run: grounder migrate`). Hooks stay side-effect-free — no auto-migrate |
-| **CLI upgrade banner** | When running Grounder and the version recorded for this machine's configuration disagree (semver-ordered when both parse as `x.y.z`): plain-language stderr on ordinary commands until migrate/vault init rewrites the ledger. Updated package → migrate; older package → install a newer Grounder; unparseable mismatch → migrate. Skipped for peek, migrate, and vault init |
+| **`grounder doctor` / `status`** | Checks install state. Schema stale → warn + migrate. Schema too new → fail (upgrade grounder). Also shows package mismatch when present. |
+| **Session hook / `handoff peek`** | Checks **schemas only**. One-line teaser: `Install outdated — run: grounder migrate`. No auto-migrate. |
+| **CLI upgrade banner** | Checks **`grounderVersion` only**. Package newer → migrate. Package older → install a newer Grounder. Skipped for peek, migrate, and vault init. |
+
+#### Schemas vs package version (keep separate)
+
+These are two different checks. Do not mix them.
+
+| Field | What it means | Used by |
+| --- | --- | --- |
+| `commandsSchema` / `hooksSchema` | Did the install shape change? (files, placeholders, hooks) | Peek, doctor schema checks, hard stop if too new |
+| `grounderVersion` | Which package last wrote the ledger? | CLI banner, doctor/status package line |
+
+Why peek ignores `grounderVersion`: peek always says “run migrate.” But a package mismatch can also mean “this Grounder is too old — upgrade the package.” Wrong hint. The CLI banner handles that case. `cli.ts` skips the banner for peek on purpose.
+
+For maintainers: bumping the package version is **not** enough for session hooks to warn. Bump the adapter schema when install output changes. That is what peek looks at.
 
 ```mermaid
 flowchart TD
   Upgrade["User upgrades grounder package"] --> NextRun["Next grounder command"]
-  NextRun --> Banner["stderr: run grounder migrate"]
-  NextRun --> Hook["Session peek: schema compare"]
+  NextRun --> Banner["stderr: package vs ledger"]
+  NextRun --> Hook["Session peek: schema only"]
   NextRun --> Doctor["grounder doctor"]
   Hook --> Teaser["Install outdated teaser"]
-  Doctor --> Warn["warn: schema stale"]
+  Doctor --> Warn["warn: schema and/or package"]
   Teaser --> Migrate["grounder migrate"]
   Warn --> Migrate
   Banner --> Migrate
@@ -149,6 +173,7 @@ flowchart TD
 
 - **Only `vault init --force` for upgrades** — wrong verb; requires vault path; trains users to force-clobber.
 - **Auto-migrate from the session hook** — hooks must stay fast and side-effect-free.
+- **Make peek also check `grounderVersion`** — peek can only say “run migrate,” but package mismatch sometimes means “upgrade grounder.” Keep schema and package checks separate (see above).
 - **Name the command `upgrade`** — confuses with upgrading the npm package itself.
 - **Compare on-disk files to shipped templates** — rendered output is machine-specific (`{{GROUNDER_CLI}}`); only “bytes we last wrote” is a valid hash baseline.
 - **Content sniffing for every future migration** — does not scale; ledger + integer schemas replace one-off detectors after the legacy bootstrap.
@@ -157,7 +182,7 @@ flowchart TD
 
 When changing install output:
 
-1. Bump `commandsSchema` and/or `hooksSchema` on the affected adapter(s).
+1. Bump `commandsSchema` and/or `hooksSchema` on the affected adapter(s). Peek only warns after a schema bump — not after a package bump alone.
 2. Ensure install still records per-file hashes for command markdown.
 3. Extend doctor messages if a new failure mode needs a distinct hint.
 4. Run `pnpm check`.
