@@ -184,7 +184,18 @@ export async function applyAgentInstalls(
     }
 
     if (!dryRun) {
-      await recordAgentInstallState(agent, { hooksInstalled, homeDir });
+      const statuses = Object.values(commands.artifacts);
+      // Only advance commandsSchema when at least one file was written or
+      // confirmed current. All-`modified` (legacy / local edits) must not mark
+      // the ledger current — otherwise plain migrate silences doctor while
+      // leaving pre-0.3 command files untouched.
+      const advanceCommandsSchema =
+        statuses.length === 0 || statuses.some((status) => status !== "modified");
+      await recordAgentInstallState(agent, {
+        hooksInstalled,
+        homeDir,
+        advanceCommandsSchema,
+      });
     }
 
     results.push({ agent, commands, hooks: hooksResult });

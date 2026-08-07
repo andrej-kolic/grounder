@@ -114,7 +114,13 @@ export function recordedHooksSchema(state: GrounderState | null, agentId: string
 
 export interface RecordAgentInstallOptions {
   agentId: string;
-  commandsSchema: number;
+  /**
+   * When set, updates `commandsSchema`; when omitted, preserves any existing
+   * value (or `0` for a new agent entry). Omit when command files were all
+   * skipped as locally modified / legacy so the ledger does not falsely look
+   * current.
+   */
+  commandsSchema?: number;
   /** When set, updates `hooksSchema`; when omitted, preserves any existing value. */
   hooksSchema?: number;
   /**
@@ -135,7 +141,8 @@ export async function recordAgentInstall(opts: RecordAgentInstallOptions): Promi
   const existing = await readGrounderState(opts.homeDir);
   const prev = existing?.agents[opts.agentId];
   const nextEntry: AgentState = {
-    commandsSchema: opts.commandsSchema,
+    commandsSchema:
+      opts.commandsSchema !== undefined ? opts.commandsSchema : (prev?.commandsSchema ?? 0),
     files: {
       ...(prev?.files ? { ...prev.files } : {}),
       ...(opts.files ?? {}),

@@ -41,14 +41,24 @@ export async function resolveAgents(ids?: string[]): Promise<AgentAdapter[]> {
  * install. When `hooksInstalled` is true and the adapter declares
  * `hooksSchema`, that value is recorded; otherwise any existing hooksSchema
  * is left alone.
+ *
+ * When `advanceCommandsSchema` is false (every command artifact was left as
+ * `modified`), the recorded commands schema is preserved so doctor/peek keep
+ * treating the install as stale until a real write or `--force`.
  */
 export async function recordAgentInstallState(
   agent: AgentAdapter,
-  opts: { hooksInstalled?: boolean; homeDir?: string } = {},
+  opts: {
+    hooksInstalled?: boolean;
+    homeDir?: string;
+    /** Default true. Pass false when no command file was created/updated/skipped-as-current. */
+    advanceCommandsSchema?: boolean;
+  } = {},
 ): Promise<void> {
+  const advanceCommandsSchema = opts.advanceCommandsSchema !== false;
   await recordAgentInstall({
     agentId: agent.id,
-    commandsSchema: agent.commandsSchema,
+    ...(advanceCommandsSchema ? { commandsSchema: agent.commandsSchema } : {}),
     hooksSchema:
       opts.hooksInstalled && agent.hooksSchema !== undefined ? agent.hooksSchema : undefined,
     grounderVersion: VERSION,

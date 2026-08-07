@@ -124,6 +124,48 @@ describe("connector/state", () => {
     });
   });
 
+  it("preserves commandsSchema when a later record omits it", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await recordAgentInstall({
+      agentId: "cursor",
+      commandsSchema: 0,
+      hooksSchema: 1,
+      grounderVersion: "0.2.0",
+      homeDir: env.home,
+    });
+    await recordAgentInstall({
+      agentId: "cursor",
+      hooksSchema: 1,
+      grounderVersion: "0.3.0",
+      homeDir: env.home,
+    });
+
+    const state = await readGrounderState(env.home);
+    expect(state).toMatchObject({
+      grounderVersion: "0.3.0",
+      agents: {
+        cursor: { commandsSchema: 0, hooksSchema: 1 },
+      },
+    });
+  });
+
+  it("defaults omitted commandsSchema to 0 for a new agent entry", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await recordAgentInstall({
+      agentId: "cursor",
+      grounderVersion: "0.3.0",
+      homeDir: env.home,
+    });
+
+    expect(await readGrounderState(env.home)).toMatchObject({
+      agents: { cursor: { commandsSchema: 0, files: {} } },
+    });
+  });
+
   it("merges files map when recording install metadata", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;

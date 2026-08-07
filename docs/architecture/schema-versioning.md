@@ -88,7 +88,7 @@ Invariants:
 - Recorded schema **less than** this binary’s adapter → stale → user should `grounder migrate`.
 - Recorded schema **greater than** this binary’s adapter → **forward-compat hard stop** (`UnsupportedSchemaError`: upgrade grounder). Same idea for `.grounder.json`’s `version` vs `SUPPORTED_REPO_VERSION` in [`connector/repo.ts`](../../packages/grounder/src/connector/repo.ts).
 - Corrupt ledger → fail with a clear “fix or remove, then migrate” message (distinct from “newer than me”).
-
+- `migrate` / vault init **must not** advance `commandsSchema` when every command artifact was left as `modified` (legacy or local edits). Runtime/`grounderVersion` (and hooks, when refreshed) may still update; doctor keeps the schema-stale / `--force` hint until a real command write lands.
 ### `grounder migrate` (not only `vault init --force`)
 
 `vault init` is “point this machine at a vault and install.” Reusing it as the routine post-upgrade action forces retyping a path and mixes first-time setup with keep-current.

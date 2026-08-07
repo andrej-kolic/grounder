@@ -83,6 +83,45 @@ describe("commands/migrate", () => {
     expect(await readFile(noteDest, "utf8")).not.toBe("my local edits\n");
   });
 
+  it("does not advance commandsSchema when plain migrate skips all legacy command files", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    // Pre-0.3 / pre-ledger: command files exist, but no per-file hashes.
+    const { rm } = await import("node:fs/promises");
+    await rm(statePath(env.home), { force: true });
+
+    const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+
+    expect(code).toBe(0);
+    expect(out).toContain("locally modified (skipped — use --force)");
+    expect(out).toContain("grounder migrate --force");
+
+    const state = await readGrounderState(env.home);
+    expect(state).toMatchObject({
+      grounderVersion: expect.any(String),
+      agents: { cursor: { commandsSchema: 0 } },
+    });
+    expect(state?.agents.cursor?.files ?? {}).toEqual({});
+
+    const forced = await captureStdout(() =>
+      runMigrateWithOptions({ homeDir: env.home, force: true }),
+    );
+    expect(forced.code).toBe(0);
+    expect(await readGrounderState(env.home)).toMatchObject({
+      agents: { cursor: { commandsSchema: 1 } },
+    });
+    expect(
+      Object.keys((await readGrounderState(env.home))?.agents.cursor?.files ?? {}).length,
+    ).toBeGreaterThan(0);
+  });
+
   it("refreshes previously installed hooks without --hooks", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
