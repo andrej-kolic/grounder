@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveHomeDir } from "../connector/home.js";
@@ -9,8 +9,8 @@ import {
   isGrounderPeekHookCommand,
   isHookRuntimeStale,
   peekHookCommand,
-  runtimeInvocation,
 } from "./hook-runtime.js";
+import { installCommandFile, recordCommandFileHashes } from "./install-command.js";
 import type {
   AgentAdapter,
   AgentInstallOptions,
@@ -72,29 +72,6 @@ export function expectedArtifacts(homeDir?: string): string[] {
 /** Paths of hook config this adapter touches — currently just `hooks.json`. */
 export function expectedHookArtifacts(homeDir?: string): string[] {
   return [cursorHooksJsonPath(homeDir)];
-}
-
-/**
- * Templates reference the CLI via a `{{GROUNDER_CLI}}` placeholder (not a
- * literal `npx grounder`) so the installed command always points at the home
- * runtime — see {@link runtimeInvocation}.
- */
-async function installCommand(
-  filename: (typeof COMMANDS)[number],
-  opts: AgentInstallOptions,
-): Promise<{ dest: string; status: ArtifactStatus }> {
-  const dest = path.join(cursorCommandsDir(opts.homeDir), filename);
-  const existed = await fileExists(dest);
-
-  if (existed && !opts.force) {
-    return { dest, status: "skipped" };
-  }
-
-  await mkdir(path.dirname(dest), { recursive: true });
-  const template = await readFile(path.join(templateDir, filename), "utf8");
-  const rendered = template.replaceAll("{{GROUNDER_CLI}}", runtimeInvocation(opts.homeDir));
-  await writeFile(dest, rendered);
-  return { dest, status: existed ? "overwritten" : "created" };
 }
 
 // ---------------------------------------------------------------------------
@@ -251,6 +228,13 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
     return { artifacts: { [dest]: "skipped" } };
   }
 
+  if (opts.dryRun) {
+    const fileExisted = await fileExists(dest);
+    const hadGrounderEntry = fileExisted && (await peekHookHadGrounderEntry(dest));
+    const status: ArtifactStatus = hadGrounderEntry ? "overwritten" : "created";
+    return { artifacts: { [dest]: status } };
+  }
+
   await installHookRuntime({ homeDir: opts.homeDir });
   const fileExisted = await fileExists(dest);
   const hadGrounderEntry = fileExisted && (await peekHookHadGrounderEntry(dest));
@@ -281,10 +265,28 @@ export const cursor: AgentAdapter = {
 
   async install(opts: AgentInstallOptions): Promise<AgentInstallResult> {
     const artifacts: Record<string, ArtifactStatus> = {};
+    const files: Record<string, { schema: number; hash: string }> = {};
     for (const filename of COMMANDS) {
-      const { dest, status } = await installCommand(filename, opts);
+      const { dest, status, hash } = await installCommandFile({
+        ...opts,
+        agentId: cursor.id,
+        commandsSchema: cursor.commandsSchema,
+        templateDir,
+        commandsDir: cursorCommandsDir(opts.homeDir),
+        filename,
+      });
       artifacts[dest] = status;
+      if (hash) {
+        files[dest] = { schema: cursor.commandsSchema, hash };
+      }
     }
+    await recordCommandFileHashes({
+      agentId: cursor.id,
+      commandsSchema: cursor.commandsSchema,
+      files,
+      homeDir: opts.homeDir,
+      dryRun: opts.dryRun,
+    });
     return { artifacts };
   },
 

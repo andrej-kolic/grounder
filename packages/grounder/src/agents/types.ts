@@ -1,7 +1,15 @@
-export type ArtifactStatus = "created" | "skipped" | "overwritten";
+/**
+ * - `created` / `overwritten` — wrote new content
+ * - `skipped` — already current (or dry-run would no-op)
+ * - `modified` — on-disk content differs from last Grounder write; left alone
+ *   unless `--force`
+ */
+export type ArtifactStatus = "created" | "skipped" | "overwritten" | "modified";
 
 export interface AgentInstallOptions {
   force?: boolean;
+  /** Preview decisions without writing files or updating the install ledger. */
+  dryRun?: boolean;
   homeDir?: string;
 }
 

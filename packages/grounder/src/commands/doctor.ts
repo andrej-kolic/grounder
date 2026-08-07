@@ -31,12 +31,12 @@ export interface DoctorOptions {
 }
 
 const VAULT_INIT = "grounder vault init <path>";
-const VAULT_INIT_FORCE = "grounder vault init <path> --force";
-const VAULT_INIT_HOOKS = "grounder vault init <path> --hooks";
+const MIGRATE = "grounder migrate";
+const MIGRATE_HOOKS = "grounder migrate --hooks";
 const REPO_INIT = "grounder init";
 
-/** Fix hint for stale install schemas (migrate lands in a later slice). */
-const MIGRATE_HINT = VAULT_INIT_FORCE;
+/** Fix hint for stale install schemas. */
+const MIGRATE_HINT = MIGRATE;
 
 async function isDirectory(dirPath: string): Promise<boolean> {
   try {
@@ -215,7 +215,7 @@ async function checkAgentArtifacts(
       continue;
     }
 
-    const fix = `${VAULT_INIT_FORCE} (or --agent=${agent.id})`;
+    const fix = `${MIGRATE_HINT} --force (or --agent=${agent.id})`;
     if (presentCount === 0) {
       checks.push(warnCheck(id, `${agent.name} detected but no Grounder command files`, fix));
     } else {
@@ -300,7 +300,7 @@ async function checkAgentHooks(
           warnCheck(
             id,
             `${agent.name} hooks schema stale (recorded ${recorded}, current ${agent.hooksSchema}) — migrate`,
-            VAULT_INIT_HOOKS,
+            MIGRATE_HINT,
           ),
         );
       } else {
@@ -308,7 +308,7 @@ async function checkAgentHooks(
       }
     } else {
       checks.push(
-        warnCheck(id, `${agent.name} detected but no Grounder session hook`, VAULT_INIT_HOOKS),
+        warnCheck(id, `${agent.name} detected but no Grounder session hook`, MIGRATE_HOOKS),
       );
     }
   }
@@ -319,7 +319,7 @@ async function checkAgentHooks(
         warnCheck(
           "hook-runtime",
           "hook runtime stale or missing (re-run after upgrading, especially bare npx)",
-          VAULT_INIT,
+          MIGRATE,
         ),
       );
     } else {

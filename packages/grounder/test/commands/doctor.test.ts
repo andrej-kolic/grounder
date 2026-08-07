@@ -133,7 +133,7 @@ describe("commands/doctor", () => {
     expect(code).toBe(1);
     expect(out).toContain("fail  agent-cursor");
     expect(out).toContain("grounder-task.md");
-    expect(out).toContain("grounder vault init <path> --force");
+    expect(out).toContain("grounder migrate --force");
     expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).toContain("ok    hook-runtime");
   });
@@ -161,7 +161,7 @@ describe("commands/doctor", () => {
     expect(code).toBe(0);
     expect(out).toContain("warn  agent-cursor");
     expect(out).toContain("commands schema stale (recorded 0, current 1) — migrate");
-    expect(out).toContain("grounder vault init <path> --force");
+    expect(out).toContain("grounder migrate");
     expect(out).toContain("warn  agent-cursor-hooks");
     expect(out).toContain("hooks schema stale (recorded 0, current 1) — migrate");
     expect(out).toMatch(/^\d+ passed, 0 failed, 2 warned$/m);
@@ -195,7 +195,7 @@ describe("commands/doctor", () => {
     expect(code).toBe(0);
     expect(out).toContain("warn  agent-cursor");
     expect(out).toContain("commands schema stale (recorded 0, current 1) — migrate");
-    expect(out).toContain("grounder vault init <path> --force");
+    expect(out).toContain("grounder migrate");
     expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
   });
 
@@ -229,7 +229,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("ok    agent-cursor");
     expect(out).toContain("warn  agent-cursor-hooks");
     expect(out).toContain("hooks schema stale (recorded 0, current 1) — migrate");
-    expect(out).toContain("grounder vault init <path> --hooks");
+    expect(out).toContain("grounder migrate");
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });
 
@@ -278,7 +278,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("warn  agent-cursor");
     expect(out).toContain("no Grounder command files");
     expect(out).toContain("warn  agent-cursor-hooks");
-    expect(out).toContain("no Grounder session hook → grounder vault init <path> --hooks");
+    expect(out).toContain("no Grounder session hook → grounder migrate --hooks");
     expect(out).toMatch(/^\d+ passed, 0 failed, 2 warned$/m);
   });
 
@@ -301,7 +301,7 @@ describe("commands/doctor", () => {
     expect(code).toBe(0);
     expect(out).toContain("ok    agent-cursor");
     expect(out).toContain("warn  agent-cursor-hooks");
-    expect(out).toContain("no Grounder session hook → grounder vault init <path> --hooks");
+    expect(out).toContain("no Grounder session hook → grounder migrate --hooks");
     // Slash commands were installed (hooks were not), so the shared runtime is
     // still checked — it just doesn't depend on hooks being installed.
     expect(out).toContain("ok    hook-runtime");
@@ -330,7 +330,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).toContain("warn  hook-runtime");
     expect(out).toContain(
-      "hook runtime stale or missing (re-run after upgrading, especially bare npx) → grounder vault init <path>",
+      "hook runtime stale or missing (re-run after upgrading, especially bare npx) → grounder migrate",
     );
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });

@@ -5,6 +5,7 @@ import {
   readGrounderState,
   recordAgentInstall,
   recordedCommandsSchema,
+  recordedFileHash,
   recordedHooksSchema,
   statePath,
   writeGrounderState,
@@ -118,6 +119,37 @@ describe("connector/state", () => {
       hooksSchema: 1,
       files: {},
     });
+  });
+
+  it("merges files map when recording install metadata", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await recordAgentInstall({
+      agentId: "cursor",
+      commandsSchema: 1,
+      grounderVersion: "0.3.0",
+      files: {
+        "/tmp/a.md": { schema: 1, hash: "sha256:aaa" },
+      },
+      homeDir: env.home,
+    });
+    await recordAgentInstall({
+      agentId: "cursor",
+      commandsSchema: 1,
+      grounderVersion: "0.3.0",
+      files: {
+        "/tmp/b.md": { schema: 1, hash: "sha256:bbb" },
+      },
+      homeDir: env.home,
+    });
+
+    const state = await readGrounderState(env.home);
+    expect(state?.agents.cursor?.files).toEqual({
+      "/tmp/a.md": { schema: 1, hash: "sha256:aaa" },
+      "/tmp/b.md": { schema: 1, hash: "sha256:bbb" },
+    });
+    expect(recordedFileHash(state, "cursor", "/tmp/a.md")).toBe("sha256:aaa");
   });
 
   it("throws on corrupt state", async () => {

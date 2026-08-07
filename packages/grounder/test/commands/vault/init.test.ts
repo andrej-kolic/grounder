@@ -1,8 +1,13 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { claudePeekHookCommand, claudeSettingsJsonPath } from "../../../src/agents/claude.js";
 import {
+  claude,
+  claudePeekHookCommand,
+  claudeSettingsJsonPath,
+} from "../../../src/agents/claude.js";
+import {
+  cursor,
   cursorHooksJsonPath,
   cursorPeekHookCommand,
   grounderNoteCommandPath,
@@ -15,7 +20,19 @@ import { homeConfigPath } from "../../../src/connector/home.js";
 import { readGrounderState, statePath } from "../../../src/connector/state.js";
 import { VERSION } from "../../../src/index.js";
 import { fileExists } from "../../../src/util/fs.js";
+import { hashContent } from "../../../src/util/hash.js";
 import { captureStdout, createTempEnv } from "../../helpers.js";
+
+async function expectedFileLedger(
+  paths: string[],
+  schema = 1,
+): Promise<Record<string, { schema: number; hash: string }>> {
+  const files: Record<string, { schema: number; hash: string }> = {};
+  for (const p of paths) {
+    files[p] = { schema, hash: hashContent(await readFile(p, "utf8")) };
+  }
+  return files;
+}
 
 describe("commands/vault/init", () => {
   let cleanup: (() => Promise<void>) | undefined;
@@ -72,7 +89,10 @@ describe("commands/vault/init", () => {
     expect(await readGrounderState(env.home)).toEqual({
       grounderVersion: VERSION,
       agents: {
-        cursor: { commandsSchema: 1, files: {} },
+        cursor: {
+          commandsSchema: 1,
+          files: await expectedFileLedger(cursor.expectedArtifacts(env.home)),
+        },
       },
     });
   });
@@ -167,8 +187,16 @@ describe("commands/vault/init", () => {
       expect(await readGrounderState(env.home)).toEqual({
         grounderVersion: VERSION,
         agents: {
-          cursor: { commandsSchema: 1, hooksSchema: 1, files: {} },
-          claude: { commandsSchema: 1, hooksSchema: 1, files: {} },
+          cursor: {
+            commandsSchema: 1,
+            hooksSchema: 1,
+            files: await expectedFileLedger(cursor.expectedArtifacts(env.home)),
+          },
+          claude: {
+            commandsSchema: 1,
+            hooksSchema: 1,
+            files: await expectedFileLedger(claude.expectedArtifacts(env.home)),
+          },
         },
       });
       expect(statePath(env.home)).toBe(path.join(env.home, ".grounder", "state.json"));

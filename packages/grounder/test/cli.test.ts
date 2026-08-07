@@ -30,9 +30,11 @@ describe("grounder cli", () => {
     expect(result.stdout).toContain("grounder path plans");
     expect(result.stdout).toContain("grounder status");
     expect(result.stdout).toContain("grounder doctor");
+    expect(result.stdout).toContain("grounder migrate");
     expect(result.stdout).toContain("grounder handoff peek");
     expect(result.stdout).toContain("Hook plumbing");
     expect(result.stdout).toContain("--hooks");
+    expect(result.stdout).toContain("--dry-run");
   });
 
   it("requires text for note command", () => {

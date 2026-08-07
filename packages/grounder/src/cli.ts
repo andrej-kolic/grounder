@@ -7,6 +7,7 @@ import { runDoctor } from "./commands/doctor.js";
 import { runHandoffList } from "./commands/handoff/list.js";
 import { runHandoffPeek } from "./commands/handoff/peek.js";
 import { runHandoff } from "./commands/handoff.js";
+import { runMigrate } from "./commands/migrate.js";
 import { runNote } from "./commands/note.js";
 import { runPathLogs } from "./commands/path/logs.js";
 import { runPathNotes } from "./commands/path/notes.js";
@@ -36,6 +37,7 @@ Usage:
   grounder path plans          Print resolved plans directory
   grounder status              Snapshot of machine + project link + resolved paths
   grounder doctor              Health checks with fix hints
+  grounder migrate             Refresh agent install after upgrading grounder
 
 Hook plumbing:
   grounder handoff peek        One-line latest-handoff teaser (used by session hooks)
@@ -51,7 +53,13 @@ Init flags:
   --vault <path> Override home vault root for this run (grounder init)
   --agent <id>   Install for a specific agent (repeatable; default: auto-detect)
                  Supported: cursor, claude
-  --hooks        Also install session-start teaser hooks (vault init)
+  --hooks        Also install session-start teaser hooks (vault init / migrate)
+
+Migrate flags:
+  --force        Overwrite locally-modified slash command files
+  --dry-run      Preview without writing
+  --agent <id>   Limit to a specific agent (repeatable)
+  --hooks        Also install hooks if not previously installed
 
 Doctor flags:
   --global       Machine-only checks (skip project/link checks)
@@ -144,6 +152,10 @@ async function main(): Promise<void> {
 
   if (command === "doctor") {
     process.exit(await runDoctor(rest));
+  }
+
+  if (command === "migrate") {
+    process.exit(await runMigrate(rest));
   }
 
   process.stderr.write(`Unknown command: ${args.join(" ")}\n\n`);

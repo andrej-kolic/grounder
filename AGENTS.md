@@ -36,9 +36,13 @@ commands/             # mirrors CLI structure
   path/notes.ts       # grounder path notes
   path/logs.ts        # grounder path logs
   path/plans.ts       # grounder path plans
+  doctor.ts           # grounder doctor
+  migrate.ts          # grounder migrate (refresh install after upgrade)
+  apply-agent-installs.ts # shared agent install loop (vault init + migrate)
 agents/               # AgentAdapter registry (pluggable install targets)
   types.ts            # AgentAdapter interface
   index.ts            # resolveAgents(), detect
+  install-command.ts  # shared slash-command install + hash drift detection
   hook-runtime.ts     # ~/.grounder/runtime for session hooks (symlink durable source / copy npx cache)
   cursor.ts           # Cursor adapter
   claude.ts           # Claude Code adapter

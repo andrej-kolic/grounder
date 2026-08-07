@@ -3,9 +3,10 @@ import path from "node:path";
 import { fileExists } from "../util/fs.js";
 import { resolveHomeDir } from "./home.js";
 
-/** Per-file install record (hash filled in by later migrate/drift work). */
+/** Per-file install record for chezmoi-style drift detection on command markdown. */
 export interface AgentFileState {
   schema: number;
+  /** `sha256:…` of the exact bytes Grounder last wrote (see `hashContent`). */
   hash?: string;
 }
 
@@ -96,20 +97,29 @@ export interface RecordAgentInstallOptions {
   commandsSchema: number;
   /** When set, updates `hooksSchema`; when omitted, preserves any existing value. */
   hooksSchema?: number;
+  /**
+   * Merge into the agent's `files` map (absolute path → state). Omitting leaves
+   * existing entries alone; pass `{}` is a no-op merge.
+   */
+  files?: Record<string, AgentFileState>;
   grounderVersion: string;
   homeDir?: string;
 }
 
 /**
  * Merge one agent's install metadata into the ledger. Creates `state.json` when
- * absent. Preserves other agents and any existing `files` map for this agent.
+ * absent. Preserves other agents and merges any provided `files` over the
+ * existing map for this agent.
  */
 export async function recordAgentInstall(opts: RecordAgentInstallOptions): Promise<GrounderState> {
   const existing = await readGrounderState(opts.homeDir);
   const prev = existing?.agents[opts.agentId];
   const nextEntry: AgentState = {
     commandsSchema: opts.commandsSchema,
-    files: prev?.files ? { ...prev.files } : {},
+    files: {
+      ...(prev?.files ? { ...prev.files } : {}),
+      ...(opts.files ?? {}),
+    },
   };
   if (opts.hooksSchema !== undefined) {
     nextEntry.hooksSchema = opts.hooksSchema;
@@ -126,4 +136,13 @@ export async function recordAgentInstall(opts: RecordAgentInstallOptions): Promi
   };
   await writeGrounderState(next, opts.homeDir);
   return next;
+}
+
+/** Last-recorded content hash for a managed file, or `undefined` if unknown. */
+export function recordedFileHash(
+  state: GrounderState | null,
+  agentId: string,
+  filePath: string,
+): string | undefined {
+  return state?.agents[agentId]?.files[filePath]?.hash;
 }
