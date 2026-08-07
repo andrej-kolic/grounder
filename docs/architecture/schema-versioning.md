@@ -87,6 +87,7 @@ Invariants:
 - Missing file or missing agent entry → treat recorded schema as **0** (legacy).
 - Recorded schema **less than** this binary’s adapter → stale → user should `grounder migrate`.
 - Recorded schema **greater than** this binary’s adapter → **forward-compat hard stop** (`UnsupportedSchemaError`: upgrade grounder). Same idea for `.grounder.json`’s `version` vs `SUPPORTED_REPO_VERSION` in [`connector/repo.ts`](../../packages/grounder/src/connector/repo.ts).
+- Ledger agent ids this binary does not know → skip with a stderr warning on `migrate` (still refresh known agents); explicit `--agent=<unknown>` still errors.
 - Corrupt ledger → fail with a clear “fix or remove, then migrate” message (distinct from “newer than me”).
 - `migrate` / vault init **must not** advance `commandsSchema` when every command artifact was left as `modified` (legacy or local edits). Runtime/`grounderVersion` (and hooks, when refreshed) may still update; doctor keeps the schema-stale / `--force` hint until a real command write lands.
 ### `grounder migrate` (not only `vault init --force`)

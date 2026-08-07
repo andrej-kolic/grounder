@@ -1,5 +1,4 @@
-import type { AgentAdapter } from "../agents/index.js";
-import { resolveAgents } from "../agents/index.js";
+import { type AgentAdapter, ALL_AGENTS, resolveAgents } from "../agents/index.js";
 import { readHomeConfig, withHomeDir } from "../connector/home.js";
 import { assertAgentSchemasSupported, readGrounderState, statePath } from "../connector/state.js";
 import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
@@ -17,9 +16,13 @@ export interface MigrateOptions {
 
 /**
  * Resolve which agents to migrate:
- * 1. Explicit `--agent` ids
- * 2. Else agents recorded in `~/.grounder/state.json`
+ * 1. Explicit `--agent` ids (unknown ids still throw)
+ * 2. Else agents recorded in `~/.grounder/state.json` that this binary knows
  * 3. Else auto-detect installed agents (legacy / pre-ledger)
+ *
+ * Ledger keys from a newer Grounder (agents this binary does not know) are
+ * skipped with a stderr warning — same forward-compat idea as schema hard-stops,
+ * but migrate can still refresh the agents it understands.
  */
 export async function resolveMigrateAgents(
   explicitIds: string[] | undefined,
@@ -31,11 +34,18 @@ export async function resolveMigrateAgents(
 
   const state = await readGrounderState(homeDir);
   const recordedIds = state ? Object.keys(state.agents) : [];
-  if (recordedIds.length > 0) {
-    return resolveAgents(recordedIds);
+  if (recordedIds.length === 0) {
+    return resolveAgents();
   }
 
-  return resolveAgents();
+  const known = ALL_AGENTS.filter((a) => recordedIds.includes(a.id));
+  const unknown = recordedIds.filter((id) => !ALL_AGENTS.some((a) => a.id === id));
+  if (unknown.length > 0) {
+    process.stderr.write(
+      `Skipping unknown agent(s) in install state: ${unknown.join(", ")}. Upgrade grounder to migrate them.\n`,
+    );
+  }
+  return known;
 }
 
 export async function runMigrate(argv: string[]): Promise<number> {

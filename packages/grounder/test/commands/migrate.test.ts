@@ -207,6 +207,71 @@ describe("commands/migrate", () => {
     expect(out).toContain(`Install state would create: ${statePath(env.home)}`);
   });
 
+  it("skips unknown ledger agent ids and still migrates known ones", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after vault init");
+    }
+    await writeGrounderState(
+      {
+        ...state,
+        agents: {
+          ...state.agents,
+          // Future Grounder agent — older binary must not crash migrate.
+          windsurf: { commandsSchema: 1, files: {} },
+        },
+      },
+      env.home,
+    );
+
+    const errChunks: string[] = [];
+    const errSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      errChunks.push(String(chunk));
+      return true;
+    });
+    try {
+      const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+      expect(code).toBe(0);
+      expect(out).toContain("already current (skipped)");
+      expect(errChunks.join("")).toContain("Skipping unknown agent(s) in install state: windsurf");
+      expect(errChunks.join("")).toContain("Upgrade grounder");
+    } finally {
+      errSpy.mockRestore();
+    }
+
+    expect(await readGrounderState(env.home)).toMatchObject({
+      agents: {
+        cursor: { commandsSchema: 1 },
+        windsurf: { commandsSchema: 1 },
+      },
+    });
+  });
+
+  it("still rejects unknown ids passed via --agent", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+
+    await expect(
+      runMigrateWithOptions({ homeDir: env.home, agents: ["windsurf"] }),
+    ).rejects.toThrow("Unknown agent id(s): windsurf");
+  });
+
   it("refuses to migrate when recorded schemas are newer than this grounder", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
