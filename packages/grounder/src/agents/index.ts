@@ -1,3 +1,5 @@
+import { recordAgentInstall } from "../connector/state.js";
+import { VERSION } from "../index.js";
 import { claude } from "./claude.js";
 import { cursor } from "./cursor.js";
 import type { AgentAdapter } from "./types.js";
@@ -32,4 +34,24 @@ export async function resolveAgents(ids?: string[]): Promise<AgentAdapter[]> {
     ALL_ADAPTERS.map(async (a) => ({ adapter: a, ok: await a.isInstalled() })),
   );
   return results.filter((r) => r.ok).map((r) => r.adapter);
+}
+
+/**
+ * Persist adapter schema versions into `~/.grounder/state.json` after an
+ * install. When `hooksInstalled` is true and the adapter declares
+ * `hooksSchema`, that value is recorded; otherwise any existing hooksSchema
+ * is left alone.
+ */
+export async function recordAgentInstallState(
+  agent: AgentAdapter,
+  opts: { hooksInstalled?: boolean; homeDir?: string } = {},
+): Promise<void> {
+  await recordAgentInstall({
+    agentId: agent.id,
+    commandsSchema: agent.commandsSchema,
+    hooksSchema:
+      opts.hooksInstalled && agent.hooksSchema !== undefined ? agent.hooksSchema : undefined,
+    grounderVersion: VERSION,
+    homeDir: opts.homeDir,
+  });
 }

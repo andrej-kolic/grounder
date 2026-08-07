@@ -269,6 +269,8 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
 export const cursor: AgentAdapter = {
   id: "cursor",
   name: "Cursor",
+  commandsSchema: 1,
+  hooksSchema: 1,
 
   async isInstalled(): Promise<boolean> {
     return fileExists(path.join(resolveHomeDir(), ".cursor"));

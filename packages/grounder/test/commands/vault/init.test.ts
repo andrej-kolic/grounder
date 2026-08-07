@@ -12,6 +12,8 @@ import {
 import { runtimeInvocation } from "../../../src/agents/hook-runtime.js";
 import { runVaultInit, runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
 import { homeConfigPath } from "../../../src/connector/home.js";
+import { readGrounderState, statePath } from "../../../src/connector/state.js";
+import { VERSION } from "../../../src/index.js";
 import { fileExists } from "../../../src/util/fs.js";
 import { captureStdout, createTempEnv } from "../../helpers.js";
 
@@ -67,6 +69,12 @@ describe("commands/vault/init", () => {
     expect(await readFile(grounderTaskHandoffCommandPath(env.home), "utf8")).toContain(
       `${cli} handoff`,
     );
+    expect(await readGrounderState(env.home)).toEqual({
+      grounderVersion: VERSION,
+      agents: {
+        cursor: { commandsSchema: 1, files: {} },
+      },
+    });
   });
 
   it("is idempotent on re-run", async () => {
@@ -156,6 +164,14 @@ describe("commands/vault/init", () => {
           ],
         },
       });
+      expect(await readGrounderState(env.home)).toEqual({
+        grounderVersion: VERSION,
+        agents: {
+          cursor: { commandsSchema: 1, hooksSchema: 1, files: {} },
+          claude: { commandsSchema: 1, hooksSchema: 1, files: {} },
+        },
+      });
+      expect(statePath(env.home)).toBe(path.join(env.home, ".grounder", "state.json"));
     });
 
     it("omits hook artifacts when --hooks is not set", async () => {

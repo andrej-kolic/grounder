@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { installHookRuntime, runtimeCliPath } from "../../agents/hook-runtime.js";
-import { resolveAgents } from "../../agents/index.js";
+import { recordAgentInstallState, resolveAgents } from "../../agents/index.js";
 import {
   homeConfigPath,
   readHomeConfig,
@@ -123,14 +123,18 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
         process.stdout.write(`✓ ${agent.name}: no artifacts to install yet\n`);
       }
 
+      let hooksInstalled = false;
       if (hooks && agent.installHooks) {
         const hookResult = await agent.installHooks({ force, homeDir });
+        hooksInstalled = true;
         for (const [artifactPath, status] of Object.entries(hookResult.artifacts)) {
           const label =
             status === "skipped" ? "already exists (skipped)" : `installed: ${artifactPath}`;
           process.stdout.write(`✓ ${agent.name} hook ${label}\n`);
         }
       }
+
+      await recordAgentInstallState(agent, { hooksInstalled, homeDir });
     }
 
     return 0;

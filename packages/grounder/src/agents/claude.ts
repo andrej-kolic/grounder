@@ -316,6 +316,8 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
 export const claude: AgentAdapter = {
   id: "claude",
   name: "Claude Code",
+  commandsSchema: 1,
+  hooksSchema: 1,
 
   async isInstalled(): Promise<boolean> {
     return fileExists(path.join(resolveHomeDir(), ".claude"));
