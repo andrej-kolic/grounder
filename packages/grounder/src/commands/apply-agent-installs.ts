@@ -6,7 +6,13 @@ import {
 } from "../agents/hook-runtime.js";
 import { recordAgentInstallState } from "../agents/index.js";
 import type { AgentAdapter, AgentInstallResult, ArtifactStatus } from "../agents/types.js";
-import { type GrounderState, readGrounderState, recordedHooksSchema } from "../connector/state.js";
+import {
+  assertAgentSchemasSupported,
+  type GrounderState,
+  readGrounderState,
+  recordedHooksSchema,
+  statePath,
+} from "../connector/state.js";
 import { fileExists } from "../util/fs.js";
 
 export interface ApplyAgentInstallsOptions {
@@ -135,6 +141,7 @@ export async function applyAgentInstalls(
   const homeDir = opts.homeDir;
   const agents = opts.agents;
   const state = await readGrounderState(homeDir);
+  assertAgentSchemasSupported(state, agents);
 
   let runtime: ApplyAgentInstallsResult["runtime"];
   if (agents.length > 0) {
@@ -181,6 +188,21 @@ export async function applyAgentInstalls(
     }
 
     results.push({ agent, commands, hooks: hooksResult });
+  }
+
+  if (agents.length > 0) {
+    const ledger = statePath(homeDir);
+    if (dryRun) {
+      process.stdout.write(
+        state
+          ? `✓ Install state would update: ${ledger}\n`
+          : `✓ Install state would create: ${ledger}\n`,
+      );
+    } else {
+      process.stdout.write(
+        state ? `✓ Install state updated: ${ledger}\n` : `✓ Install state created: ${ledger}\n`,
+      );
+    }
   }
 
   const modifiedWithoutForce =

@@ -11,7 +11,9 @@ import {
   readGrounderState,
   recordedCommandsSchema,
   recordedHooksSchema,
+  statePath,
 } from "../connector/state.js";
+import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
 import {
   resolveLogsDir,
   resolveNotesDir,
@@ -35,6 +37,7 @@ const MIGRATE = "grounder migrate";
 const MIGRATE_FORCE = "grounder migrate --force";
 const MIGRATE_HOOKS = "grounder migrate --hooks";
 const REPO_INIT = "grounder init";
+const UPGRADE_GROUNDER = "upgrade grounder";
 
 /**
  * Commands installed before Grounder 0.3 have no per-file content hash, so
@@ -150,20 +153,39 @@ async function checkProjectsDir(vaultRoot: string | null): Promise<CheckResult> 
 }
 
 /**
- * Load `~/.grounder/state.json` for doctor. Missing file → `null` (schema 0).
- * Corrupt file → fail check; callers should skip schema-staleness warns.
+ * Load `~/.grounder/state.json` for doctor.
+ * Missing → warn (legacy / pre-ledger); corrupt → fail; present → ok.
  */
 async function loadInstallState(homeDir?: string): Promise<{
   state: GrounderState | null;
-  check: CheckResult | null;
+  check: CheckResult;
 }> {
+  const filePath = statePath(homeDir);
   try {
-    return { state: await readGrounderState(homeDir), check: null };
+    const state = await readGrounderState(homeDir);
+    if (!state) {
+      return {
+        state: null,
+        check: warnCheck(
+          "install-state",
+          "install state missing (pre-ledger / never migrated)",
+          MIGRATE_FORCE,
+        ),
+      };
+    }
+    return {
+      state,
+      check: okCheck("install-state", `install state present (${filePath})`),
+    };
   } catch (error: unknown) {
     const detail = error instanceof Error ? error.message : String(error);
     return {
       state: null,
-      check: failCheck("install-state", `install state invalid: ${detail}`, VAULT_INIT),
+      check: failCheck(
+        "install-state",
+        `install state invalid: ${detail}`,
+        `fix or remove ${filePath}, then ${MIGRATE_FORCE}`,
+      ),
     };
   }
 }
@@ -180,6 +202,17 @@ function commandsSchemaStale(
   return recordedCommandsSchema(state, agent.id) < agent.commandsSchema;
 }
 
+function commandsSchemaAhead(
+  agent: AgentAdapter,
+  state: GrounderState | null,
+  stateReadable: boolean,
+): boolean {
+  if (!stateReadable) {
+    return false;
+  }
+  return recordedCommandsSchema(state, agent.id) > agent.commandsSchema;
+}
+
 function hooksSchemaStale(
   agent: AgentAdapter,
   state: GrounderState | null,
@@ -189,6 +222,17 @@ function hooksSchemaStale(
     return false;
   }
   return recordedHooksSchema(state, agent.id) < agent.hooksSchema;
+}
+
+function hooksSchemaAhead(
+  agent: AgentAdapter,
+  state: GrounderState | null,
+  stateReadable: boolean,
+): boolean {
+  if (!stateReadable || agent.hooksSchema === undefined) {
+    return false;
+  }
+  return recordedHooksSchema(state, agent.id) > agent.hooksSchema;
 }
 
 async function checkAgentArtifacts(
@@ -206,7 +250,16 @@ async function checkAgentArtifacts(
     const id = `agent-${agent.id}`;
 
     if (presentCount === expected.length) {
-      if (commandsSchemaStale(agent, state, stateReadable)) {
+      if (commandsSchemaAhead(agent, state, stateReadable)) {
+        const recorded = recordedCommandsSchema(state, agent.id);
+        checks.push(
+          failCheck(
+            id,
+            `${agent.name} commands schema newer than this grounder (recorded ${recorded}, supported ${agent.commandsSchema})`,
+            UPGRADE_GROUNDER,
+          ),
+        );
+      } else if (commandsSchemaStale(agent, state, stateReadable)) {
         const recorded = recordedCommandsSchema(state, agent.id);
         checks.push(
           warnCheck(
@@ -300,7 +353,16 @@ async function checkAgentHooks(
 
     if (present.every(Boolean) && expected.length > 0) {
       anyHooksInstalled = true;
-      if (hooksSchemaStale(agent, state, stateReadable)) {
+      if (hooksSchemaAhead(agent, state, stateReadable)) {
+        const recorded = recordedHooksSchema(state, agent.id);
+        checks.push(
+          failCheck(
+            id,
+            `${agent.name} hooks schema newer than this grounder (recorded ${recorded}, supported ${agent.hooksSchema})`,
+            UPGRADE_GROUNDER,
+          ),
+        );
+      } else if (hooksSchemaStale(agent, state, stateReadable)) {
         const recorded = recordedHooksSchema(state, agent.id);
         checks.push(
           warnCheck(
@@ -344,19 +406,13 @@ async function runMachineChecks(homeDir?: string): Promise<{
   const { check: vaultCheck, vaultRoot } = await checkVault(home);
   const projectsCheck = await checkProjectsDir(vaultRoot);
   const { state, check: stateCheck } = await loadInstallState(homeDir);
-  const stateReadable = stateCheck === null;
+  // Corrupt ledger: don't invent schema-0 migrate warns on top of the fail.
+  const stateReadable = stateCheck.level !== "fail";
   const agentChecks = await checkAgentArtifacts(state, stateReadable, homeDir);
   const hookChecks = await checkAgentHooks(state, stateReadable, homeDir);
 
   return {
-    checks: [
-      homeCheck,
-      vaultCheck,
-      projectsCheck,
-      ...(stateCheck ? [stateCheck] : []),
-      ...agentChecks,
-      ...hookChecks,
-    ],
+    checks: [homeCheck, vaultCheck, projectsCheck, stateCheck, ...agentChecks, ...hookChecks],
     home,
   };
 }
@@ -383,6 +439,7 @@ async function runProjectChecks(
     );
 
     let repo: Awaited<ReturnType<typeof readRepoConfig>> = null;
+    let repoUnsupported = false;
     try {
       repo = await readRepoConfig(linkedRoot);
       if (!repo) {
@@ -398,18 +455,27 @@ async function runProjectChecks(
       }
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
-      checks.push(
-        failCheck(
-          "repo-config-valid",
-          `invalid repo config: ${detail}`,
-          `Fix or re-run ${REPO_INIT} --force`,
-        ),
-      );
+      if (isUnsupportedSchemaError(error)) {
+        repoUnsupported = true;
+        checks.push(failCheck("repo-config-valid", detail, UPGRADE_GROUNDER));
+      } else {
+        checks.push(
+          failCheck(
+            "repo-config-valid",
+            `invalid repo config: ${detail}`,
+            `Fix or re-run ${REPO_INIT} --force`,
+          ),
+        );
+      }
     }
 
     if (!home || !repo) {
-      const reason = !home ? "no home config" : "no valid repo config";
-      const fix = !home ? VAULT_INIT : REPO_INIT;
+      const reason = !home
+        ? "no home config"
+        : repoUnsupported
+          ? "unsupported repo config version"
+          : "no valid repo config";
+      const fix = !home ? VAULT_INIT : repoUnsupported ? UPGRADE_GROUNDER : REPO_INIT;
       checks.push(failCheck("notes-dir", `cannot resolve notes/ (${reason})`, fix));
       checks.push(failCheck("logs-dir", `cannot resolve logs/ (${reason})`, fix));
       checks.push(failCheck("plans-dir", `cannot resolve plans/ (${reason})`, fix));

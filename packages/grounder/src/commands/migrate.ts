@@ -1,7 +1,8 @@
 import type { AgentAdapter } from "../agents/index.js";
 import { resolveAgents } from "../agents/index.js";
 import { readHomeConfig, withHomeDir } from "../connector/home.js";
-import { readGrounderState } from "../connector/state.js";
+import { assertAgentSchemasSupported, readGrounderState, statePath } from "../connector/state.js";
+import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
 import { flagBool, flagStrings, parseArgs } from "../util/parse-args.js";
 import { applyAgentInstalls } from "./apply-agent-installs.js";
 
@@ -63,6 +64,17 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
 
     const agents = await resolveMigrateAgents(options.agents, homeDir);
 
+    try {
+      const state = await readGrounderState(homeDir);
+      assertAgentSchemasSupported(state, agents);
+    } catch (error: unknown) {
+      if (isUnsupportedSchemaError(error)) {
+        process.stderr.write(`${error.message}\n`);
+        return 1;
+      }
+      throw error;
+    }
+
     process.stdout.write(`Vault root: ${home.vaultRoot}\n`);
     if (dryRun) {
       process.stdout.write("Dry run — no files will be written.\n");
@@ -79,6 +91,7 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
       process.stdout.write(
         "  hooks    previously installed or --hooks (owned JSON always refreshed)\n",
       );
+      process.stdout.write(`  state    ${statePath(homeDir)}\n`);
     }
     process.stdout.write("\n");
 

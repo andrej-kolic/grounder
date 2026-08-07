@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  assertAgentSchemasSupported,
   readGrounderState,
   recordAgentInstall,
   recordedCommandsSchema,
@@ -10,6 +11,7 @@ import {
   statePath,
   writeGrounderState,
 } from "../../src/connector/state.js";
+import { UnsupportedSchemaError } from "../../src/connector/unsupported-schema.js";
 import { createTempEnv } from "../helpers.js";
 
 describe("connector/state", () => {
@@ -161,5 +163,66 @@ describe("connector/state", () => {
     await writeFile(statePath(env.home), '{"agents":{}}\n', "utf8");
 
     await expect(readGrounderState(env.home)).rejects.toThrow(/missing grounderVersion/);
+  });
+
+  it("throws a clear error when state JSON is malformed", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    await mkdir(path.dirname(statePath(env.home)), { recursive: true });
+    await writeFile(statePath(env.home), "{/\n", "utf8");
+
+    await expect(readGrounderState(env.home)).rejects.toThrow(
+      /Invalid grounder state.*Fix or remove it.*migrate --force/,
+    );
+  });
+
+  it("hard-stops when recorded agent schemas are ahead of this binary", async () => {
+    const state = {
+      grounderVersion: "9.9.9",
+      agents: {
+        cursor: { commandsSchema: 99, hooksSchema: 1, files: {} },
+      },
+    };
+
+    expect(() =>
+      assertAgentSchemasSupported(state, [
+        { id: "cursor", name: "Cursor", commandsSchema: 1, hooksSchema: 1 },
+      ]),
+    ).toThrow(UnsupportedSchemaError);
+
+    expect(() =>
+      assertAgentSchemasSupported(
+        {
+          grounderVersion: "9.9.9",
+          agents: {
+            cursor: { commandsSchema: 1, hooksSchema: 50, files: {} },
+          },
+        },
+        [{ id: "cursor", name: "Cursor", commandsSchema: 1, hooksSchema: 1 }],
+      ),
+    ).toThrow(/hooks schema 50.*Upgrade grounder/);
+
+    expect(() =>
+      assertAgentSchemasSupported(
+        {
+          grounderVersion: "9.9.9",
+          agents: {
+            cursor: {
+              commandsSchema: 1,
+              files: { "/tmp/x.md": { schema: 7, hash: "sha256:x" } },
+            },
+          },
+        },
+        [{ id: "cursor", name: "Cursor", commandsSchema: 1 }],
+      ),
+    ).toThrow(/file .* schema 7.*Upgrade grounder/);
+
+    expect(() =>
+      assertAgentSchemasSupported(state, [
+        { id: "claude", name: "Claude Code", commandsSchema: 1 },
+      ]),
+    ).not.toThrow();
   });
 });

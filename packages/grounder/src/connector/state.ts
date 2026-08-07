@@ -2,6 +2,15 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileExists } from "../util/fs.js";
 import { resolveHomeDir } from "./home.js";
+import { UnsupportedSchemaError } from "./unsupported-schema.js";
+
+/** Minimal adapter shape for forward-compat schema compares. */
+export interface AgentSchemaSupport {
+  id: string;
+  name: string;
+  commandsSchema: number;
+  hooksSchema?: number;
+}
 
 /** Per-file install record for chezmoi-style drift detection on command markdown. */
 export interface AgentFileState {
@@ -35,9 +44,19 @@ export async function readGrounderState(homeDir?: string): Promise<GrounderState
     return null;
   }
 
-  const raw = JSON.parse(await readFile(filePath, "utf8")) as Partial<GrounderState>;
+  let raw: Partial<GrounderState>;
+  try {
+    raw = JSON.parse(await readFile(filePath, "utf8")) as Partial<GrounderState>;
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Invalid grounder state at ${filePath}: ${detail}. Fix or remove it, then run: grounder migrate --force`,
+    );
+  }
   if (typeof raw.grounderVersion !== "string" || raw.grounderVersion.length === 0) {
-    throw new Error(`Invalid grounder state at ${filePath}: missing grounderVersion`);
+    throw new Error(
+      `Invalid grounder state at ${filePath}: missing grounderVersion. Fix or remove it, then run: grounder migrate --force`,
+    );
   }
   if (raw.agents === null || typeof raw.agents !== "object" || Array.isArray(raw.agents)) {
     throw new Error(`Invalid grounder state at ${filePath}: missing agents`);
@@ -145,4 +164,48 @@ export function recordedFileHash(
   filePath: string,
 ): string | undefined {
   return state?.agents[agentId]?.files[filePath]?.hash;
+}
+
+/**
+ * Hard-stop when `state.json` records a schema newer than this binary's
+ * adapters understand. Missing state / unknown agents are fine (legacy).
+ */
+export function assertAgentSchemasSupported(
+  state: GrounderState | null,
+  agents: ReadonlyArray<AgentSchemaSupport>,
+): void {
+  if (!state) {
+    return;
+  }
+
+  for (const agent of agents) {
+    const recorded = state.agents[agent.id];
+    if (!recorded) {
+      continue;
+    }
+
+    if (recorded.commandsSchema > agent.commandsSchema) {
+      throw new UnsupportedSchemaError(
+        `${agent.name} commands schema ${recorded.commandsSchema} is newer than this grounder supports (${agent.commandsSchema}). Upgrade grounder.`,
+      );
+    }
+
+    if (
+      recorded.hooksSchema !== undefined &&
+      agent.hooksSchema !== undefined &&
+      recorded.hooksSchema > agent.hooksSchema
+    ) {
+      throw new UnsupportedSchemaError(
+        `${agent.name} hooks schema ${recorded.hooksSchema} is newer than this grounder supports (${agent.hooksSchema}). Upgrade grounder.`,
+      );
+    }
+
+    for (const [filePath, file] of Object.entries(recorded.files)) {
+      if (typeof file?.schema === "number" && file.schema > agent.commandsSchema) {
+        throw new UnsupportedSchemaError(
+          `${agent.name} file ${filePath} schema ${file.schema} is newer than this grounder supports (${agent.commandsSchema}). Upgrade grounder.`,
+        );
+      }
+    }
+  }
 }

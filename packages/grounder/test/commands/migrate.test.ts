@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cursorHooksJsonPath, grounderNoteCommandPath } from "../../src/agents/cursor.js";
 import { runMigrateWithOptions } from "../../src/commands/migrate.js";
 import { runVaultInitWithOptions } from "../../src/commands/vault/init.js";
-import { readGrounderState } from "../../src/connector/state.js";
+import { readGrounderState, statePath, writeGrounderState } from "../../src/connector/state.js";
 import { fileExists } from "../../src/util/fs.js";
 import { captureStdout, createTempEnv } from "../helpers.js";
 
@@ -141,7 +141,86 @@ describe("commands/migrate", () => {
     expect(code).toBe(0);
     expect(out).toContain("Dry run");
     expect(out).toContain("would update:");
+    expect(out).toContain(`Install state would update: ${statePath(env.home)}`);
     expect(out).not.toContain("grounder migrate --force");
     expect(await readFile(noteDest, "utf8")).toBe(before);
+  });
+
+  it("dry-run mentions creating install state when the ledger is missing", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    const { rm } = await import("node:fs/promises");
+    await rm(statePath(env.home), { force: true });
+
+    const { code, out } = await captureStdout(() =>
+      runMigrateWithOptions({ homeDir: env.home, dryRun: true }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain(`  state    ${statePath(env.home)}`);
+    expect(out).toContain(`Install state would create: ${statePath(env.home)}`);
+  });
+
+  it("refuses to migrate when recorded schemas are newer than this grounder", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await writeGrounderState(
+      {
+        grounderVersion: "9.9.9",
+        agents: {
+          cursor: { commandsSchema: 99, files: {} },
+        },
+      },
+      env.home,
+    );
+
+    const chunks: string[] = [];
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      chunks.push(String(chunk));
+      return true;
+    });
+    try {
+      const { code } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+      expect(code).toBe(1);
+      expect(chunks.join("")).toContain("Upgrade grounder");
+      expect(chunks.join("")).toContain("commands schema 99");
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(await readGrounderState(env.home)).toMatchObject({
+      agents: { cursor: { commandsSchema: 99 } },
+    });
+  });
+
+  it("refuses to migrate when install state JSON is corrupt", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await writeFile(statePath(env.home), "{/\n", "utf8");
+
+    await expect(runMigrateWithOptions({ homeDir: env.home, dryRun: true })).rejects.toThrow(
+      /Invalid grounder state.*migrate --force/,
+    );
   });
 });

@@ -42,6 +42,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("ok    home-config");
     expect(out).toContain("ok    vault");
     expect(out).toContain("ok    projects-dir");
+    expect(out).toContain("ok    install-state");
     expect(out).toContain("ok    agent-cursor");
     expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).toContain("ok    hook-runtime");
@@ -159,12 +160,14 @@ describe("commands/doctor", () => {
     );
 
     expect(code).toBe(0);
+    expect(out).toContain("warn  install-state");
+    expect(out).toContain("install state missing (pre-ledger / never migrated)");
     expect(out).toContain("warn  agent-cursor");
     expect(out).toContain("commands schema stale (recorded 0, current 1) — migrate");
     expect(out).toContain("grounder migrate --force");
     expect(out).toContain("warn  agent-cursor-hooks");
     expect(out).toContain("hooks schema stale (recorded 0, current 1) — migrate");
-    expect(out).toMatch(/^\d+ passed, 0 failed, 2 warned$/m);
+    expect(out).toMatch(/^\d+ passed, 0 failed, 3 warned$/m);
   });
 
   it("warns when recorded commands schema is behind the adapter", async () => {
@@ -253,9 +256,74 @@ describe("commands/doctor", () => {
     expect(code).toBe(1);
     expect(out).toContain("fail  install-state");
     expect(out).toContain("missing grounderVersion");
+    expect(out).toContain("fix or remove");
+    expect(out).toContain("grounder migrate --force");
     // Presence still ok — do not invent a schema-0 migrate warn on corrupt ledger.
     expect(out).toContain("ok    agent-cursor");
     expect(out).not.toContain("commands schema stale");
+  });
+
+  it("fails when recorded schemas are newer than this grounder", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await writeGrounderState(
+      {
+        grounderVersion: "9.9.9",
+        agents: {
+          cursor: { commandsSchema: 99, hooksSchema: 50, files: {} },
+        },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(1);
+    expect(out).toContain("fail  agent-cursor");
+    expect(out).toContain("commands schema newer than this grounder (recorded 99, supported 1)");
+    expect(out).toContain("fail  agent-cursor-hooks");
+    expect(out).toContain("hooks schema newer than this grounder (recorded 50, supported 1)");
+    expect(out).toContain("upgrade grounder");
+    expect(out).not.toContain("commands schema stale");
+  });
+
+  it("fails when repo config version is newer than this grounder", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await writeFile(
+      path.join(env.repo, ".grounder.json"),
+      `${JSON.stringify({ version: 2, projectId: "my-app" }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(1);
+    expect(out).toContain("fail  repo-config-valid");
+    expect(out).toContain("Upgrade grounder");
+    expect(out).toContain("→ upgrade grounder");
+    expect(out).toContain("unsupported repo config version");
+    expect(out).not.toContain("grounder init --force");
   });
 
   it("warns when a detected agent has no command files", async () => {
@@ -275,11 +343,12 @@ describe("commands/doctor", () => {
     );
 
     expect(code).toBe(0);
+    expect(out).toContain("warn  install-state");
     expect(out).toContain("warn  agent-cursor");
     expect(out).toContain("no Grounder command files");
     expect(out).toContain("warn  agent-cursor-hooks");
     expect(out).toContain("no Grounder session hook → grounder migrate --hooks");
-    expect(out).toMatch(/^\d+ passed, 0 failed, 2 warned$/m);
+    expect(out).toMatch(/^\d+ passed, 0 failed, 3 warned$/m);
   });
 
   it("warns (never fails) when session hooks are absent", async () => {
