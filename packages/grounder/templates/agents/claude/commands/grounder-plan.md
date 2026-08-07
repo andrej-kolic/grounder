@@ -28,12 +28,12 @@ Resolve a filename for `--title`:
 
 Then run from the linked project folder or any subdirectory beneath it:
 
-  npx grounder plan "<body>" --title <name>
+  {{GROUNDER_CLI}} plan "<body>" --title <name>
 
 For multi-line bodies, prefer a shell heredoc so quoting does not break:
 
 ```bash
-npx grounder plan "$(cat <<'EOF'
+{{GROUNDER_CLI}} plan "$(cat <<'EOF'
 # Plan: …
 …
 EOF

@@ -6,11 +6,11 @@ From the linked project folder or any subdirectory beneath it:
 
 1. Get the current handoff (skips empty/unreadable files, same pick as the session-start teaser):
 
-   npx grounder handoff list --head
+   {{GROUNDER_CLI}} handoff list --head
 
 2. If empty: tell the user there are no handoffs yet, then read repo `AGENTS.md` only and proceed.
 
-3. Otherwise, read that file. If the user names a specific session instead, run `npx grounder handoff list --limit 5` and read the path they mean.
+3. Otherwise, read that file. If the user names a specific session instead, run `{{GROUNDER_CLI}} handoff list --limit 5` and read the path they mean.
 
 4. Read repo `AGENTS.md` (project conventions and constraints).
 

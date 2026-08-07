@@ -133,6 +133,26 @@ async function checkProjectsDir(vaultRoot: string | null): Promise<CheckResult> 
   return okCheck("projects-dir", `10-Projects/ present (${projectsDir})`);
 }
 
+/**
+ * True when `filePath` still contains the pre-runtime literal `npx grounder`
+ * invocation (installed before command templates switched to the shared
+ * `~/.grounder/runtime` mechanism). `installCommand` skips existing files
+ * without `--force`, so upgrading alone never rewrites these.
+ */
+async function commandFileUsesNpx(filePath: string): Promise<boolean> {
+  try {
+    const content = await readFile(filePath, "utf8");
+    return /\bnpx\s+grounder\b/.test(content);
+  } catch {
+    return false;
+  }
+}
+
+async function anyCommandFileUsesNpx(filePaths: string[]): Promise<boolean> {
+  const results = await Promise.all(filePaths.map(commandFileUsesNpx));
+  return results.some(Boolean);
+}
+
 async function checkAgentArtifacts(homeDir?: string): Promise<CheckResult[]> {
   const agents = await resolveAgents();
   const checks: CheckResult[] = [];
@@ -144,7 +164,17 @@ async function checkAgentArtifacts(homeDir?: string): Promise<CheckResult[]> {
     const id = `agent-${agent.id}`;
 
     if (presentCount === expected.length) {
-      checks.push(okCheck(id, `${agent.name} command files present`));
+      if (await anyCommandFileUsesNpx(expected)) {
+        checks.push(
+          warnCheck(
+            id,
+            `${agent.name} command file(s) still invoke npx grounder (pre-runtime) — migrate`,
+            VAULT_INIT_FORCE,
+          ),
+        );
+      } else {
+        checks.push(okCheck(id, `${agent.name} command files present`));
+      }
       continue;
     }
 
@@ -197,14 +227,20 @@ async function hookFileHasGrounderEntry(filePath: string): Promise<boolean> {
  * Warn-only: session hooks are opt-in. Missing entry never fails doctor.
  * One check per detected agent that declares `expectedHookArtifacts`.
  *
- * When at least one agent has a Grounder hook installed, also check the shared
- * `~/.grounder/runtime` materialization — stale mainly for bare-npx copy installs
- * after an upgrade (symlink installs stay current without re-init).
+ * Slash commands and session hooks both depend on the shared
+ * `~/.grounder/runtime` materialization, so it's checked whenever *either* is
+ * installed — stale mainly for bare-npx copy installs after an upgrade
+ * (symlink installs stay current without re-init).
  */
 async function checkAgentHooks(homeDir?: string): Promise<CheckResult[]> {
   const agents = await resolveAgents();
   const checks: CheckResult[] = [];
   let anyHooksInstalled = false;
+
+  const commandsPresent = await Promise.all(
+    agents.map((agent) => Promise.all(agent.expectedArtifacts(homeDir).map((p) => fileExists(p)))),
+  );
+  const anyCommandsInstalled = commandsPresent.some((present) => present.some(Boolean));
 
   for (const agent of agents) {
     if (!agent.expectedHookArtifacts) {
@@ -225,13 +261,13 @@ async function checkAgentHooks(homeDir?: string): Promise<CheckResult[]> {
     }
   }
 
-  if (anyHooksInstalled) {
+  if (anyHooksInstalled || anyCommandsInstalled) {
     if (await isHookRuntimeStale(homeDir)) {
       checks.push(
         warnCheck(
           "hook-runtime",
           "hook runtime stale or missing (re-run after upgrading, especially bare npx)",
-          VAULT_INIT_HOOKS,
+          VAULT_INIT,
         ),
       );
     } else {

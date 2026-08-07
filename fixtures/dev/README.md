@@ -28,7 +28,7 @@ Run `init` from this folder — it writes `.grounder.json` here (not at the mono
 
 After editing `packages/grounder/src`, run `pnpm build` from the repo root — the bin runs `dist/cli.js`.
 
-`--hooks` installs Cursor/Claude session-start hooks. Because `pnpm grounder` here runs straight from this checkout (`node packages/grounder/dist/cli.js`, no `npx`), `vault init --hooks` **symlinks** `~/.grounder/runtime/dist` to this checkout's `dist/` — after that one-time run, `pnpm build` alone keeps both agents' hooks current. No need to re-run `vault init` after every change.
+Both slash commands and (with `--hooks`) session-start hooks run through `~/.grounder/runtime/dist/cli.js`, never `npx`. Because `pnpm grounder` here runs straight from this checkout (`node packages/grounder/dist/cli.js`), `vault init` **symlinks** `~/.grounder/runtime/dist` to this checkout's `dist/` — after that one-time run, `pnpm build` alone keeps slash commands *and* hooks current. No need to re-run `vault init` after every change, and no risk of them silently running a different (published) version — see the [Session-start hooks](../../packages/grounder/README.md#session-start-hooks) section of `packages/grounder/README.md` for the symlink/copy mechanism.
 
 ## Session handoff loop
 
@@ -85,8 +85,8 @@ In Cursor / Claude Code (from this folder or a linked project):
 (new session)           → optional one-line teaser if a handoff exists (with --hooks)
 /grounder-task          → list --head + read newest usable handoff + AGENTS.md (read-only)
 … work …
-/grounder-task-handoff  → summarize → grounder handoff "<body>"
-/grounder-plan          → write/update named plan → grounder plan "<body>" --title <name>
+/grounder-task-handoff  → summarize → runtime handoff "<body>"
+/grounder-plan          → write/update named plan → runtime plan "<body>" --title <name>
 ```
 
 Verify the teaser without starting an agent session:
@@ -97,7 +97,7 @@ pnpm grounder handoff peek          # linked + handoff → one line; else silent
 
 The teaser never auto-loads the full handoff and never blocks a session — run `/grounder-task` only when you want the body.
 
-`/grounder-note` and `/grounder-plan` shell out via `npx grounder …`. Re-install agent artifacts after template changes:
+All four slash commands run through the symlinked runtime described above, so they always exercise this checkout's build — `pnpm build` after editing `src/` is enough; no re-run of `vault init` needed to pick up code changes. Re-run only after editing **templates** (`templates/agents/*/commands/*.md`), since template content is copied at install time:
 
 ```bash
 pnpm grounder vault init <path-to-your-vault> --force --yes --hooks
