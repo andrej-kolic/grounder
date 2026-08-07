@@ -1,5 +1,5 @@
 import path from "node:path";
-import { claude, cursor } from "../agents/index.js";
+import { ALL_AGENTS } from "../agents/index.js";
 import { currentBranch, findGitRoot } from "../connector/git.js";
 import { type HomeConfig, homeConfigPath, readHomeConfig, withHomeDir } from "../connector/home.js";
 import {
@@ -31,9 +31,6 @@ const REPO_INIT_FORCE = "grounder init --force";
 const MIGRATE = "grounder migrate";
 const MIGRATE_FORCE = "grounder migrate --force";
 const UPGRADE_GROUNDER = "upgrade grounder";
-
-/** Adapters known to this binary — schema compare only (no `isInstalled` I/O). */
-const SCHEMA_AGENTS = [cursor, claude] as const;
 
 function section(title: string): string {
   return `${title}\n`;
@@ -92,7 +89,7 @@ async function writeInstallStateLine(homeDir?: string): Promise<void> {
     if (packageNotice) {
       process.stdout.write(statusLine("Package:", packageNotice.status));
     }
-    if (isInstallSchemaStale(state, SCHEMA_AGENTS)) {
+    if (isInstallSchemaStale(state, ALL_AGENTS)) {
       process.stdout.write(statusLine("Schemas:", `stale → run: ${MIGRATE}`));
     }
   } catch {

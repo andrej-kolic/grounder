@@ -1,6 +1,6 @@
-import { readFile, stat } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import path from "node:path";
-import { isGrounderPeekHookCommand, isHookRuntimeStale } from "../agents/hook-runtime.js";
+import { hookFileHasGrounderEntry, isHookRuntimeStale } from "../agents/hook-runtime.js";
 import type { AgentAdapter } from "../agents/index.js";
 import { resolveAgents } from "../agents/index.js";
 import { findGitRoot } from "../connector/git.js";
@@ -314,33 +314,6 @@ async function checkAgentArtifacts(
   }
 
   return checks;
-}
-
-/** True when any nested `command` field is Grounder's peek hook (Cursor or Claude shape). */
-function jsonContainsGrounderPeekCommand(value: unknown): boolean {
-  if (Array.isArray(value)) {
-    return value.some(jsonContainsGrounderPeekCommand);
-  }
-  if (value && typeof value === "object") {
-    const obj = value as Record<string, unknown>;
-    if (isGrounderPeekHookCommand(obj.command)) {
-      return true;
-    }
-    return Object.values(obj).some(jsonContainsGrounderPeekCommand);
-  }
-  return false;
-}
-
-async function hookFileHasGrounderEntry(filePath: string): Promise<boolean> {
-  try {
-    if (!(await fileExists(filePath))) {
-      return false;
-    }
-    const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
-    return jsonContainsGrounderPeekCommand(parsed);
-  } catch {
-    return false;
-  }
 }
 
 /**

@@ -1,6 +1,6 @@
 import path from "node:path";
 import { readCursorHookWorkspaceRoot } from "../../agents/cursor-hook-input.js";
-import { claude, cursor } from "../../agents/index.js";
+import { ALL_AGENTS } from "../../agents/index.js";
 import { withHomeDir } from "../../connector/home.js";
 import { resolveLinkedProject } from "../../connector/linked.js";
 import { isInstallSchemaStale, readGrounderState } from "../../connector/state.js";
@@ -21,9 +21,6 @@ export interface HandoffPeekOptions {
    */
   json?: boolean;
 }
-
-/** Adapters known to this binary — schema compare only (no `isInstalled` I/O). */
-const SCHEMA_AGENTS = [cursor, claude] as const;
 
 const MIGRATE_TEASER = "[grounder] Install outdated — run: grounder migrate.";
 
@@ -100,7 +97,7 @@ function resolveCursorHookCwd(stdinWorkspaceRoot: string | undefined): string | 
 async function schemaMigrateNeeded(homeDir?: string): Promise<boolean> {
   try {
     const state = await readGrounderState(homeDir);
-    return isInstallSchemaStale(state, SCHEMA_AGENTS);
+    return isInstallSchemaStale(state, ALL_AGENTS);
   } catch {
     return false;
   }

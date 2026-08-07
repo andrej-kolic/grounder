@@ -1,7 +1,6 @@
-import { readFile } from "node:fs/promises";
 import {
+  hookFileHasGrounderEntry,
   installHookRuntime,
-  isGrounderPeekHookCommand,
   runtimeCliPath,
 } from "../agents/hook-runtime.js";
 import { recordAgentInstallState } from "../agents/index.js";
@@ -13,7 +12,6 @@ import {
   recordedHooksSchema,
   statePath,
 } from "../connector/state.js";
-import { fileExists } from "../util/fs.js";
 
 export interface ApplyAgentInstallsOptions {
   agents: AgentAdapter[];
@@ -39,33 +37,6 @@ export interface AgentApplyResult {
 export interface ApplyAgentInstallsResult {
   runtime?: { cliPath: string; status: ArtifactStatus; mode: "symlink" | "copy" };
   agents: AgentApplyResult[];
-}
-
-/** True when any nested `command` field is Grounder's peek hook. */
-function jsonContainsGrounderPeekCommand(value: unknown): boolean {
-  if (Array.isArray(value)) {
-    return value.some(jsonContainsGrounderPeekCommand);
-  }
-  if (value && typeof value === "object") {
-    const obj = value as Record<string, unknown>;
-    if (isGrounderPeekHookCommand(obj.command)) {
-      return true;
-    }
-    return Object.values(obj).some(jsonContainsGrounderPeekCommand);
-  }
-  return false;
-}
-
-async function hookFileHasGrounderEntry(filePath: string): Promise<boolean> {
-  try {
-    if (!(await fileExists(filePath))) {
-      return false;
-    }
-    const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
-    return jsonContainsGrounderPeekCommand(parsed);
-  } catch {
-    return false;
-  }
 }
 
 async function agentHasInstalledHooks(agent: AgentAdapter, homeDir?: string): Promise<boolean> {
