@@ -1,10 +1,17 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { isGrounderPeekHookCommand, isHookRuntimeStale } from "../agents/hook-runtime.js";
+import type { AgentAdapter } from "../agents/index.js";
 import { resolveAgents } from "../agents/index.js";
 import { findGitRoot } from "../connector/git.js";
 import { homeConfigPath, readHomeConfig, withHomeDir } from "../connector/home.js";
 import { findLinkedRepoRoot, readRepoConfig } from "../connector/repo.js";
+import {
+  type GrounderState,
+  readGrounderState,
+  recordedCommandsSchema,
+  recordedHooksSchema,
+} from "../connector/state.js";
 import {
   resolveLogsDir,
   resolveNotesDir,
@@ -27,6 +34,9 @@ const VAULT_INIT = "grounder vault init <path>";
 const VAULT_INIT_FORCE = "grounder vault init <path> --force";
 const VAULT_INIT_HOOKS = "grounder vault init <path> --hooks";
 const REPO_INIT = "grounder init";
+
+/** Fix hint for stale install schemas (migrate lands in a later slice). */
+const MIGRATE_HINT = VAULT_INIT_FORCE;
 
 async function isDirectory(dirPath: string): Promise<boolean> {
   try {
@@ -134,26 +144,52 @@ async function checkProjectsDir(vaultRoot: string | null): Promise<CheckResult> 
 }
 
 /**
- * True when `filePath` still contains the pre-runtime literal `npx grounder`
- * invocation (installed before command templates switched to the shared
- * `~/.grounder/runtime` mechanism). `installCommand` skips existing files
- * without `--force`, so upgrading alone never rewrites these.
+ * Load `~/.grounder/state.json` for doctor. Missing file → `null` (schema 0).
+ * Corrupt file → fail check; callers should skip schema-staleness warns.
  */
-async function commandFileUsesNpx(filePath: string): Promise<boolean> {
+async function loadInstallState(homeDir?: string): Promise<{
+  state: GrounderState | null;
+  check: CheckResult | null;
+}> {
   try {
-    const content = await readFile(filePath, "utf8");
-    return /\bnpx\s+grounder\b/.test(content);
-  } catch {
-    return false;
+    return { state: await readGrounderState(homeDir), check: null };
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return {
+      state: null,
+      check: failCheck("install-state", `install state invalid: ${detail}`, VAULT_INIT),
+    };
   }
 }
 
-async function anyCommandFileUsesNpx(filePaths: string[]): Promise<boolean> {
-  const results = await Promise.all(filePaths.map(commandFileUsesNpx));
-  return results.some(Boolean);
+function commandsSchemaStale(
+  agent: AgentAdapter,
+  state: GrounderState | null,
+  /** When false, state was unreadable — don't invent a schema-0 warn. */
+  stateReadable: boolean,
+): boolean {
+  if (!stateReadable) {
+    return false;
+  }
+  return recordedCommandsSchema(state, agent.id) < agent.commandsSchema;
 }
 
-async function checkAgentArtifacts(homeDir?: string): Promise<CheckResult[]> {
+function hooksSchemaStale(
+  agent: AgentAdapter,
+  state: GrounderState | null,
+  stateReadable: boolean,
+): boolean {
+  if (!stateReadable || agent.hooksSchema === undefined) {
+    return false;
+  }
+  return recordedHooksSchema(state, agent.id) < agent.hooksSchema;
+}
+
+async function checkAgentArtifacts(
+  state: GrounderState | null,
+  stateReadable: boolean,
+  homeDir?: string,
+): Promise<CheckResult[]> {
   const agents = await resolveAgents();
   const checks: CheckResult[] = [];
 
@@ -164,12 +200,13 @@ async function checkAgentArtifacts(homeDir?: string): Promise<CheckResult[]> {
     const id = `agent-${agent.id}`;
 
     if (presentCount === expected.length) {
-      if (await anyCommandFileUsesNpx(expected)) {
+      if (commandsSchemaStale(agent, state, stateReadable)) {
+        const recorded = recordedCommandsSchema(state, agent.id);
         checks.push(
           warnCheck(
             id,
-            `${agent.name} command file(s) still invoke npx grounder (pre-runtime) — migrate`,
-            VAULT_INIT_FORCE,
+            `${agent.name} commands schema stale (recorded ${recorded}, current ${agent.commandsSchema}) — migrate`,
+            MIGRATE_HINT,
           ),
         );
       } else {
@@ -232,7 +269,11 @@ async function hookFileHasGrounderEntry(filePath: string): Promise<boolean> {
  * installed — stale mainly for bare-npx copy installs after an upgrade
  * (symlink installs stay current without re-init).
  */
-async function checkAgentHooks(homeDir?: string): Promise<CheckResult[]> {
+async function checkAgentHooks(
+  state: GrounderState | null,
+  stateReadable: boolean,
+  homeDir?: string,
+): Promise<CheckResult[]> {
   const agents = await resolveAgents();
   const checks: CheckResult[] = [];
   let anyHooksInstalled = false;
@@ -253,7 +294,18 @@ async function checkAgentHooks(homeDir?: string): Promise<CheckResult[]> {
 
     if (present.every(Boolean) && expected.length > 0) {
       anyHooksInstalled = true;
-      checks.push(okCheck(id, `${agent.name} session hook installed`));
+      if (hooksSchemaStale(agent, state, stateReadable)) {
+        const recorded = recordedHooksSchema(state, agent.id);
+        checks.push(
+          warnCheck(
+            id,
+            `${agent.name} hooks schema stale (recorded ${recorded}, current ${agent.hooksSchema}) — migrate`,
+            VAULT_INIT_HOOKS,
+          ),
+        );
+      } else {
+        checks.push(okCheck(id, `${agent.name} session hook installed`));
+      }
     } else {
       checks.push(
         warnCheck(id, `${agent.name} detected but no Grounder session hook`, VAULT_INIT_HOOKS),
@@ -285,11 +337,20 @@ async function runMachineChecks(homeDir?: string): Promise<{
   const { check: homeCheck, home } = await checkHomeConfig();
   const { check: vaultCheck, vaultRoot } = await checkVault(home);
   const projectsCheck = await checkProjectsDir(vaultRoot);
-  const agentChecks = await checkAgentArtifacts(homeDir);
-  const hookChecks = await checkAgentHooks(homeDir);
+  const { state, check: stateCheck } = await loadInstallState(homeDir);
+  const stateReadable = stateCheck === null;
+  const agentChecks = await checkAgentArtifacts(state, stateReadable, homeDir);
+  const hookChecks = await checkAgentHooks(state, stateReadable, homeDir);
 
   return {
-    checks: [homeCheck, vaultCheck, projectsCheck, ...agentChecks, ...hookChecks],
+    checks: [
+      homeCheck,
+      vaultCheck,
+      projectsCheck,
+      ...(stateCheck ? [stateCheck] : []),
+      ...agentChecks,
+      ...hookChecks,
+    ],
     home,
   };
 }

@@ -1,12 +1,13 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { grounderNoteCommandPath, grounderTaskCommandPath } from "../../src/agents/cursor.js";
+import { grounderTaskCommandPath } from "../../src/agents/cursor.js";
 import { grounderRuntimeDir } from "../../src/agents/hook-runtime.js";
 import { runDoctorWithOptions } from "../../src/commands/doctor.js";
 import { runRepoInitWithOptions } from "../../src/commands/repo/init.js";
 import { runVaultInitWithOptions } from "../../src/commands/vault/init.js";
 import { writeRepoConfig } from "../../src/connector/repo.js";
+import { statePath, writeGrounderState } from "../../src/connector/state.js";
 import { captureStdout, createTempEnv } from "../helpers.js";
 
 describe("commands/doctor", () => {
@@ -137,7 +138,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("ok    hook-runtime");
   });
 
-  it("warns when a command file still invokes npx grounder (pre-runtime install)", async () => {
+  it("warns when install state is missing (legacy pre-ledger install)", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -149,10 +150,42 @@ describe("commands/doctor", () => {
       agents: ["cursor"],
     });
     await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
-    // Simulate a command file installed before templates dropped literal npx.
-    await writeFile(
-      grounderNoteCommandPath(env.home),
-      'Run:\n\n  npx grounder note "<user text>"\n',
+    // Pre-ledger installs have command files but no ~/.grounder/state.json →
+    // treat as schema 0 (same migrate hint as the old npx content sniff).
+    await rm(statePath(env.home));
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("warn  agent-cursor");
+    expect(out).toContain("commands schema stale (recorded 0, current 1) — migrate");
+    expect(out).toContain("grounder vault init <path> --force");
+    expect(out).toContain("warn  agent-cursor-hooks");
+    expect(out).toContain("hooks schema stale (recorded 0, current 1) — migrate");
+    expect(out).toMatch(/^\d+ passed, 0 failed, 2 warned$/m);
+  });
+
+  it("warns when recorded commands schema is behind the adapter", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await writeGrounderState(
+      {
+        grounderVersion: "0.1.0",
+        agents: {
+          cursor: { commandsSchema: 0, files: {} },
+        },
+      },
+      env.home,
     );
 
     const { code, out } = await captureStdout(() =>
@@ -161,9 +194,68 @@ describe("commands/doctor", () => {
 
     expect(code).toBe(0);
     expect(out).toContain("warn  agent-cursor");
-    expect(out).toContain("still invoke npx grounder (pre-runtime) — migrate");
+    expect(out).toContain("commands schema stale (recorded 0, current 1) — migrate");
     expect(out).toContain("grounder vault init <path> --force");
+    expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
+  });
+
+  it("warns when recorded hooks schema is behind the adapter", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await writeGrounderState(
+      {
+        grounderVersion: "0.1.0",
+        agents: {
+          cursor: { commandsSchema: 1, hooksSchema: 0, files: {} },
+        },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("ok    agent-cursor");
+    expect(out).toContain("warn  agent-cursor-hooks");
+    expect(out).toContain("hooks schema stale (recorded 0, current 1) — migrate");
+    expect(out).toContain("grounder vault init <path> --hooks");
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
+  });
+
+  it("fails when install state is corrupt", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await writeFile(statePath(env.home), '{"agents":{}}\n', "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(1);
+    expect(out).toContain("fail  install-state");
+    expect(out).toContain("missing grounderVersion");
+    // Presence still ok — do not invent a schema-0 migrate warn on corrupt ledger.
+    expect(out).toContain("ok    agent-cursor");
+    expect(out).not.toContain("commands schema stale");
   });
 
   it("warns when a detected agent has no command files", async () => {
