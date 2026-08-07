@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   assertAgentSchemasSupported,
+  isInstallSchemaStale,
   readGrounderState,
   recordAgentInstall,
   recordedCommandsSchema,
@@ -176,6 +177,56 @@ describe("connector/state", () => {
     await expect(readGrounderState(env.home)).rejects.toThrow(
       /Invalid grounder state.*Fix or remove it.*migrate --force/,
     );
+  });
+
+  it("isInstallSchemaStale compares recorded schemas without treating missing state as stale", async () => {
+    expect(isInstallSchemaStale(null, [{ id: "cursor", name: "Cursor", commandsSchema: 1 }])).toBe(
+      false,
+    );
+
+    expect(
+      isInstallSchemaStale(
+        {
+          grounderVersion: "0.3.0",
+          agents: { cursor: { commandsSchema: 1, hooksSchema: 1, files: {} } },
+        },
+        [{ id: "cursor", name: "Cursor", commandsSchema: 1, hooksSchema: 1 }],
+      ),
+    ).toBe(false);
+
+    expect(
+      isInstallSchemaStale(
+        {
+          grounderVersion: "0.3.0",
+          agents: { cursor: { commandsSchema: 0, files: {} } },
+        },
+        [{ id: "cursor", name: "Cursor", commandsSchema: 1 }],
+      ),
+    ).toBe(true);
+
+    expect(
+      isInstallSchemaStale(
+        {
+          grounderVersion: "0.3.0",
+          agents: { cursor: { commandsSchema: 1, hooksSchema: 0, files: {} } },
+        },
+        [{ id: "cursor", name: "Cursor", commandsSchema: 1, hooksSchema: 1 }],
+      ),
+    ).toBe(true);
+
+    // Agent not in ledger → ignore (avoids false stale for uninstalled agents).
+    expect(
+      isInstallSchemaStale(
+        {
+          grounderVersion: "0.3.0",
+          agents: { cursor: { commandsSchema: 1, files: {} } },
+        },
+        [
+          { id: "cursor", name: "Cursor", commandsSchema: 1 },
+          { id: "claude", name: "Claude Code", commandsSchema: 1 },
+        ],
+      ),
+    ).toBe(false);
   });
 
   it("hard-stops when recorded agent schemas are ahead of this binary", async () => {

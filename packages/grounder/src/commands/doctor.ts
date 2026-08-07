@@ -20,6 +20,7 @@ import {
   resolvePlansDir,
   resolveVaultRoot,
 } from "../connector/vault.js";
+import { VERSION } from "../index.js";
 import { fileExists } from "../util/fs.js";
 import { flagBool, parseArgs } from "../util/parse-args.js";
 import { projectsParent } from "../vault/layout.js";
@@ -188,6 +189,21 @@ async function loadInstallState(homeDir?: string): Promise<{
       ),
     };
   }
+}
+
+/** Warn when package is newer than the last migrate/vault-init that wrote the ledger. */
+function checkPackageVersion(state: GrounderState | null): CheckResult | null {
+  if (!state) {
+    return null;
+  }
+  if (state.grounderVersion === VERSION) {
+    return null;
+  }
+  return warnCheck(
+    "package-version",
+    `package ${VERSION} newer than last migrate (${state.grounderVersion})`,
+    MIGRATE,
+  );
 }
 
 function commandsSchemaStale(
@@ -408,11 +424,20 @@ async function runMachineChecks(homeDir?: string): Promise<{
   const { state, check: stateCheck } = await loadInstallState(homeDir);
   // Corrupt ledger: don't invent schema-0 migrate warns on top of the fail.
   const stateReadable = stateCheck.level !== "fail";
+  const packageVersionCheck = checkPackageVersion(state);
   const agentChecks = await checkAgentArtifacts(state, stateReadable, homeDir);
   const hookChecks = await checkAgentHooks(state, stateReadable, homeDir);
 
   return {
-    checks: [homeCheck, vaultCheck, projectsCheck, stateCheck, ...agentChecks, ...hookChecks],
+    checks: [
+      homeCheck,
+      vaultCheck,
+      projectsCheck,
+      stateCheck,
+      ...(packageVersionCheck ? [packageVersionCheck] : []),
+      ...agentChecks,
+      ...hookChecks,
+    ],
     home,
   };
 }

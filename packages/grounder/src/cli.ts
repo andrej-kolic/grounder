@@ -15,6 +15,7 @@ import { runPathPlans } from "./commands/path/plans.js";
 import { runPlan } from "./commands/plan.js";
 import { runRepoInit } from "./commands/repo/init.js";
 import { runStatus } from "./commands/status.js";
+import { notifyUpgradeIfNeeded } from "./commands/upgrade-banner.js";
 import { runVaultInit } from "./commands/vault/init.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -106,6 +107,15 @@ async function main(): Promise<void> {
   }
 
   const [command, ...rest] = args;
+
+  // Skip banner when it would be noise: session hooks, or commands that refresh the ledger.
+  const skipUpgradeBanner =
+    (command === "handoff" && rest[0] === "peek") ||
+    command === "migrate" ||
+    (command === "vault" && rest[0] === "init");
+  if (!skipUpgradeBanner) {
+    await notifyUpgradeIfNeeded();
+  }
 
   if (command === "vault" && rest[0] === "init") {
     process.exit(await runVaultInit(rest.slice(1)));

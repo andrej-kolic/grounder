@@ -8,6 +8,7 @@ import { runRepoInitWithOptions } from "../../src/commands/repo/init.js";
 import { runVaultInitWithOptions } from "../../src/commands/vault/init.js";
 import { writeRepoConfig } from "../../src/connector/repo.js";
 import { statePath, writeGrounderState } from "../../src/connector/state.js";
+import { VERSION } from "../../src/index.js";
 import { captureStdout, createTempEnv } from "../helpers.js";
 
 describe("commands/doctor", () => {
@@ -183,7 +184,7 @@ describe("commands/doctor", () => {
     await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     await writeGrounderState(
       {
-        grounderVersion: "0.1.0",
+        grounderVersion: VERSION,
         agents: {
           cursor: { commandsSchema: 0, files: {} },
         },
@@ -199,7 +200,44 @@ describe("commands/doctor", () => {
     expect(out).toContain("warn  agent-cursor");
     expect(out).toContain("commands schema stale (recorded 0, current 1) — migrate");
     expect(out).toContain("grounder migrate --force");
+    expect(out).not.toContain("package-version");
     expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
+  });
+
+  it("warns when package is newer than state.grounderVersion", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await writeGrounderState(
+      {
+        grounderVersion: "0.1.0",
+        agents: {
+          cursor: { commandsSchema: 1, hooksSchema: 1, files: {} },
+        },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("ok    install-state");
+    expect(out).toContain("warn  package-version");
+    expect(out).toContain(`package ${VERSION} newer than last migrate (0.1.0)`);
+    expect(out).toContain("→ grounder migrate");
+    expect(out).toContain("ok    agent-cursor");
+    expect(out).toContain("ok    agent-cursor-hooks");
+    expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });
 
   it("warns when recorded hooks schema is behind the adapter", async () => {
@@ -216,7 +254,7 @@ describe("commands/doctor", () => {
     await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     await writeGrounderState(
       {
-        grounderVersion: "0.1.0",
+        grounderVersion: VERSION,
         agents: {
           cursor: { commandsSchema: 1, hooksSchema: 0, files: {} },
         },

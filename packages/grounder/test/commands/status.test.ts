@@ -6,7 +6,8 @@ import { runStatusWithOptions } from "../../src/commands/status.js";
 import { runVaultInitWithOptions } from "../../src/commands/vault/init.js";
 import { homeConfigPath, writeHomeConfig } from "../../src/connector/home.js";
 import { writeRepoConfig } from "../../src/connector/repo.js";
-import { statePath } from "../../src/connector/state.js";
+import { statePath, writeGrounderState } from "../../src/connector/state.js";
+import { VERSION } from "../../src/index.js";
 import { captureStdout, createTempEnv } from "../helpers.js";
 
 describe("commands/status", () => {
@@ -40,6 +41,8 @@ describe("commands/status", () => {
     expect(out).toContain(`  Config:     ${homeConfigPath(env.home)}`);
     expect(out).toContain(`  Vault:      ${env.vault}`);
     expect(out).toContain(`  State:      ${statePath(env.home)}`);
+    expect(out).not.toContain("Package:");
+    expect(out).not.toContain("Schemas:");
     expect(out).toContain("Project\n");
     expect(out).toContain("  Linked:     yes");
     expect(out).toContain(`  Folder:     ${env.repo}`);
@@ -75,6 +78,67 @@ describe("commands/status", () => {
     expect(code).toBe(0);
     expect(out).toContain(`  Vault:      ${env.vault}`);
     expect(out).toContain("  State:      missing → run: grounder migrate --force");
+  });
+
+  it("reports package lag when grounderVersion is behind the running package", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await writeGrounderState(
+      {
+        grounderVersion: "0.1.0",
+        agents: {
+          cursor: { commandsSchema: 1, hooksSchema: 1, files: {} },
+        },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runStatusWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain(`  State:      ${statePath(env.home)}`);
+    expect(out).toContain("  Package:    newer than last migrate (0.1.0) → run: grounder migrate");
+    expect(out).not.toContain("Schemas:");
+    expect(VERSION).not.toBe("0.1.0");
+  });
+
+  it("reports schema lag when recorded schemas are behind adapters", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await writeGrounderState(
+      {
+        grounderVersion: VERSION,
+        agents: {
+          cursor: { commandsSchema: 0, files: {} },
+        },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runStatusWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain(`  State:      ${statePath(env.home)}`);
+    expect(out).not.toContain("Package:");
+    expect(out).toContain("  Schemas:    stale → run: grounder migrate");
   });
 
   it("reports missing vault when neither vault nor project is configured", async () => {

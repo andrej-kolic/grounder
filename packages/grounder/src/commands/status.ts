@@ -1,4 +1,5 @@
 import path from "node:path";
+import { claude, cursor } from "../agents/index.js";
 import { currentBranch, findGitRoot } from "../connector/git.js";
 import { type HomeConfig, homeConfigPath, readHomeConfig, withHomeDir } from "../connector/home.js";
 import {
@@ -7,7 +8,7 @@ import {
   readRepoConfig,
   repoConfigPath,
 } from "../connector/repo.js";
-import { readGrounderState, statePath } from "../connector/state.js";
+import { isInstallSchemaStale, readGrounderState, statePath } from "../connector/state.js";
 import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
 import {
   resolveLogsDir,
@@ -15,6 +16,7 @@ import {
   resolvePlansDir,
   resolveVaultRoot,
 } from "../connector/vault.js";
+import { VERSION } from "../index.js";
 
 export interface StatusOptions {
   cwd?: string;
@@ -25,8 +27,12 @@ const LABEL_WIDTH = 12;
 const VAULT_INIT = "grounder vault init <path>";
 const REPO_INIT = "grounder init";
 const REPO_INIT_FORCE = "grounder init --force";
+const MIGRATE = "grounder migrate";
 const MIGRATE_FORCE = "grounder migrate --force";
 const UPGRADE_GROUNDER = "upgrade grounder";
+
+/** Adapters known to this binary — schema compare only (no `isInstalled` I/O). */
+const SCHEMA_AGENTS = [cursor, claude] as const;
 
 function section(title: string): string {
   return `${title}\n`;
@@ -81,6 +87,17 @@ async function writeInstallStateLine(homeDir?: string): Promise<void> {
       return;
     }
     process.stdout.write(statusLine("State:", statePath(homeDir)));
+    if (state.grounderVersion !== VERSION) {
+      process.stdout.write(
+        statusLine(
+          "Package:",
+          `newer than last migrate (${state.grounderVersion}) → run: ${MIGRATE}`,
+        ),
+      );
+    }
+    if (isInstallSchemaStale(state, SCHEMA_AGENTS)) {
+      process.stdout.write(statusLine("Schemas:", `stale → run: ${MIGRATE}`));
+    }
   } catch {
     process.stdout.write(statusLine("State:", `invalid → run: ${MIGRATE_FORCE}`));
   }

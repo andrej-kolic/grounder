@@ -26,6 +26,7 @@ export interface AgentState {
 }
 
 export interface GrounderState {
+  /** Package version that last wrote install artifacts (via vault init / migrate). */
   grounderVersion: string;
   agents: Record<string, AgentState>;
 }
@@ -155,6 +156,39 @@ export async function recordAgentInstall(opts: RecordAgentInstallOptions): Promi
   };
   await writeGrounderState(next, opts.homeDir);
   return next;
+}
+
+/**
+ * True when recorded install schemas lag what this binary expects.
+ * Missing state → not stale here (callers treat null as legacy separately).
+ * Only agents present in the ledger are compared — unknown/uninstalled
+ * adapters are ignored (no `isInstalled` I/O).
+ */
+export function isInstallSchemaStale(
+  state: GrounderState | null,
+  agents: ReadonlyArray<AgentSchemaSupport>,
+): boolean {
+  if (!state) {
+    return false;
+  }
+
+  for (const agent of agents) {
+    const entry = state.agents[agent.id];
+    if (!entry) {
+      continue;
+    }
+    if (entry.commandsSchema < agent.commandsSchema) {
+      return true;
+    }
+    if (
+      agent.hooksSchema !== undefined &&
+      entry.hooksSchema !== undefined &&
+      entry.hooksSchema < agent.hooksSchema
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /** Last-recorded content hash for a managed file, or `undefined` if unknown. */
