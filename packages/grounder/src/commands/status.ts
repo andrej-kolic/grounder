@@ -17,6 +17,7 @@ import {
   resolveVaultRoot,
 } from "../connector/vault.js";
 import { VERSION } from "../index.js";
+import { packageVersionNotice } from "./package-version-notice.js";
 
 export interface StatusOptions {
   cwd?: string;
@@ -87,13 +88,9 @@ async function writeInstallStateLine(homeDir?: string): Promise<void> {
       return;
     }
     process.stdout.write(statusLine("State:", statePath(homeDir)));
-    if (state.grounderVersion !== VERSION) {
-      process.stdout.write(
-        statusLine(
-          "Package:",
-          `newer than last migrate (${state.grounderVersion}) → run: ${MIGRATE}`,
-        ),
-      );
+    const packageNotice = packageVersionNotice(VERSION, state.grounderVersion);
+    if (packageNotice) {
+      process.stdout.write(statusLine("Package:", packageNotice.status));
     }
     if (isInstallSchemaStale(state, SCHEMA_AGENTS)) {
       process.stdout.write(statusLine("Schemas:", `stale → run: ${MIGRATE}`));

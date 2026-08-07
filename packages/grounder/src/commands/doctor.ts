@@ -25,6 +25,7 @@ import { fileExists } from "../util/fs.js";
 import { flagBool, parseArgs } from "../util/parse-args.js";
 import { projectsParent } from "../vault/layout.js";
 import { type CheckResult, failCheck, okCheck, warnCheck } from "./check.js";
+import { packageVersionNotice } from "./package-version-notice.js";
 
 export interface DoctorOptions {
   cwd?: string;
@@ -191,19 +192,16 @@ async function loadInstallState(homeDir?: string): Promise<{
   }
 }
 
-/** Warn when package is newer than the last migrate/vault-init that wrote the ledger. */
+/** Warn when package version disagrees with the last migrate/vault-init ledger write. */
 function checkPackageVersion(state: GrounderState | null): CheckResult | null {
   if (!state) {
     return null;
   }
-  if (state.grounderVersion === VERSION) {
+  const notice = packageVersionNotice(VERSION, state.grounderVersion);
+  if (!notice) {
     return null;
   }
-  return warnCheck(
-    "package-version",
-    `package ${VERSION} newer than last migrate (${state.grounderVersion})`,
-    MIGRATE,
-  );
+  return warnCheck("package-version", notice.message, notice.fix);
 }
 
 function commandsSchemaStale(

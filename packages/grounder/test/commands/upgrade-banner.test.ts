@@ -33,13 +33,37 @@ describe("commands/upgrade-banner", () => {
       return true;
     });
 
-    const expected = `Grounder upgraded to ${VERSION} — run \`grounder migrate\`\n\n`;
+    const expected = `Grounder was updated (${VERSION}). Run \`grounder migrate\` to update your configuration.\n\n`;
     await notifyUpgradeIfNeeded(env.home);
     expect(chunks.join("")).toBe(expected);
 
     chunks.length = 0;
     await notifyUpgradeIfNeeded(env.home);
     expect(chunks.join("")).toBe(expected);
+  });
+
+  it("prints a downgrade notice when the package is older than the ledger", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await writeGrounderState(
+      {
+        grounderVersion: "99.0.0",
+        agents: { cursor: { commandsSchema: 1, files: {} } },
+      },
+      env.home,
+    );
+
+    const chunks: string[] = [];
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      chunks.push(String(chunk));
+      return true;
+    });
+
+    await notifyUpgradeIfNeeded(env.home);
+    expect(chunks.join("")).toBe(
+      `This Grounder (${VERSION}) is older than your configuration (99.0.0). Install a newer Grounder.\n\n`,
+    );
   });
 
   it("stays silent when grounderVersion already matches the running package", async () => {

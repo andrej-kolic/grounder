@@ -233,11 +233,45 @@ describe("commands/doctor", () => {
     expect(code).toBe(0);
     expect(out).toContain("ok    install-state");
     expect(out).toContain("warn  package-version");
-    expect(out).toContain(`package ${VERSION} newer than last migrate (0.1.0)`);
+    expect(out).toContain(
+      `Grounder ${VERSION} is installed, but your configuration is still from 0.1.0`,
+    );
     expect(out).toContain("→ grounder migrate");
     expect(out).toContain("ok    agent-cursor");
     expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
+  });
+
+  it("warns when package is older than state.grounderVersion", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await writeGrounderState(
+      {
+        grounderVersion: "99.0.0",
+        agents: {
+          cursor: { commandsSchema: 1, hooksSchema: 1, files: {} },
+        },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("warn  package-version");
+    expect(out).toContain(`this Grounder (${VERSION}) is older than your configuration (99.0.0)`);
+    expect(out).toContain("→ install a newer Grounder");
   });
 
   it("warns when recorded hooks schema is behind the adapter", async () => {

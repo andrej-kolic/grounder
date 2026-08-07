@@ -110,7 +110,7 @@ Three channels, no new product surface:
 | --- | --- |
 | **`grounder doctor` / `status`** | Pull: install-state check, schema stale → warn + migrate hint; schema ahead → fail / upgrade; `status` shows State path |
 | **Session hook / `handoff peek`** | Push: cheap integer stale check; one-line teaser (`Install outdated — run: grounder migrate`). Hooks stay side-effect-free — no auto-migrate |
-| **CLI upgrade banner** | When `state.json`’s `grounderVersion` ≠ running package version, stderr notice on ordinary commands until migrate/vault init rewrites the ledger. Skipped for peek, migrate, and vault init |
+| **CLI upgrade banner** | When running Grounder and the version recorded for this machine's configuration disagree (semver-ordered when both parse as `x.y.z`): plain-language stderr on ordinary commands until migrate/vault init rewrites the ledger. Updated package → migrate; older package → install a newer Grounder; unparseable mismatch → migrate. Skipped for peek, migrate, and vault init |
 
 ```mermaid
 flowchart TD
@@ -142,7 +142,7 @@ flowchart TD
 | `grounder migrate` | `commands/migrate.ts` |
 | Doctor / status checks | `commands/doctor.ts`, `commands/status.ts` |
 | Peek teaser | `commands/handoff/peek.ts` |
-| Upgrade banner | `commands/upgrade-banner.ts`, wired from `cli.ts` |
+| Upgrade banner | `commands/upgrade-banner.ts`, `commands/package-version-notice.ts`, `util/semver.ts`, wired from `cli.ts` |
 
 ## Rejected alternatives
 

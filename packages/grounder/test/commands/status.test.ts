@@ -106,9 +106,37 @@ describe("commands/status", () => {
 
     expect(code).toBe(0);
     expect(out).toContain(`  State:      ${statePath(env.home)}`);
-    expect(out).toContain("  Package:    newer than last migrate (0.1.0) → run: grounder migrate");
+    expect(out).toContain("  Package:    configuration outdated — run: grounder migrate");
     expect(out).not.toContain("Schemas:");
     expect(VERSION).not.toBe("0.1.0");
+  });
+
+  it("reports when the running package is older than the ledger", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await writeGrounderState(
+      {
+        grounderVersion: "99.0.0",
+        agents: {
+          cursor: { commandsSchema: 1, hooksSchema: 1, files: {} },
+        },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runStatusWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("  Package:    older than configuration — install a newer Grounder");
   });
 
   it("reports schema lag when recorded schemas are behind adapters", async () => {
