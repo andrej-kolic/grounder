@@ -183,5 +183,15 @@ export async function applyAgentInstalls(
     results.push({ agent, commands, hooks: hooksResult });
   }
 
+  const modifiedWithoutForce =
+    !force &&
+    results.some((r) => Object.values(r.commands.artifacts).some((s) => s === "modified"));
+  if (modifiedWithoutForce) {
+    process.stdout.write(
+      "\nNote: some command files were left alone (local edits, or an install from before Grounder 0.3).\n" +
+        "  To refresh them: grounder migrate --force\n",
+    );
+  }
+
   return { runtime, agents: results };
 }

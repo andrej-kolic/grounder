@@ -161,7 +161,7 @@ describe("commands/doctor", () => {
     expect(code).toBe(0);
     expect(out).toContain("warn  agent-cursor");
     expect(out).toContain("commands schema stale (recorded 0, current 1) — migrate");
-    expect(out).toContain("grounder migrate");
+    expect(out).toContain("grounder migrate --force");
     expect(out).toContain("warn  agent-cursor-hooks");
     expect(out).toContain("hooks schema stale (recorded 0, current 1) — migrate");
     expect(out).toMatch(/^\d+ passed, 0 failed, 2 warned$/m);
@@ -195,7 +195,7 @@ describe("commands/doctor", () => {
     expect(code).toBe(0);
     expect(out).toContain("warn  agent-cursor");
     expect(out).toContain("commands schema stale (recorded 0, current 1) — migrate");
-    expect(out).toContain("grounder migrate");
+    expect(out).toContain("grounder migrate --force");
     expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
   });
 

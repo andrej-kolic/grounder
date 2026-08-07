@@ -56,7 +56,8 @@ Init flags:
   --hooks        Also install session-start teaser hooks (vault init / migrate)
 
 Migrate flags:
-  --force        Overwrite locally-modified slash command files
+  --force        Overwrite command files you edited locally; also needed
+                 once when upgrading from Grounder before 0.3
   --dry-run      Preview without writing
   --agent <id>   Limit to a specific agent (repeatable)
   --hooks        Also install hooks if not previously installed

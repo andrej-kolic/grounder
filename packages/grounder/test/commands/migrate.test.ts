@@ -72,6 +72,7 @@ describe("commands/migrate", () => {
     const skipped = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
     expect(skipped.code).toBe(0);
     expect(skipped.out).toContain("locally modified (skipped — use --force)");
+    expect(skipped.out).toContain("grounder migrate --force");
     expect(await readFile(noteDest, "utf8")).toBe("my local edits\n");
 
     const forced = await captureStdout(() =>
@@ -140,6 +141,7 @@ describe("commands/migrate", () => {
     expect(code).toBe(0);
     expect(out).toContain("Dry run");
     expect(out).toContain("would update:");
+    expect(out).not.toContain("grounder migrate --force");
     expect(await readFile(noteDest, "utf8")).toBe(before);
   });
 });

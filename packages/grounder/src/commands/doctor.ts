@@ -32,11 +32,17 @@ export interface DoctorOptions {
 
 const VAULT_INIT = "grounder vault init <path>";
 const MIGRATE = "grounder migrate";
+const MIGRATE_FORCE = "grounder migrate --force";
 const MIGRATE_HOOKS = "grounder migrate --hooks";
 const REPO_INIT = "grounder init";
 
-/** Fix hint for stale install schemas. */
-const MIGRATE_HINT = MIGRATE;
+/**
+ * Commands installed before Grounder 0.3 have no per-file content hash, so
+ * migrate cannot tell stock files from user edits — `--force` is required once.
+ */
+function commandsMigrateHint(recordedSchema: number): string {
+  return recordedSchema === 0 ? MIGRATE_FORCE : MIGRATE;
+}
 
 async function isDirectory(dirPath: string): Promise<boolean> {
   try {
@@ -206,7 +212,7 @@ async function checkAgentArtifacts(
           warnCheck(
             id,
             `${agent.name} commands schema stale (recorded ${recorded}, current ${agent.commandsSchema}) — migrate`,
-            MIGRATE_HINT,
+            commandsMigrateHint(recorded),
           ),
         );
       } else {
@@ -215,7 +221,7 @@ async function checkAgentArtifacts(
       continue;
     }
 
-    const fix = `${MIGRATE_HINT} --force (or --agent=${agent.id})`;
+    const fix = `${MIGRATE_FORCE} (or --agent=${agent.id})`;
     if (presentCount === 0) {
       checks.push(warnCheck(id, `${agent.name} detected but no Grounder command files`, fix));
     } else {
@@ -300,7 +306,7 @@ async function checkAgentHooks(
           warnCheck(
             id,
             `${agent.name} hooks schema stale (recorded ${recorded}, current ${agent.hooksSchema}) — migrate`,
-            MIGRATE_HINT,
+            MIGRATE,
           ),
         );
       } else {
