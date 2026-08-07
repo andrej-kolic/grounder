@@ -90,8 +90,12 @@ function resolveCursorHookCwd(stdinWorkspaceRoot: string | undefined): string | 
 }
 
 /**
- * Migrate nudge when recorded schemas lag this binary. Missing/corrupt
- * state stays silent here — `doctor` owns the missing-ledger warn.
+ * Whether to print the "run grounder migrate" line from session peek.
+ * Only looks at `~/.grounder/state.json` — does not open Cursor/Claude files.
+ *
+ * If hooks were never enabled (no hooks version in state), that is not "out of
+ * date" here. Doctor is the place that checks whether hook files exist on disk.
+ * If state is missing or unreadable, stay quiet — doctor reports that.
  */
 async function schemaMigrateNeeded(homeDir?: string): Promise<boolean> {
   try {
@@ -143,8 +147,8 @@ export async function runHandoffPeek(argv: string[]): Promise<number> {
  * files and falls back to the next-newest — the same selection `grounder handoff list
  * --head` uses, so the teaser and `/grounder-task` never disagree about which handoff
  * is current.
- * Also flags schema staleness (cheap integer compare against `state.json`) so session
- * hooks nudge users who never run `doctor`.
+ * Also checks `state.json` and may add a one-line "run grounder migrate" hint
+ * for people who never run doctor.
  * Uses {@link resolveLinkedProject} directly (not `requireLinkedProject`) so failures stay silent.
  * @returns Always `0`.
  */

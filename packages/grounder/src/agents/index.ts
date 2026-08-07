@@ -37,21 +37,21 @@ export async function resolveAgents(ids?: string[]): Promise<AgentAdapter[]> {
 }
 
 /**
- * Persist adapter schema versions into `~/.grounder/state.json` after an
- * install. When `hooksInstalled` is true and the adapter declares
- * `hooksSchema`, that value is recorded; otherwise any existing hooksSchema
- * is left alone.
+ * Write this agent's install version info into `~/.grounder/state.json` after
+ * install. If hooks were installed and the agent supports them, store the hooks
+ * version; otherwise leave any existing hooks version as-is.
  *
- * When `advanceCommandsSchema` is false (every command artifact was left as
- * `modified`), the recorded commands schema is preserved so doctor/peek keep
- * treating the install as stale until a real write or `--force`.
+ * When `advanceCommandsSchema` is false (every command file was left alone
+ * because it looked locally edited or from an old install), do not bump the
+ * commands version in state — otherwise doctor/peek would stop warning even
+ * though the files were never updated. Use `--force` (or a real write) first.
  */
 export async function recordAgentInstallState(
   agent: AgentAdapter,
   opts: {
     hooksInstalled?: boolean;
     homeDir?: string;
-    /** Default true. Pass false when no command file was created/updated/skipped-as-current. */
+    /** Default true. Pass false when no command file was written or already up to date. */
     advanceCommandsSchema?: boolean;
   } = {},
 ): Promise<void> {

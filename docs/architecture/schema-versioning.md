@@ -133,7 +133,7 @@ flowchart TD
 
 | Concern | Location |
 | --- | --- |
-| Ledger read/write, stale/ahead helpers | `connector/state.ts` |
+| Install "out of date?" helpers | `connector/state.ts` — `isInstallSchemaStale` for peek/status (state file only; hooks never enabled ≠ out of date). `isHooksSchemaBehind` for doctor when hook files already exist |
 | Shared “newer schema” error type | `connector/unsupported-schema.ts` |
 | Repo marker version guard | `connector/repo.ts` |
 | Hash of rendered command bytes | `util/hash.ts` + `agents/install-command.ts` |

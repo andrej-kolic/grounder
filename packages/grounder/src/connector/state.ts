@@ -107,7 +107,7 @@ export function recordedCommandsSchema(state: GrounderState | null, agentId: str
   return state?.agents[agentId]?.commandsSchema ?? 0;
 }
 
-/** Recorded hooks schema for an agent, or `0` when missing (legacy / never installed). */
+/** Hooks version stored for an agent, or `0` if missing (never stored / never installed). */
 export function recordedHooksSchema(state: GrounderState | null, agentId: string): number {
   return state?.agents[agentId]?.hooksSchema ?? 0;
 }
@@ -115,13 +115,13 @@ export function recordedHooksSchema(state: GrounderState | null, agentId: string
 export interface RecordAgentInstallOptions {
   agentId: string;
   /**
-   * When set, updates `commandsSchema`; when omitted, preserves any existing
-   * value (or `0` for a new agent entry). Omit when command files were all
-   * skipped as locally modified / legacy so the ledger does not falsely look
-   * current.
+   * When set, updates the commands version in state; when omitted, keeps the
+   * existing value (or `0` for a new agent). Omit when every command file was
+   * skipped as locally edited or from an old install, so state does not look
+   * up to date when the files were not updated.
    */
   commandsSchema?: number;
-  /** When set, updates `hooksSchema`; when omitted, preserves any existing value. */
+  /** When set, updates the hooks version; when omitted, keeps any existing value. */
   hooksSchema?: number;
   /**
    * Merge into the agent's `files` map (absolute path → state). Omitting leaves
@@ -133,9 +133,9 @@ export interface RecordAgentInstallOptions {
 }
 
 /**
- * Merge one agent's install metadata into the ledger. Creates `state.json` when
- * absent. Preserves other agents and merges any provided `files` over the
- * existing map for this agent.
+ * Merge one agent's install info into `~/.grounder/state.json`. Creates the
+ * file when missing. Keeps other agents and merges any provided `files` over
+ * this agent's existing map.
  */
 export async function recordAgentInstall(opts: RecordAgentInstallOptions): Promise<GrounderState> {
   const existing = await readGrounderState(opts.homeDir);
@@ -166,10 +166,17 @@ export async function recordAgentInstall(opts: RecordAgentInstallOptions): Promi
 }
 
 /**
- * True when recorded install schemas lag what this binary expects.
- * Missing state → not stale here (callers treat null as legacy separately).
- * Only agents present in the ledger are compared — unknown/uninstalled
- * adapters are ignored (no `isInstalled` I/O).
+ * True when `state.json` says this machine's install is behind what this
+ * Grounder version expects. Used by peek/status — they only read `state.json`,
+ * they do not look at Cursor/Claude files on disk.
+ *
+ * If there is no state file, returns false (callers handle that separately).
+ * Only agents listed in state are checked.
+ *
+ * Session hooks: if an agent has no `hooksSchema` in state, that means hooks
+ * were never turned on for them. That is not "behind" — otherwise peek would
+ * keep telling people who never enabled hooks to run migrate. When hooks
+ * actually exist on disk, doctor uses {@link isHooksSchemaBehind} instead.
  */
 export function isInstallSchemaStale(
   state: GrounderState | null,
@@ -198,6 +205,38 @@ export function isInstallSchemaStale(
   return false;
 }
 
+/**
+ * True when session-hook install info is behind what this Grounder expects.
+ * Call only after you already know Grounder hooks exist on disk (doctor).
+ *
+ * If state never stored a hooks version, treat that as version 0 so older
+ * hook installs still get a migrate hint. Peek/status must not use this —
+ * use {@link isInstallSchemaStale}, which leaves "hooks never enabled" alone.
+ */
+export function isHooksSchemaBehind(
+  recorded: number | undefined,
+  expected: number | undefined,
+): boolean {
+  if (expected === undefined) {
+    return false;
+  }
+  return (recorded ?? 0) < expected;
+}
+
+/**
+ * True when state says hooks are newer than this Grounder understands.
+ * No stored hooks version is not "newer".
+ */
+export function isHooksSchemaAhead(
+  recorded: number | undefined,
+  expected: number | undefined,
+): boolean {
+  if (expected === undefined || recorded === undefined) {
+    return false;
+  }
+  return recorded > expected;
+}
+
 /** Last-recorded content hash for a managed file, or `undefined` if unknown. */
 export function recordedFileHash(
   state: GrounderState | null,
@@ -208,8 +247,8 @@ export function recordedFileHash(
 }
 
 /**
- * Hard-stop when `state.json` records a schema newer than this binary's
- * adapters understand. Missing state / unknown agents are fine (legacy).
+ * Hard stop when `state.json` has install versions newer than this Grounder
+ * understands. Missing state or unknown agents are fine (older installs).
  */
 export function assertAgentSchemasSupported(
   state: GrounderState | null,

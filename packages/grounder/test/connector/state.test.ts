@@ -3,6 +3,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   assertAgentSchemasSupported,
+  isHooksSchemaAhead,
+  isHooksSchemaBehind,
   isInstallSchemaStale,
   readGrounderState,
   recordAgentInstall,
@@ -256,7 +258,19 @@ describe("connector/state", () => {
       ),
     ).toBe(true);
 
-    // Agent not in ledger → ignore (avoids false stale for uninstalled agents).
+    // No hooks version in state = hooks were never enabled → not "behind" for
+    // peek/status. Doctor only treats that as behind when hook files exist.
+    expect(
+      isInstallSchemaStale(
+        {
+          grounderVersion: "0.3.0",
+          agents: { cursor: { commandsSchema: 1, files: {} } },
+        },
+        [{ id: "cursor", name: "Cursor", commandsSchema: 1, hooksSchema: 1 }],
+      ),
+    ).toBe(false);
+
+    // Agent not in state → ignore (don't flag agents that were never installed).
     expect(
       isInstallSchemaStale(
         {
@@ -269,6 +283,18 @@ describe("connector/state", () => {
         ],
       ),
     ).toBe(false);
+  });
+
+  it("isHooksSchemaBehind treats a missing hooks version as 0 (for doctor when hooks exist)", () => {
+    expect(isHooksSchemaBehind(undefined, 1)).toBe(true);
+    expect(isHooksSchemaBehind(0, 1)).toBe(true);
+    expect(isHooksSchemaBehind(1, 1)).toBe(false);
+    expect(isHooksSchemaBehind(2, 1)).toBe(false);
+    expect(isHooksSchemaBehind(0, undefined)).toBe(false);
+
+    expect(isHooksSchemaAhead(undefined, 1)).toBe(false);
+    expect(isHooksSchemaAhead(2, 1)).toBe(true);
+    expect(isHooksSchemaAhead(1, 1)).toBe(false);
   });
 
   it("hard-stops when recorded agent schemas are ahead of this binary", async () => {

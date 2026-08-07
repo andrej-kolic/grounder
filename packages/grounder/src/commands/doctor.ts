@@ -8,6 +8,8 @@ import { homeConfigPath, readHomeConfig, withHomeDir } from "../connector/home.j
 import { findLinkedRepoRoot, readRepoConfig } from "../connector/repo.js";
 import {
   type GrounderState,
+  isHooksSchemaAhead,
+  isHooksSchemaBehind,
   readGrounderState,
   recordedCommandsSchema,
   recordedHooksSchema,
@@ -227,6 +229,14 @@ function commandsSchemaAhead(
   return recordedCommandsSchema(state, agent.id) > agent.commandsSchema;
 }
 
+/**
+ * Whether installed session hooks are behind this Grounder.
+ * Only call when those hook files are already present.
+ *
+ * No hooks version in state counts as version 0, so older hook installs still
+ * suggest migrate. Peek/status use {@link isInstallSchemaStale} instead, which
+ * does not treat "hooks never enabled" as behind.
+ */
 function hooksSchemaStale(
   agent: AgentAdapter,
   state: GrounderState | null,
@@ -235,7 +245,7 @@ function hooksSchemaStale(
   if (!stateReadable || agent.hooksSchema === undefined) {
     return false;
   }
-  return recordedHooksSchema(state, agent.id) < agent.hooksSchema;
+  return isHooksSchemaBehind(state?.agents[agent.id]?.hooksSchema, agent.hooksSchema);
 }
 
 function hooksSchemaAhead(
@@ -246,7 +256,7 @@ function hooksSchemaAhead(
   if (!stateReadable || agent.hooksSchema === undefined) {
     return false;
   }
-  return recordedHooksSchema(state, agent.id) > agent.hooksSchema;
+  return isHooksSchemaAhead(state?.agents[agent.id]?.hooksSchema, agent.hooksSchema);
 }
 
 async function checkAgentArtifacts(

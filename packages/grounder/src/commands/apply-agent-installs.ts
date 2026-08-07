@@ -185,10 +185,11 @@ export async function applyAgentInstalls(
 
     if (!dryRun) {
       const statuses = Object.values(commands.artifacts);
-      // Only advance commandsSchema when at least one file was written or
-      // confirmed current. All-`modified` (legacy / local edits) must not mark
-      // the ledger current — otherwise plain migrate silences doctor while
-      // leaving pre-0.3 command files untouched.
+      // Only bump the commands version in state when at least one file was
+      // written or already up to date. If every file was skipped as locally
+      // edited (or from before Grounder tracked hashes), do not mark state as
+      // current — otherwise plain migrate would silence doctor while leaving
+      // those old command files untouched.
       const advanceCommandsSchema =
         statuses.length === 0 || statuses.some((status) => status !== "modified");
       await recordAgentInstallState(agent, {
