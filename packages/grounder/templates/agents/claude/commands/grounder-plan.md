@@ -22,7 +22,22 @@ Build a markdown body with these sections:
 …
 ```
 
-Resolve a filename for `--title`:
+Choose create vs update:
+
+**Update when you already know the plan’s vault path** (attached/open in context): use `--path` with that exact path. Do not invent or sanitize a `--title`.
+
+```bash
+{{GROUNDER_CLI}} plan "$(cat <<'EOF'
+# Plan: …
+…
+EOF
+)" --path <absolute-or-relative-path-to-existing-plan.md>
+```
+
+`--path` must resolve under this project's `plans/` dir. It always overwrites (no `--force`).
+
+**Create a new plan** (or update by explicit name when you do not have the file open):
+resolve a filename for `--title`:
 - If the instruction names one explicitly (e.g. `save as "implementation-phase-1"` or `…phase-1.md`), use it (strip a trailing `.md`).
 - Otherwise derive a short kebab-case name from the plan's title/goal and confirm it with the user before writing.
 
