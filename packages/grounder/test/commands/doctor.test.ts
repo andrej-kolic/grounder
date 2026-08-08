@@ -150,6 +150,34 @@ describe("commands/doctor", () => {
     expect(out).toContain("fail  plans-dir");
   });
 
+  it("warns (exit 0) when linked layout dirs are missing", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await writeRepoConfig(env.repo, { version: 1, projectId: "my-app" });
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("ok    repo-config");
+    expect(out).toContain("warn  notes-dir");
+    expect(out).toContain("notes/ missing");
+    expect(out).toContain("warn  logs-dir");
+    expect(out).toContain("logs/ missing");
+    expect(out).toContain("warn  plans-dir");
+    expect(out).toContain("plans/ missing");
+    expect(out).toContain("→ grounder init");
+    expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
+  });
+
   it("fails when a detected agent is missing a command file", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;

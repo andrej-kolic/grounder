@@ -551,20 +551,21 @@ async function runProjectChecks(
       const logs = resolveLogsDir(home, repo);
       const plans = resolvePlansDir(home, repo);
 
+      // Missing layout dirs are warn, not fail: note/handoff/plan writers mkdir on first use.
       checks.push(
         (await isDirectory(notes))
           ? okCheck("notes-dir", `notes/ present (${notes})`)
-          : failCheck("notes-dir", `${notes} missing`, `${REPO_INIT} (creates dirs)`),
+          : warnCheck("notes-dir", `notes/ missing (${notes})`, REPO_INIT),
       );
       checks.push(
         (await isDirectory(logs))
           ? okCheck("logs-dir", `logs/ present (${logs})`)
-          : failCheck("logs-dir", `${logs} missing`, REPO_INIT),
+          : warnCheck("logs-dir", `logs/ missing (${logs})`, REPO_INIT),
       );
       checks.push(
         (await isDirectory(plans))
           ? okCheck("plans-dir", `plans/ present (${plans})`)
-          : failCheck("plans-dir", `${plans} missing`, REPO_INIT),
+          : warnCheck("plans-dir", `plans/ missing (${plans})`, REPO_INIT),
       );
     }
   }
