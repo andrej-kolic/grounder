@@ -106,10 +106,13 @@ Subcommands:
     group: "Write",
     summary: "Write/update a named plan under vault plans/",
     listUsage: "plan <text>",
-    usage: "grounder plan <text> --title <name> [--force]",
+    usage: "grounder plan <text> (--title <name> [--force] | --path <file>)",
     flags: `Flags:
-  --title <name> Required filename (trailing .md ok; sanitized, max 80 chars)
-  --force        Overwrite an existing plan (preserves original created)`,
+  --title <name> Required filename stem when creating/updating by name
+                 (trailing .md ok; sanitized, max 80 chars)
+  --path <file>  Update an existing plan by path (must resolve under this
+                 project's plans/; no title sanitization; always overwrites)
+  --force        With --title: overwrite an existing plan (preserves created)`,
   },
   {
     id: "path notes",

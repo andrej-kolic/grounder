@@ -21,3 +21,22 @@ export function expandHome(input: string): string {
 export function resolveUserPath(input: string, cwd: string = process.cwd()): string {
   return path.resolve(cwd, expandHome(input));
 }
+
+/**
+ * True when `child` resolves to a path strictly inside `parent` (or equal to it).
+ * Uses resolved absolute paths; rejects `..` escape and cross-root relatives.
+ */
+export function isPathInside(parent: string, child: string): boolean {
+  const root = path.resolve(parent);
+  const target = path.resolve(child);
+  if (root === target) {
+    return true;
+  }
+  const relative = path.relative(root, target);
+  return (
+    relative !== "" &&
+    relative !== ".." &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}

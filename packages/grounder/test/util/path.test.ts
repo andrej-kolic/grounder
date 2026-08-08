@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { expandHome, resolveUserPath } from "../../src/util/path.js";
+import { expandHome, isPathInside, resolveUserPath } from "../../src/util/path.js";
 
 describe("util/path", () => {
   describe("expandHome", () => {
@@ -35,6 +35,20 @@ describe("util/path", () => {
 
     it("resolves relative paths against cwd", () => {
       expect(resolveUserPath("vault", "/tmp")).toBe(path.resolve("/tmp", "vault"));
+    });
+  });
+
+  describe("isPathInside", () => {
+    it("accepts the parent itself and nested children", () => {
+      expect(isPathInside("/vault/plans", "/vault/plans")).toBe(true);
+      expect(isPathInside("/vault/plans", "/vault/plans/doc.md")).toBe(true);
+      expect(isPathInside("/vault/plans", "/vault/plans/sub/doc.md")).toBe(true);
+    });
+
+    it("rejects siblings and parent escapes", () => {
+      expect(isPathInside("/vault/plans", "/vault/plans-evil/doc.md")).toBe(false);
+      expect(isPathInside("/vault/plans", "/vault/notes/doc.md")).toBe(false);
+      expect(isPathInside("/vault/plans", "/vault/plans/../notes/doc.md")).toBe(false);
     });
   });
 });

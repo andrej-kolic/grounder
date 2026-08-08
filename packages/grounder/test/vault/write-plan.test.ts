@@ -1,7 +1,7 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { writePlan } from "../../src/vault/write-plan.js";
+import { updatePlanAtPath, writePlan } from "../../src/vault/write-plan.js";
 import { createTempEnv } from "../helpers.js";
 
 describe("vault/write-plan", () => {
@@ -129,5 +129,44 @@ Ship plan capture.
     const content = await readFile(result.path, "utf8");
     expect(content).toContain(`created: "${updatedAt.toISOString()}"`);
     expect(content).toContain(`updated: "${updatedAt.toISOString()}"`);
+  });
+
+  it("updatePlanAtPath overwrites by exact path without renaming", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const plansDir = path.join(env.vault, "plans");
+    await mkdir(plansDir, { recursive: true });
+    const filePath = path.join(plansDir, "document 1.md");
+    await writeFile(
+      filePath,
+      [
+        "---",
+        'project: "my-app"',
+        `created: "${createdAt.toISOString()}"`,
+        "---",
+        "",
+        "# old\n",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const newBody = "# new conclusions\n";
+    const result = await updatePlanAtPath(filePath, newBody, {
+      projectId: "my-app",
+      now: updatedAt,
+    });
+
+    expect(result).toEqual({ path: filePath, status: "overwritten" });
+    expect(await readFile(filePath, "utf8")).toBe(
+      [
+        "---",
+        'project: "my-app"',
+        `created: "${createdAt.toISOString()}"`,
+        `updated: "${updatedAt.toISOString()}"`,
+        "---",
+        "",
+        newBody,
+      ].join("\n"),
+    );
   });
 });

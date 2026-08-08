@@ -85,6 +85,7 @@ describe("help", () => {
       const out = chunks.join("");
       expect(out).toContain("Usage: grounder plan");
       expect(out).toContain("--force");
+      expect(out).toContain("--path");
       expect(out).toContain("named plan");
     } finally {
       spy.mockRestore();
