@@ -4,7 +4,7 @@ import { resolvePlansDir } from "../connector/vault.js";
 import { helpExitCode } from "../help.js";
 import { fileExists } from "../util/fs.js";
 import { flagBool, flagString, parseArgs } from "../util/parse-args.js";
-import { isPathInside, resolveUserPath } from "../util/path.js";
+import { isPathInside, isRealPathInside, resolveUserPath } from "../util/path.js";
 import { sanitizePlanName } from "../util/plan-name.js";
 import { updatePlanAtPath, writePlan } from "../vault/write-plan.js";
 import { requireLinkedProject } from "./require-linked.js";
@@ -158,6 +158,15 @@ async function updateByPath(
 
   if (!(await fileExists(filePath))) {
     process.stderr.write(`Plan not found: ${filePath}\n`);
+    return 1;
+  }
+
+  // Check follows symlinks; write would too — refuse links that land outside plans/.
+  const realInside = await isRealPathInside(plansDir, filePath);
+  if (realInside !== true) {
+    process.stderr.write(
+      `Plan path must resolve inside this project's plans directory:\n  ${plansDir}\nGot: ${filePath}\n`,
+    );
     return 1;
   }
 

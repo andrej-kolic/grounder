@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -318,6 +318,35 @@ describe("commands/plan", () => {
     expect(err).toContain("Plan path must resolve inside this project's plans directory:");
     expect(err).toContain(plansDir);
     expect(err).toContain(outside);
+  });
+
+  it("rejects --path that is a symlink pointing outside plans/", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
+    const outside = path.join(env.home, "outside-secret.md");
+    await writeFile(outside, "# keep me\n", "utf8");
+    const linkPath = path.join(plansDir, "escape.md");
+    await symlink(outside, linkPath);
+
+    const { code, err } = await captureStderr(() =>
+      runPlanWithOptions({
+        cwd: env.repo,
+        text: planBody,
+        planPath: linkPath,
+        homeDir: env.home,
+      }),
+    );
+
+    expect(code).toBe(1);
+    expect(err).toContain("Plan path must resolve inside this project's plans directory:");
+    expect(err).toContain(linkPath);
+    expect(await readFile(outside, "utf8")).toBe("# keep me\n");
   });
 
   it("rejects nonexistent --path under plans/", async () => {
