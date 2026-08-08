@@ -206,6 +206,7 @@ describe("agents/hook-runtime", () => {
         version: string;
       };
       expect(manifest.mode).toBe("copy");
+      expect(manifest).not.toHaveProperty("nodePath");
       expect(manifest.version).toBe("9.9.9");
     });
 

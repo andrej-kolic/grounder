@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -37,6 +37,14 @@ async function rewriteCommandFileNodePaths(filePath: string, nodePath: string): 
     throw new Error(`no current execPath invocation in ${filePath}`);
   }
   await writeFile(filePath, text.replaceAll(from, shellQuote(nodePath)));
+}
+
+/** Present file without execute bit — X_OK is meaningful on POSIX only. */
+async function writeNonExecutableNodeStub(homeDir: string): Promise<string> {
+  const nodePath = path.join(homeDir, "non-executable-node");
+  await writeFile(nodePath, "#!/bin/sh\necho stub\n");
+  await chmod(nodePath, 0o644);
+  return nodePath;
 }
 
 describe("commands/doctor", () => {
@@ -531,6 +539,36 @@ describe("commands/doctor", () => {
     expect(out).toContain("→ grounder migrate");
   });
 
+  it.skipIf(process.platform === "win32")(
+    "fails when the session hook Node interpreter exists but is not executable",
+    async () => {
+      const env = await createTempEnv({ packageName: "my-app" });
+      cleanup = env.cleanup;
+
+      await runVaultInitWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        hooks: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      });
+      await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+      const nonExecNode = await writeNonExecutableNodeStub(env.home);
+      await rewriteCursorHookNodePath(env.home, nonExecNode);
+
+      const { code, out } = await captureStdout(() =>
+        runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+      );
+
+      expect(code).toBe(1);
+      expect(out).toContain("fail  agent-cursor-hooks");
+      expect(out).toContain("Node interpreter missing or not executable");
+      expect(out).toContain(nonExecNode);
+      expect(out).toContain("→ grounder migrate");
+    },
+  );
+
   it("does not flag a different-but-still-executable Node path in the session hook", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
@@ -555,6 +593,38 @@ describe("commands/doctor", () => {
     expect(code).toBe(0);
     expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).not.toContain("Node interpreter missing or not executable");
+  });
+
+  it("does not fail interpreter check for legacy npx session hooks", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const hooksPath = cursorHooksJsonPath(env.home);
+    const parsed = JSON.parse(await readFile(hooksPath, "utf8")) as {
+      hooks?: { sessionStart?: Array<{ command?: string }> };
+    };
+    const entry = parsed.hooks?.sessionStart?.[0];
+    if (!entry) {
+      throw new Error("expected Cursor Grounder sessionStart hook");
+    }
+    entry.command = "npx grounder handoff peek --json";
+    await writeFile(hooksPath, `${JSON.stringify(parsed, null, 2)}\n`);
+
+    const { out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(out).not.toContain("Node interpreter missing or not executable");
+    expect(out).toContain("agent-cursor-hooks");
   });
 
   it("fails when a slash-command Node interpreter is missing", async () => {
@@ -582,6 +652,35 @@ describe("commands/doctor", () => {
     expect(out).toContain(missingNode);
     expect(out).toContain("→ grounder migrate");
   });
+
+  it.skipIf(process.platform === "win32")(
+    "fails when a slash-command Node interpreter exists but is not executable",
+    async () => {
+      const env = await createTempEnv({ packageName: "my-app" });
+      cleanup = env.cleanup;
+
+      await runVaultInitWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      });
+      await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+      const nonExecNode = await writeNonExecutableNodeStub(env.home);
+      await rewriteCommandFileNodePaths(grounderNoteCommandPath(env.home), nonExecNode);
+
+      const { code, out } = await captureStdout(() =>
+        runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+      );
+
+      expect(code).toBe(1);
+      expect(out).toContain("fail  agent-cursor");
+      expect(out).toContain("command Node interpreter missing or not executable");
+      expect(out).toContain(nonExecNode);
+      expect(out).toContain("→ grounder migrate");
+    },
+  );
 
   it("does not flag a different-but-still-executable Node path in slash commands", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
