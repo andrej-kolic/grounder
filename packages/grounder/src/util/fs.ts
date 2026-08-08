@@ -1,10 +1,24 @@
-import { access, writeFile } from "node:fs/promises";
+import { access, constants, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { collisionSuffix } from "./timestamp-slug.js";
 
 export async function fileExists(filePath: string): Promise<boolean> {
   try {
     await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True when `filePath` is present and executable (`X_OK`).
+ * On Windows, `X_OK` effectively degrades toward existence — callers should
+ * not oversell POSIX execute-bit semantics there.
+ */
+export async function isExecutable(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath, constants.X_OK);
     return true;
   } catch {
     return false;

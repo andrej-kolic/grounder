@@ -120,7 +120,7 @@ Three channels, no new product surface:
 
 | Channel | Role |
 | --- | --- |
-| **`grounder doctor` / `status`** | Checks install state. Schema stale → warn + migrate. Schema too new → fail (upgrade grounder). Also shows package mismatch when present. |
+| **`grounder doctor` / `status`** | Checks install state. Schema stale → warn + migrate. Schema too new → fail (upgrade grounder). Also shows package mismatch when present. Missing/non-executable Node in hooks or commands → fail + migrate ([details](./runtime-invocation.md)). |
 | **Session hook / `handoff peek`** | Checks **schemas only**. One-line teaser: `Install outdated — run: grounder migrate`. No auto-migrate. |
 | **CLI upgrade banner** | Checks **`grounderVersion` only**. Package newer → migrate. Package older → install a newer Grounder. Skipped for peek, migrate, and vault init. |
 

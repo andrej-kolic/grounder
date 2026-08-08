@@ -3,12 +3,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  extractRuntimeNodePath,
+  findRuntimeNodePathsInText,
   grounderRuntimeDir,
   installHookRuntime,
   isGrounderPeekHookCommand,
   isHookRuntimeStale,
   peekHookCommand,
   runtimeCliPath,
+  runtimeInvocation,
   runtimeManifestPath,
   shellQuote,
 } from "../../src/agents/hook-runtime.js";
@@ -73,6 +76,76 @@ describe("agents/hook-runtime", () => {
     });
   });
 
+  describe("extractRuntimeNodePath", () => {
+    it("extracts the node path from a home-runtime invocation", () => {
+      expect(
+        extractRuntimeNodePath(
+          "'/bin/node' '/Users/me/.grounder/runtime/dist/cli.js' handoff peek",
+        ),
+      ).toBe("/bin/node");
+      expect(extractRuntimeNodePath(runtimeInvocation("/tmp/home"))).toBe(process.execPath);
+      expect(extractRuntimeNodePath(`  ${peekHookCommand("/tmp/home")}  `)).toBe(process.execPath);
+    });
+
+    it("reverses shellQuote escaping for a path with an embedded quote", () => {
+      const nodePath = "/Users/o'brien/.nvm/versions/node/v22.0.0/bin/node";
+      const cmd = `${shellQuote(nodePath)} ${shellQuote("/home/me/.grounder/runtime/dist/cli.js")} handoff peek`;
+      expect(cmd).toContain(`'\\''`);
+      expect(extractRuntimeNodePath(cmd)).toBe(nodePath);
+    });
+
+    it("accepts Windows absolute paths", () => {
+      expect(
+        extractRuntimeNodePath(
+          "'C:\\Program Files\\node.exe' 'C:\\Users\\me\\.grounder\\runtime\\dist\\cli.js' handoff peek",
+        ),
+      ).toBe("C:\\Program Files\\node.exe");
+    });
+
+    it("skips legacy npx forms (no absolute interpreter)", () => {
+      expect(extractRuntimeNodePath("npx grounder handoff peek")).toBeNull();
+      expect(extractRuntimeNodePath("npx grounder handoff peek --json")).toBeNull();
+      expect(extractRuntimeNodePath("  npx grounder handoff peek  ")).toBeNull();
+    });
+
+    it("returns null for non-matching shapes", () => {
+      expect(extractRuntimeNodePath(undefined)).toBeNull();
+      expect(extractRuntimeNodePath("echo hello")).toBeNull();
+      expect(extractRuntimeNodePath("'npx' 'grounder' handoff peek")).toBeNull();
+      expect(extractRuntimeNodePath("'/bin/node' '/opt/other/cli.js' handoff peek")).toBeNull();
+      expect(extractRuntimeNodePath("'/bin/node'")).toBeNull();
+      // Relative / non-absolute first token — not the runtime shape
+      expect(
+        extractRuntimeNodePath(
+          "'zzzUsers/me/.nvm/node' '/Users/me/.grounder/runtime/dist/cli.js' note x",
+        ),
+      ).toBeNull();
+    });
+  });
+
+  describe("findRuntimeNodePathsInText", () => {
+    it("finds invocations embedded mid-line (slash-command markdown)", () => {
+      const text = [
+        "Save a note.",
+        "",
+        "  '/opt/node' '/Users/me/.grounder/runtime/dist/cli.js' note \"<user text>\"",
+        "",
+        "Also run `'/bin/node' '/home/u/.grounder/runtime/dist/cli.js' handoff list --head`.",
+      ].join("\n");
+      expect(findRuntimeNodePathsInText(text)).toEqual(["/opt/node", "/bin/node"]);
+    });
+
+    it("dedupes repeated paths and skips non-runtime shapes", () => {
+      const text = [
+        "'/opt/node' '/x/.grounder/runtime/dist/cli.js' note a",
+        "'/opt/node' '/x/.grounder/runtime/dist/cli.js' note b",
+        "npx grounder note hi",
+        "'zzzUsers/x' '/x/.grounder/runtime/dist/cli.js' note c",
+      ].join("\n");
+      expect(findRuntimeNodePathsInText(text)).toEqual(["/opt/node"]);
+    });
+  });
+
   describe("peekHookCommand", () => {
     it("points at home runtime cli with quoted node path", () => {
       const cmd = peekHookCommand("/tmp/home");
@@ -107,10 +180,9 @@ describe("agents/hook-runtime", () => {
       const manifest = JSON.parse(await readFile(runtimeManifestPath(env.home), "utf8")) as {
         mode: string;
         version: string;
-        nodePath: string;
       };
       expect(manifest.mode).toBe("symlink");
-      expect(manifest.nodePath).toBe(process.execPath);
+      expect(manifest).not.toHaveProperty("nodePath");
       expect(manifest.version).toMatch(/^\d+\.\d+\.\d+/);
       expect(grounderRuntimeDir(env.home)).toBe(path.join(env.home, ".grounder", "runtime"));
     });
@@ -134,6 +206,7 @@ describe("agents/hook-runtime", () => {
         version: string;
       };
       expect(manifest.mode).toBe("copy");
+      expect(manifest).not.toHaveProperty("nodePath");
       expect(manifest.version).toBe("9.9.9");
     });
 

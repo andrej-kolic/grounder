@@ -6,4 +6,6 @@ coverage/
 .env
 .env.*
 .pnpm-store/
+
+.grounder.json
 fixtures/dev/.grounder.json

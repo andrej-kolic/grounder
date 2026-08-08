@@ -283,7 +283,7 @@ That refresh only touches the shared runtime, not installed command files — se
 | Session-start teaser missing (optional) | `grounder migrate --hooks` — `doctor` warns when absent |
 | Shared runtime stale after upgrade (bare npx install) | `grounder migrate` — `doctor` warns when `hook-runtime` is stale |
 | Migrate skips all commands as locally modified (first run after upgrade) | `grounder migrate --force` once, then plain `migrate` on later upgrades |
-| Switched Node version / nvm environment (command files invoke the old `node`) | `grounder migrate` (add `--force` if files were edited or you’re still on a pre-0.3 install) |
+| Node binary gone / not executable (`doctor` fails on hook or command interpreter path) | `grounder migrate` (add `--force` if command files were edited or you’re still on a pre-0.3 install) |
 
 ## Development
 
