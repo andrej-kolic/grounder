@@ -127,6 +127,7 @@ grounder handoff list        Print recent handoff paths (newest first)
 grounder handoff list --head Print only the newest usable handoff path
 grounder handoff peek        One-line latest-handoff teaser (used by session hooks)
 grounder plan <text>         Write/update a named plan under vault plans/
+grounder plan list           Print recent plan paths (newest first)
 grounder path notes          Print resolved notes directory
 grounder path logs           Print resolved logs directory
 grounder path plans          Print resolved plans directory
@@ -162,17 +163,18 @@ See [Upgrading](#upgrading) for the usual post-package-upgrade flow. Untouched c
 | Flag | Commands | Description |
 | --- | --- | --- |
 | `--title <slug>` | `note`, `handoff` | Filename slug (default: slugified text / first line) |
-| `--limit <n>` | `handoff list` | Max paths to print (default: 5) |
+| `--limit <n>` | `handoff list`, `plan list` | Max paths to print (default: 5) |
 | `--head` | `handoff list` | Print only the newest *usable* handoff path — skips empty/unreadable files, same pick as `handoff peek` |
 
 ### Plan flags
 
 | Flag | Commands | Description |
 | --- | --- | --- |
-| `--title <name>` | `plan` | **Required** filename (trailing `.md` ok; sanitized, max 80 chars; no auto-slug) |
-| `--force` | `plan` | Overwrite an existing plan (preserves original `created`, sets `updated`) |
+| `--title <name>` | `plan` | Filename stem when creating/updating by name (trailing `.md` ok; sanitized, max 80 chars; no auto-slug). Mutually exclusive with `--path`. |
+| `--path <file>` | `plan` | Update an existing plan by path (must resolve under this project's `plans/`; no title sanitization; always overwrites). Mutually exclusive with `--title`. |
+| `--force` | `plan` | With `--title`: overwrite an existing plan (preserves original `created`, sets `updated`). Not used with `--path`. |
 
-Unlike `note` / `handoff` (always a new dated file), `plan` is name-addressed: without `--force`, a second write to the same title refuses and exits 1.
+Unlike `note` / `handoff` (always a new dated file), `plan` is living: create or collide by `--title` (use `--force` to overwrite), or update an existing file in place with `--path`.
 
 ### Doctor flags
 

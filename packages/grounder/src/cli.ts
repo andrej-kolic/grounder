@@ -12,6 +12,7 @@ import { runNote } from "./commands/note.js";
 import { runPathLogs } from "./commands/path/logs.js";
 import { runPathNotes } from "./commands/path/notes.js";
 import { runPathPlans } from "./commands/path/plans.js";
+import { runPlanList } from "./commands/plan/list.js";
 import { runPlan } from "./commands/plan.js";
 import { runRepoInit } from "./commands/repo/init.js";
 import { runStatus } from "./commands/status.js";
@@ -99,6 +100,10 @@ async function main(): Promise<void> {
 
   if (command === "handoff") {
     process.exit(await runHandoff(rest));
+  }
+
+  if (command === "plan" && rest[0] === "list") {
+    process.exit(await runPlanList(rest.slice(1)));
   }
 
   if (command === "plan") {

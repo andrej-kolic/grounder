@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -197,14 +197,16 @@ describe("commands/plan", () => {
     const { code, err } = await captureStderr(() => runPlan([]));
     expect(code).toBe(1);
     expect(err).toContain("Usage: grounder plan <text> --title <name>");
+    expect(err).toContain("--path <file>");
   });
 
-  it("returns usage error when --title is missing", async () => {
+  it("returns usage error when --title and --path are both missing", async () => {
     const { code, err } = await captureStderr(() =>
       runPlanWithOptions({ text: planBody, homeDir: "/tmp/unused-grounder-home" }),
     );
     expect(code).toBe(1);
     expect(err).toContain("Usage: grounder plan <text> --title <name>");
+    expect(err).toContain("--path <file>");
   });
 
   it("returns usage error when --title sanitizes to empty", async () => {
@@ -217,6 +219,254 @@ describe("commands/plan", () => {
     );
     expect(code).toBe(1);
     expect(err).toContain("Usage: grounder plan <text> --title <name>");
+  });
+
+  it("rejects --title and --path together", async () => {
+    const { code, err } = await captureStderr(() =>
+      runPlanWithOptions({
+        text: planBody,
+        title: "phase-1",
+        planPath: "/tmp/plan.md",
+        homeDir: "/tmp/unused-grounder-home",
+      }),
+    );
+    expect(code).toBe(1);
+    expect(err).toContain("Use either --title or --path, not both.");
+  });
+
+  it("rejects --force with --path", async () => {
+    const { code, err } = await captureStderr(() =>
+      runPlanWithOptions({
+        text: planBody,
+        planPath: "/tmp/plan.md",
+        force: true,
+        homeDir: "/tmp/unused-grounder-home",
+      }),
+    );
+    expect(code).toBe(1);
+    expect(err).toContain("--force is not used with --path");
+  });
+
+  it("updates an existing plan by --path without sanitizing the filename", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
+    const spacedPath = path.join(plansDir, "document 1.md");
+    const createdAt = new Date("2026-06-26T14:30:00.000Z");
+    const updatedAt = new Date("2026-07-01T10:00:00.000Z");
+    await writeFile(
+      spacedPath,
+      [
+        "---",
+        'project: "my-app"',
+        `created: "${createdAt.toISOString()}"`,
+        "---",
+        "",
+        "# old\n",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const newBody = "# new conclusions\n";
+    const { code, out } = await captureStdout(() =>
+      runPlanWithOptions({
+        cwd: env.repo,
+        text: newBody,
+        planPath: spacedPath,
+        homeDir: env.home,
+        now: updatedAt,
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe(`Updated ${spacedPath}\n`);
+    const content = await readFile(spacedPath, "utf8");
+    expect(content).toContain(`created: "${createdAt.toISOString()}"\n`);
+    expect(content).toContain(`updated: "${updatedAt.toISOString()}"\n`);
+    expect(content.endsWith(newBody)).toBe(true);
+    await expect(readFile(path.join(plansDir, "document-1.md"), "utf8")).rejects.toThrow();
+  });
+
+  it("rejects --path outside this project's plans/", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const outside = path.join(env.vault, "10-Projects", "my-app", "notes", "sneaky.md");
+    await mkdir(path.dirname(outside), { recursive: true });
+    await writeFile(outside, "# no\n", "utf8");
+
+    const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
+    const { code, err } = await captureStderr(() =>
+      runPlanWithOptions({
+        cwd: env.repo,
+        text: planBody,
+        planPath: outside,
+        homeDir: env.home,
+      }),
+    );
+
+    expect(code).toBe(1);
+    expect(err).toContain("Plan path must resolve inside this project's plans directory:");
+    expect(err).toContain(plansDir);
+    expect(err).toContain(outside);
+  });
+
+  it("rejects --path that is a symlink pointing outside plans/", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
+    const outside = path.join(env.home, "outside-secret.md");
+    await writeFile(outside, "# keep me\n", "utf8");
+    const linkPath = path.join(plansDir, "escape.md");
+    await symlink(outside, linkPath);
+
+    const { code, err } = await captureStderr(() =>
+      runPlanWithOptions({
+        cwd: env.repo,
+        text: planBody,
+        planPath: linkPath,
+        homeDir: env.home,
+      }),
+    );
+
+    expect(code).toBe(1);
+    expect(err).toContain("Plan path must resolve inside this project's plans directory:");
+    expect(err).toContain(linkPath);
+    expect(await readFile(outside, "utf8")).toBe("# keep me\n");
+  });
+
+  it("rejects nonexistent --path under plans/", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const missing = path.join(env.vault, "10-Projects", "my-app", "plans", "missing.md");
+    const { code, err } = await captureStderr(() =>
+      runPlanWithOptions({
+        cwd: env.repo,
+        text: planBody,
+        planPath: missing,
+        homeDir: env.home,
+      }),
+    );
+
+    expect(code).toBe(1);
+    expect(err).toContain(`Plan not found: ${missing}`);
+  });
+
+  it("rejects --path that is not a .md file", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
+    const notMd = path.join(plansDir, "notes.txt");
+    await writeFile(notMd, "x", "utf8");
+
+    const { code, err } = await captureStderr(() =>
+      runPlanWithOptions({
+        cwd: env.repo,
+        text: planBody,
+        planPath: notMd,
+        homeDir: env.home,
+      }),
+    );
+
+    expect(code).toBe(1);
+    expect(err).toContain("Plan path must be a .md file under plans/:");
+    expect(err).toContain(notMd);
+  });
+
+  it("updates via relative --path resolved from cwd", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
+    const spacedPath = path.join(plansDir, "document 1.md");
+    await writeFile(
+      spacedPath,
+      [
+        "---",
+        'project: "my-app"',
+        'created: "2026-06-26T14:30:00.000Z"',
+        "---",
+        "",
+        "# old\n",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const relativePath = path.relative(env.repo, spacedPath);
+    expect(path.isAbsolute(relativePath)).toBe(false);
+
+    const { code, out } = await captureStdout(() =>
+      runPlanWithOptions({
+        cwd: env.repo,
+        text: "# relative update\n",
+        planPath: relativePath,
+        homeDir: env.home,
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe(`Updated ${spacedPath}\n`);
+    expect(await readFile(spacedPath, "utf8")).toContain("# relative update");
+  });
+
+  it("cli updates via --path", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const spacedPath = path.join(env.vault, "10-Projects", "my-app", "plans", "document 1.md");
+    await writeFile(
+      spacedPath,
+      [
+        "---",
+        'project: "my-app"',
+        'created: "2026-06-26T14:30:00.000Z"',
+        "---",
+        "",
+        "# old\n",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = runCli(
+      ["plan", "# Updated\n", "--path", spacedPath],
+      withGroundedHome(env.home),
+      env.repo,
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(`Updated ${spacedPath}`);
+    expect(await readFile(spacedPath, "utf8")).toContain("# Updated");
   });
 
   it("returns standard stderr hint when unlinked", async () => {

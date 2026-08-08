@@ -26,7 +26,8 @@ const QUICKSTART = `Quickstart:
   grounder note "my first note"
   grounder handoff $'# Handoff\\n\\n## Next\\n1. …'
   grounder handoff list
-  grounder plan $'# Goal\\n\\nShip it' --title phase-1`;
+  grounder plan $'# Goal\\n\\nShip it' --title phase-1
+  grounder plan list`;
 
 /**
  * Single registry driving synopsis, full help, and per-command help so they
@@ -106,10 +107,25 @@ Subcommands:
     group: "Write",
     summary: "Write/update a named plan under vault plans/",
     listUsage: "plan <text>",
-    usage: "grounder plan <text> --title <name> [--force]",
+    usage: "grounder plan <text> (--title <name> [--force] | --path <file>)",
     flags: `Flags:
-  --title <name> Required filename (trailing .md ok; sanitized, max 80 chars)
-  --force        Overwrite an existing plan (preserves original created)`,
+  --title <name> Required filename stem when creating/updating by name
+                 (trailing .md ok; sanitized, max 80 chars)
+  --path <file>  Update an existing plan by path (must resolve under this
+                 project's plans/; no title sanitization; always overwrites)
+  --force        With --title: overwrite an existing plan (preserves created)
+
+Subcommands:
+  plan list   Print recent plan paths (newest first)`,
+  },
+  {
+    id: "plan list",
+    group: "Write",
+    summary: "Print recent plan paths (newest first)",
+    listUsage: "plan list",
+    usage: "grounder plan list [--limit <n>]",
+    flags: `Flags:
+  --limit <n>  Max paths to print (default: 5)`,
   },
   {
     id: "path notes",
@@ -214,6 +230,7 @@ export const DISPATCHED_COMMAND_IDS = [
   "handoff list",
   "handoff peek",
   "plan",
+  "plan list",
   "path",
   "path notes",
   "path logs",

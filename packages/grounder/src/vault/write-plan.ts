@@ -39,6 +39,33 @@ function buildFrontmatter(options: {
 }
 
 /**
+ * Overwrites an existing plan at an absolute path.
+ * Preserves original `created` (falls back to `now` if missing) and sets `updated`.
+ * Caller must validate the path (e.g. inside this project's `plans/` dir).
+ */
+export async function updatePlanAtPath(
+  filePath: string,
+  body: string,
+  options: Omit<WritePlanOptions, "force">,
+): Promise<WritePlanResult> {
+  const now = options.now ?? new Date();
+  const existing = await readFile(filePath, "utf8");
+  const fm = parseHandoffFrontmatter(existing);
+  const created = fm.created ?? now.toISOString();
+  const updated = now.toISOString();
+
+  const content =
+    buildFrontmatter({
+      projectId: options.projectId,
+      created,
+      updated,
+    }) + body;
+
+  await writeFile(filePath, content, "utf8");
+  return { path: filePath, status: "overwritten" };
+}
+
+/**
  * Writes or updates a named plan markdown file under `plansDir` (created if missing).
  * Target is always `plansDir/<name>.md` — no collision suffixes.
  * Without `force`, an existing file is left untouched and status `"exists"` is returned.
@@ -60,23 +87,16 @@ export async function writePlan(
     return { path: filePath, status: "exists" };
   }
 
-  let created = now.toISOString();
-  let updated: string | undefined;
-
   if (exists && options.force) {
-    const existing = await readFile(filePath, "utf8");
-    const fm = parseHandoffFrontmatter(existing);
-    created = fm.created ?? created;
-    updated = now.toISOString();
+    return updatePlanAtPath(filePath, body, { projectId: options.projectId, now });
   }
 
   const content =
     buildFrontmatter({
       projectId: options.projectId,
-      created,
-      updated,
+      created: now.toISOString(),
     }) + body;
 
   await writeFile(filePath, content, "utf8");
-  return { path: filePath, status: exists ? "overwritten" : "created" };
+  return { path: filePath, status: "created" };
 }
