@@ -1,5 +1,6 @@
 import { withHomeDir } from "../../connector/home.js";
 import { resolveNotesDir } from "../../connector/vault.js";
+import { helpExitCode } from "../../help.js";
 import { requireLinkedProject } from "../require-linked.js";
 
 export interface PathNotesOptions {
@@ -7,7 +8,12 @@ export interface PathNotesOptions {
   homeDir?: string;
 }
 
-export async function runPathNotes(_argv: string[]): Promise<number> {
+export async function runPathNotes(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "path notes");
+  if (helpCode !== null) {
+    return helpCode;
+  }
+
   return runPathNotesWithOptions({});
 }
 

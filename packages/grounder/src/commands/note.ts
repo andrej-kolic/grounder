@@ -1,5 +1,6 @@
 import { withHomeDir } from "../connector/home.js";
 import { resolveNotesDir } from "../connector/vault.js";
+import { helpExitCode } from "../help.js";
 import { flagString, parseArgs } from "../util/parse-args.js";
 import { writeNote } from "../vault/write-note.js";
 import { requireLinkedProject } from "./require-linked.js";
@@ -13,6 +14,11 @@ export interface NoteOptions {
 }
 
 export async function runNote(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "note");
+  if (helpCode !== null) {
+    return helpCode;
+  }
+
   const { positional, flags } = parseArgs(argv);
   const text = positional.join(" ").trim();
 

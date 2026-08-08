@@ -10,6 +10,7 @@ import {
   resolvePlansDir,
   resolveVaultRoot,
 } from "../../connector/vault.js";
+import { helpExitCode } from "../../help.js";
 import { flagBool, flagString, parseArgs } from "../../util/parse-args.js";
 import { resolveUserPath } from "../../util/path.js";
 import { confirm } from "../../util/prompt.js";
@@ -24,6 +25,11 @@ export interface RepoInitOptions {
 }
 
 export async function runRepoInit(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "init");
+  if (helpCode !== null) {
+    return helpCode;
+  }
+
   const { flags } = parseArgs(argv);
   return runRepoInitWithOptions({
     yes: flagBool(flags, "yes", "y"),

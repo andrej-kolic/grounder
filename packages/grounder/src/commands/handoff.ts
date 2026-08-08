@@ -1,6 +1,7 @@
 import { currentBranch } from "../connector/git.js";
 import { withHomeDir } from "../connector/home.js";
 import { resolveLogsDir } from "../connector/vault.js";
+import { helpExitCode } from "../help.js";
 import { flagString, parseArgs } from "../util/parse-args.js";
 import { writeHandoff } from "../vault/write-handoff.js";
 import { requireLinkedProject } from "./require-linked.js";
@@ -24,6 +25,11 @@ export interface HandoffOptions {
  * @returns Exit code (`0` on success, `1` on usage or config errors).
  */
 export async function runHandoff(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "handoff");
+  if (helpCode !== null) {
+    return helpCode;
+  }
+
   const { positional, flags } = parseArgs(argv);
   const text = positional.join(" ").trim();
 

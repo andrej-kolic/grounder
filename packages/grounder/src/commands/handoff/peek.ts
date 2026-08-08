@@ -5,6 +5,7 @@ import { withHomeDir } from "../../connector/home.js";
 import { resolveLinkedProject } from "../../connector/linked.js";
 import { isInstallSchemaStale, readGrounderState } from "../../connector/state.js";
 import { resolveLogsDir } from "../../connector/vault.js";
+import { helpExitCode } from "../../help.js";
 import { parseHandoffFrontmatter } from "../../util/frontmatter.js";
 import { flagBool, parseArgs } from "../../util/parse-args.js";
 import { findUsableHandoff } from "../../vault/find-usable-handoff.js";
@@ -130,6 +131,11 @@ function composeTeaser(
  * @returns Always `0`.
  */
 export async function runHandoffPeek(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "handoff peek");
+  if (helpCode !== null) {
+    return helpCode;
+  }
+
   const { flags } = parseArgs(argv);
   const stdinWorkspaceRoot = await readCursorHookWorkspaceRoot(process.stdin);
   return runHandoffPeekWithOptions({

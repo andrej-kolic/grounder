@@ -1,5 +1,6 @@
 import { withHomeDir } from "../connector/home.js";
 import { resolvePlansDir } from "../connector/vault.js";
+import { helpExitCode } from "../help.js";
 import { flagBool, flagString, parseArgs } from "../util/parse-args.js";
 import { sanitizePlanName } from "../util/plan-name.js";
 import { writePlan } from "../vault/write-plan.js";
@@ -26,6 +27,11 @@ export interface PlanOptions {
  * @returns Exit code (`0` on success, `1` on usage or config errors).
  */
 export async function runPlan(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "plan");
+  if (helpCode !== null) {
+    return helpCode;
+  }
+
   const { positional, flags } = parseArgs(argv);
   const text = positional.join(" ").trim();
 

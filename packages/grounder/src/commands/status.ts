@@ -16,6 +16,7 @@ import {
   resolvePlansDir,
   resolveVaultRoot,
 } from "../connector/vault.js";
+import { helpExitCode } from "../help.js";
 import { VERSION } from "../index.js";
 import { packageVersionNotice } from "./package-version-notice.js";
 
@@ -97,7 +98,12 @@ async function writeInstallStateLine(homeDir?: string): Promise<void> {
   }
 }
 
-export async function runStatus(_argv: string[]): Promise<number> {
+export async function runStatus(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "status");
+  if (helpCode !== null) {
+    return helpCode;
+  }
+
   return runStatusWithOptions({});
 }
 

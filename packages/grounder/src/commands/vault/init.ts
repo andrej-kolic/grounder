@@ -7,6 +7,7 @@ import {
   withHomeDir,
   writeHomeConfig,
 } from "../../connector/home.js";
+import { helpExitCode } from "../../help.js";
 import { flagBool, flagStrings, parseArgs } from "../../util/parse-args.js";
 import { resolveUserPath } from "../../util/path.js";
 import { confirm } from "../../util/prompt.js";
@@ -25,6 +26,11 @@ export interface VaultInitOptions {
 }
 
 export async function runVaultInit(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "vault init");
+  if (helpCode !== null) {
+    return helpCode;
+  }
+
   const { positional, flags, repeated } = parseArgs(argv);
   const vaultPathArg = positional[0];
   const yes = flagBool(flags, "yes", "y");

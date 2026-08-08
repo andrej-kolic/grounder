@@ -1,5 +1,6 @@
 import { withHomeDir } from "../../connector/home.js";
 import { resolvePlansDir } from "../../connector/vault.js";
+import { helpExitCode } from "../../help.js";
 import { requireLinkedProject } from "../require-linked.js";
 
 export interface PathPlansOptions {
@@ -7,7 +8,12 @@ export interface PathPlansOptions {
   homeDir?: string;
 }
 
-export async function runPathPlans(_argv: string[]): Promise<number> {
+export async function runPathPlans(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "path plans");
+  if (helpCode !== null) {
+    return helpCode;
+  }
+
   return runPathPlansWithOptions({});
 }
 
