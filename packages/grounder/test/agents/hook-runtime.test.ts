@@ -3,12 +3,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  extractRuntimeNodePath,
   grounderRuntimeDir,
   installHookRuntime,
   isGrounderPeekHookCommand,
   isHookRuntimeStale,
   peekHookCommand,
   runtimeCliPath,
+  runtimeInvocation,
   runtimeManifestPath,
   shellQuote,
 } from "../../src/agents/hook-runtime.js";
@@ -70,6 +72,47 @@ describe("agents/hook-runtime", () => {
       expect(isGrounderPeekHookCommand("npx grounder note hi")).toBe(false);
       expect(isGrounderPeekHookCommand("echo hello")).toBe(false);
       expect(isGrounderPeekHookCommand(undefined)).toBe(false);
+    });
+  });
+
+  describe("extractRuntimeNodePath", () => {
+    it("extracts the node path from a home-runtime invocation", () => {
+      expect(
+        extractRuntimeNodePath(
+          "'/bin/node' '/Users/me/.grounder/runtime/dist/cli.js' handoff peek",
+        ),
+      ).toBe("/bin/node");
+      expect(extractRuntimeNodePath(runtimeInvocation("/tmp/home"))).toBe(process.execPath);
+      expect(extractRuntimeNodePath(`  ${peekHookCommand("/tmp/home")}  `)).toBe(process.execPath);
+    });
+
+    it("reverses shellQuote escaping for a path with an embedded quote", () => {
+      const nodePath = "/Users/o'brien/.nvm/versions/node/v22.0.0/bin/node";
+      const cmd = `${shellQuote(nodePath)} ${shellQuote("/home/me/.grounder/runtime/dist/cli.js")} handoff peek`;
+      expect(cmd).toContain(`'\\''`);
+      expect(extractRuntimeNodePath(cmd)).toBe(nodePath);
+    });
+
+    it("accepts Windows absolute paths", () => {
+      expect(
+        extractRuntimeNodePath(
+          "'C:\\Program Files\\node.exe' 'C:\\Users\\me\\.grounder\\runtime\\dist\\cli.js' handoff peek",
+        ),
+      ).toBe("C:\\Program Files\\node.exe");
+    });
+
+    it("skips legacy npx forms (no absolute interpreter)", () => {
+      expect(extractRuntimeNodePath("npx grounder handoff peek")).toBeNull();
+      expect(extractRuntimeNodePath("npx grounder handoff peek --json")).toBeNull();
+      expect(extractRuntimeNodePath("  npx grounder handoff peek  ")).toBeNull();
+    });
+
+    it("returns null for non-matching shapes", () => {
+      expect(extractRuntimeNodePath(undefined)).toBeNull();
+      expect(extractRuntimeNodePath("echo hello")).toBeNull();
+      expect(extractRuntimeNodePath("'npx' 'grounder' handoff peek")).toBeNull();
+      expect(extractRuntimeNodePath("'/bin/node' '/opt/other/cli.js' handoff peek")).toBeNull();
+      expect(extractRuntimeNodePath("'/bin/node'")).toBeNull();
     });
   });
 

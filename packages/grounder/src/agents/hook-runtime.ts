@@ -49,8 +49,8 @@
  *    `"npx grounder handoff peek"` and `installCommand` back to a plain
  *    `copyFile` (drop the `{{GROUNDER_CLI}}` template substitution), dropping
  *    calls to {@link installHookRuntime} / {@link peekHookCommand} /
- *    {@link runtimeInvocation} / {@link isGrounderPeekHookCommand} /
- *    {@link isHookRuntimeStale}.
+ *    {@link runtimeInvocation} / {@link extractRuntimeNodePath} /
+ *    {@link isGrounderPeekHookCommand} / {@link isHookRuntimeStale}.
  * 3. Remove runtime paths from `expectedHookArtifacts` and docs that mention
  *    `~/.grounder/runtime`, and revert templates' `{{GROUNDER_CLI}}` back to
  *    literal `npx grounder`.
@@ -105,6 +105,70 @@ export function runtimeManifestPath(homeDir?: string): string {
  */
 export function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * Reverse one {@link shellQuote} token starting at `start`.
+ * Handles the close/escape/reopen sequence (`'\''`) for embedded quotes.
+ */
+function parseShellQuoted(input: string, start: number): { value: string; next: number } | null {
+  if (input[start] !== "'") {
+    return null;
+  }
+  let i = start + 1;
+  let value = "";
+  while (i < input.length) {
+    if (input[i] === "'") {
+      // shellQuote escape: close quote, literal `'`, reopen — characters `'\''`
+      if (input[i + 1] === "\\" && input[i + 2] === "'" && input[i + 3] === "'") {
+        value += "'";
+        i += 4;
+        continue;
+      }
+      return { value, next: i + 1 };
+    }
+    value += input[i];
+    i += 1;
+  }
+  return null;
+}
+
+function isAbsolutePath(p: string): boolean {
+  return path.posix.isAbsolute(p) || path.win32.isAbsolute(p);
+}
+
+/**
+ * Extract the baked Node interpreter path from a home-runtime invocation
+ * string (`'<abs node>' '<abs …/runtime/dist/cli.js>' …`).
+ *
+ * Returns `null` when the string is not that exact shape — including legacy
+ * `npx grounder …` entries, which have no absolute interpreter to validate.
+ */
+export function extractRuntimeNodePath(command: unknown): string | null {
+  if (typeof command !== "string") {
+    return null;
+  }
+  const trimmed = command.trim();
+  const first = parseShellQuoted(trimmed, 0);
+  if (!first || !isAbsolutePath(first.value)) {
+    return null;
+  }
+  let i = first.next;
+  if (trimmed[i] !== " ") {
+    return null;
+  }
+  while (trimmed[i] === " ") {
+    i += 1;
+  }
+  const second = parseShellQuoted(trimmed, i);
+  if (!second) {
+    return null;
+  }
+  const cliNormalized = second.value.replace(/\\/g, "/");
+  if (!cliNormalized.includes("/.grounder/runtime/dist/cli.js")) {
+    return null;
+  }
+  return first.value;
 }
 
 /**
