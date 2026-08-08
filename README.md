@@ -65,3 +65,4 @@ Agent-agnostic core (`connector/`, `vault/`, `commands/`) plus a pluggable `agen
 Design notes for contributors (not user how-tos):
 
 - [Schema versioning and install migration](docs/architecture/schema-versioning.md) — `state.json`, hash drift, `grounder migrate`, forward-compat
+- [Runtime invocation](docs/architecture/runtime-invocation.md) — baked Node + `~/.grounder/runtime`, doctor dangling-interpreter check
