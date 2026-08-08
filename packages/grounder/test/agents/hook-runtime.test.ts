@@ -107,10 +107,9 @@ describe("agents/hook-runtime", () => {
       const manifest = JSON.parse(await readFile(runtimeManifestPath(env.home), "utf8")) as {
         mode: string;
         version: string;
-        nodePath: string;
       };
       expect(manifest.mode).toBe("symlink");
-      expect(manifest.nodePath).toBe(process.execPath);
+      expect(manifest).not.toHaveProperty("nodePath");
       expect(manifest.version).toMatch(/^\d+\.\d+\.\d+/);
       expect(grounderRuntimeDir(env.home)).toBe(path.join(env.home, ".grounder", "runtime"));
     });

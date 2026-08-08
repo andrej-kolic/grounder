@@ -81,7 +81,6 @@ const defaultPackageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.u
 export interface HookRuntimeManifest {
   mode: "symlink" | "copy";
   version: string;
-  nodePath: string;
   sourcePackageRoot: string;
   installedAt: string;
 }
@@ -211,7 +210,6 @@ async function readRuntimeManifest(homeDir?: string): Promise<HookRuntimeManifes
     return {
       mode: raw.mode,
       version: raw.version,
-      nodePath: typeof raw.nodePath === "string" ? raw.nodePath : "",
       sourcePackageRoot: typeof raw.sourcePackageRoot === "string" ? raw.sourcePackageRoot : "",
       installedAt: typeof raw.installedAt === "string" ? raw.installedAt : "",
     };
@@ -343,7 +341,6 @@ export async function installHookRuntime(options: {
   const manifest: HookRuntimeManifest = {
     mode,
     version: await readPackageVersion(packageRoot),
-    nodePath: process.execPath,
     sourcePackageRoot: packageRoot,
     installedAt: new Date().toISOString(),
   };
