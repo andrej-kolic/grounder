@@ -19,6 +19,7 @@ describe("help", () => {
 
   it("resolves nested topics with longest match", () => {
     expect(resolveCommandHelp(["handoff", "list"])?.id).toBe("handoff list");
+    expect(resolveCommandHelp(["plan", "list"])?.id).toBe("plan list");
     expect(resolveCommandHelp(["handoff"])?.id).toBe("handoff");
     expect(resolveCommandHelp(["vault"])?.id).toBe("vault");
     expect(resolveCommandHelp(["vault", "init"])?.id).toBe("vault init");

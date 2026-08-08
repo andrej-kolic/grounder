@@ -84,6 +84,8 @@ describe("grounder cli", () => {
     for (const [args, needle] of [
       [["handoff", "list", "--help"], "handoff list"],
       [["help", "handoff", "list"], "handoff list"],
+      [["plan", "list", "--help"], "plan list"],
+      [["help", "plan", "list"], "plan list"],
       [["handoff", "peek", "--help"], "handoff peek"],
       [["vault", "init", "--help"], "vault init"],
       [["help", "vault", "init"], "vault init"],

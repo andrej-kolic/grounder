@@ -26,6 +26,7 @@ vault/                # vault on disk
   write-handoff.ts    # handoff file I/O (frontmatter + body)
   write-plan.ts       # plan file I/O (named, updatable; --force)
   list-handoffs.ts    # list logs/*.md newest-first
+  list-plans.ts       # list plans/*.md newest mtime first
   find-usable-handoff.ts # newest-first, skipping empty/unreadable (peek + list --head)
 commands/             # mirrors CLI structure
   require-linked.ts   # CLI stderr wrapper around resolveLinkedProject
@@ -35,6 +36,7 @@ commands/             # mirrors CLI structure
   handoff.ts          # grounder handoff
   handoff/list.ts     # grounder handoff list
   plan.ts             # grounder plan
+  plan/list.ts        # grounder plan list
   path/notes.ts       # grounder path notes
   path/logs.ts        # grounder path logs
   path/plans.ts       # grounder path plans
