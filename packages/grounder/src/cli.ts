@@ -28,6 +28,18 @@ function printVersion(): void {
   process.stdout.write(`${pkg.version}\n`);
 }
 
+function exitUnknownCommand(args: string[]): never {
+  process.stderr.write(`Unknown command: ${args.join(" ")}\n`);
+  process.stderr.write("Run `grounder --help` for a list of commands.\n");
+  process.exit(1);
+}
+
+/** Parent topic with no/unknown subcommand: print usage (exit 1) or help (exit 0). */
+function exitParentTopic(commandId: string, asHelp: boolean): never {
+  printCommandHelpById(commandId);
+  process.exit(asHelp ? 0 : 1);
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -66,13 +78,7 @@ async function main(): Promise<void> {
     if (rest[0] === "init") {
       process.exit(await runVaultInit(rest.slice(1)));
     }
-    if (wantsHelp(rest)) {
-      printCommandHelpById("vault init");
-      process.exit(0);
-    }
-    process.stderr.write(`Unknown command: ${args.join(" ")}\n`);
-    process.stderr.write("Run `grounder --help` for a list of commands.\n");
-    process.exit(1);
+    exitParentTopic("vault", wantsHelp(rest) || rest.length === 0);
   }
 
   if (command === "init") {
@@ -109,13 +115,7 @@ async function main(): Promise<void> {
     if (rest[0] === "plans") {
       process.exit(await runPathPlans(rest.slice(1)));
     }
-    if (wantsHelp(rest)) {
-      printCommandHelpById("path");
-      process.exit(0);
-    }
-    process.stderr.write(`Unknown command: ${args.join(" ")}\n`);
-    process.stderr.write("Run `grounder --help` for a list of commands.\n");
-    process.exit(1);
+    exitParentTopic("path", wantsHelp(rest) || rest.length === 0);
   }
 
   if (command === "status") {
@@ -130,9 +130,7 @@ async function main(): Promise<void> {
     process.exit(await runMigrate(rest));
   }
 
-  process.stderr.write(`Unknown command: ${args.join(" ")}\n`);
-  process.stderr.write("Run `grounder --help` for a list of commands.\n");
-  process.exit(1);
+  exitUnknownCommand(args);
 }
 
 main().catch((error: unknown) => {

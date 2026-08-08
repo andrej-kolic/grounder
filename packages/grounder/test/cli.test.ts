@@ -33,6 +33,8 @@ describe("grounder cli", () => {
       expect(result.stdout).toContain("Write:");
       expect(result.stdout).toContain("Maintain:");
       expect(result.stdout).toContain("grounder help <command>");
+      // `help` is discoverable via global options / pointer, not the command list.
+      expect(result.stdout).not.toMatch(/^\s+help /m);
       expect(result.stdout).not.toContain("\nCommands:\n");
       expect(result.stdout).not.toContain("--dry-run");
       expect(result.stdout).not.toContain("Hook plumbing");
@@ -46,6 +48,8 @@ describe("grounder cli", () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("Setup:");
       expect(result.stdout).toContain("Commands:");
+      expect(result.stdout).toContain("Setup\nvault init");
+      expect(result.stdout).toContain("Write\nnote");
       expect(result.stdout).toContain("Usage: grounder vault init");
       expect(result.stdout).toContain("Usage: grounder note");
       expect(result.stdout).toContain("Usage: grounder plan");
@@ -83,13 +87,39 @@ describe("grounder cli", () => {
       [["handoff", "peek", "--help"], "handoff peek"],
       [["vault", "init", "--help"], "vault init"],
       [["help", "vault", "init"], "vault init"],
+      [["help", "vault"], "vault init"],
+      [["vault", "--help"], "vault init"],
       [["path", "notes", "--help"], "path notes"],
       [["help", "path", "notes"], "path notes"],
+      [["path", "--help"], "path <notes|logs|plans>"],
+      [["help", "path"], "path <notes|logs|plans>"],
     ] as const) {
       const result = run([...args]);
       expect(result.status).toBe(0);
       expect(result.stdout).toContain(`Usage: grounder ${needle}`);
     }
+  });
+
+  it("prints parent usage for bare vault/path", () => {
+    const vault = run(["vault"]);
+    expect(vault.status).toBe(0);
+    expect(vault.stdout).toContain("Usage: grounder vault init");
+    expect(vault.stdout).toContain("Subcommands:");
+
+    const pathCmd = run(["path"]);
+    expect(pathCmd.status).toBe(0);
+    expect(pathCmd.stdout).toContain("Usage: grounder path <notes|logs|plans>");
+    expect(pathCmd.stdout).toContain("Subcommands:");
+  });
+
+  it("prints parent usage (exit 1) for unknown vault/path subcommands", () => {
+    const vault = run(["vault", "nope"]);
+    expect(vault.status).toBe(1);
+    expect(vault.stdout).toContain("Usage: grounder vault init");
+
+    const pathCmd = run(["path", "nope"]);
+    expect(pathCmd.status).toBe(1);
+    expect(pathCmd.stdout).toContain("Usage: grounder path <notes|logs|plans>");
   });
 
   it("short-circuits --help before side effects on argument-less commands", async () => {

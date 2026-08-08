@@ -34,6 +34,16 @@ const QUICKSTART = `Quickstart:
  */
 export const COMMANDS: readonly CommandMeta[] = [
   {
+    id: "vault",
+    group: "Setup",
+    summary: "Vault setup commands",
+    listUsage: "vault init <path>",
+    usage: "grounder vault init <path> [--yes] [--force] [--agent <id>] [--hooks]",
+    list: false,
+    flags: `Subcommands:
+  vault init   Initialize vault + home config (once per machine)`,
+  },
+  {
     id: "vault init",
     group: "Setup",
     summary: "Initialize vault + home config (once per machine)",
@@ -179,6 +189,7 @@ Subcommands:
     summary: "Show help (full reference / per-command)",
     listUsage: "help [<command>]",
     usage: "grounder help [<command>]",
+    list: false,
     flags: `With no args, prints the full reference (same as --help).
 With a command id, prints that command's usage and flags.
 
@@ -189,6 +200,29 @@ Examples:
   grounder help vault init`,
   },
 ];
+
+/**
+ * Command ids the CLI dispatches (including parent topics). Keep in sync with
+ * `cli.ts` / `helpExitCode(...)` call sites — the invariant test locks this.
+ */
+export const DISPATCHED_COMMAND_IDS = [
+  "vault",
+  "vault init",
+  "init",
+  "note",
+  "handoff",
+  "handoff list",
+  "handoff peek",
+  "plan",
+  "path",
+  "path notes",
+  "path logs",
+  "path plans",
+  "status",
+  "doctor",
+  "migrate",
+  "help",
+] as const;
 
 const byId = new Map(COMMANDS.map((c) => [c.id, c]));
 
@@ -264,19 +298,29 @@ function formatGroupedLists(): string {
   return blocks.join("\n\n");
 }
 
+function formatCommandDetail(c: CommandMeta): string {
+  const lines = [`${c.id}`, `  Usage: ${c.usage}`];
+  if (c.flags) {
+    for (const line of c.flags.split("\n")) {
+      lines.push(line.length > 0 ? `  ${line}` : "");
+    }
+  }
+  return lines.join("\n");
+}
+
 function formatFullCommandDetails(): string {
-  return listedCommands()
-    .filter((c) => c.id !== "help")
-    .map((c) => {
-      const lines = [`${c.id}`, `  Usage: ${c.usage}`];
-      if (c.flags) {
-        for (const line of c.flags.split("\n")) {
-          lines.push(line.length > 0 ? `  ${line}` : "");
-        }
-      }
-      return lines.join("\n");
-    })
-    .join("\n\n");
+  const listed = listedCommands().filter((c) => c.id !== "help");
+  const blocks: string[] = [];
+
+  for (const group of GROUP_ORDER) {
+    const cmds = listed.filter((c) => c.group === group);
+    if (cmds.length === 0) {
+      continue;
+    }
+    blocks.push(`${group}\n${cmds.map(formatCommandDetail).join("\n\n")}`);
+  }
+
+  return blocks.join("\n\n");
 }
 
 /** Bare `grounder` / `-h` — short grouped synopsis (no flag encyclopedia). */
