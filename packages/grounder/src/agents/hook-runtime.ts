@@ -50,6 +50,8 @@
  *    `copyFile` (drop the `{{GROUNDER_CLI}}` template substitution), dropping
  *    calls to {@link installHookRuntime} / {@link peekHookCommand} /
  *    {@link runtimeInvocation} / {@link extractRuntimeNodePath} /
+ *    {@link findRuntimeNodePathsInText} /
+ *    {@link collectGrounderPeekHookCommands} / {@link hookFileGrounderPeekCommands} /
  *    {@link isGrounderPeekHookCommand} / {@link isHookRuntimeStale}.
  * 3. Remove runtime paths from `expectedHookArtifacts` and docs that mention
  *    `~/.grounder/runtime`, and revert templates' `{{GROUNDER_CLI}}` back to
@@ -172,6 +174,27 @@ export function extractRuntimeNodePath(command: unknown): string | null {
 }
 
 /**
+ * Find every baked Node interpreter path embedded in free-form text (slash-command
+ * markdown, etc.). Scans for the same `'<abs node>' '<abs …/cli.js>'` shape as
+ * {@link extractRuntimeNodePath}, including mid-line / backtick-wrapped uses.
+ */
+export function findRuntimeNodePathsInText(text: string): string[] {
+  const found: string[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== "'") {
+      continue;
+    }
+    const nodePath = extractRuntimeNodePath(text.slice(i));
+    if (nodePath !== null && !seen.has(nodePath)) {
+      seen.add(nodePath);
+      found.push(nodePath);
+    }
+  }
+  return found;
+}
+
+/**
  * Quoted `<node> <runtime cli.js>` prefix, shared by every home-runtime
  * invocation (session hooks and slash-command templates alike). Append
  * subcommand args to build a full command string.
@@ -210,32 +233,51 @@ export function isGrounderPeekHookCommand(command: unknown): boolean {
   );
 }
 
+/** Collect Grounder peek hook `command` strings nested anywhere in parsed JSON. */
+export function collectGrounderPeekHookCommands(value: unknown): string[] {
+  const out: string[] = [];
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) {
+      for (const item of v) {
+        walk(item);
+      }
+      return;
+    }
+    if (v && typeof v === "object") {
+      const obj = v as Record<string, unknown>;
+      if (typeof obj.command === "string" && isGrounderPeekHookCommand(obj.command)) {
+        out.push(obj.command);
+      }
+      for (const child of Object.values(obj)) {
+        walk(child);
+      }
+    }
+  };
+  walk(value);
+  return out;
+}
+
 /** True when any nested `command` field in parsed JSON is Grounder's peek hook. */
 export function jsonContainsGrounderPeekCommand(value: unknown): boolean {
-  if (Array.isArray(value)) {
-    return value.some(jsonContainsGrounderPeekCommand);
-  }
-  if (value && typeof value === "object") {
-    const obj = value as Record<string, unknown>;
-    if (isGrounderPeekHookCommand(obj.command)) {
-      return true;
+  return collectGrounderPeekHookCommands(value).length > 0;
+}
+
+/** Grounder peek hook command strings in a hooks/settings JSON file (empty if absent/unreadable). */
+export async function hookFileGrounderPeekCommands(filePath: string): Promise<string[]> {
+  try {
+    if (!(await fileExists(filePath))) {
+      return [];
     }
-    return Object.values(obj).some(jsonContainsGrounderPeekCommand);
+    const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
+    return collectGrounderPeekHookCommands(parsed);
+  } catch {
+    return [];
   }
-  return false;
 }
 
 /** True when a hooks/settings JSON file contains Grounder's peek hook entry. */
 export async function hookFileHasGrounderEntry(filePath: string): Promise<boolean> {
-  try {
-    if (!(await fileExists(filePath))) {
-      return false;
-    }
-    const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
-    return jsonContainsGrounderPeekCommand(parsed);
-  } catch {
-    return false;
-  }
+  return (await hookFileGrounderPeekCommands(filePath)).length > 0;
 }
 
 /**

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   extractRuntimeNodePath,
+  findRuntimeNodePathsInText,
   grounderRuntimeDir,
   installHookRuntime,
   isGrounderPeekHookCommand,
@@ -113,6 +114,35 @@ describe("agents/hook-runtime", () => {
       expect(extractRuntimeNodePath("'npx' 'grounder' handoff peek")).toBeNull();
       expect(extractRuntimeNodePath("'/bin/node' '/opt/other/cli.js' handoff peek")).toBeNull();
       expect(extractRuntimeNodePath("'/bin/node'")).toBeNull();
+      // Relative / non-absolute first token — not the runtime shape
+      expect(
+        extractRuntimeNodePath(
+          "'zzzUsers/me/.nvm/node' '/Users/me/.grounder/runtime/dist/cli.js' note x",
+        ),
+      ).toBeNull();
+    });
+  });
+
+  describe("findRuntimeNodePathsInText", () => {
+    it("finds invocations embedded mid-line (slash-command markdown)", () => {
+      const text = [
+        "Save a note.",
+        "",
+        "  '/opt/node' '/Users/me/.grounder/runtime/dist/cli.js' note \"<user text>\"",
+        "",
+        "Also run `'/bin/node' '/home/u/.grounder/runtime/dist/cli.js' handoff list --head`.",
+      ].join("\n");
+      expect(findRuntimeNodePathsInText(text)).toEqual(["/opt/node", "/bin/node"]);
+    });
+
+    it("dedupes repeated paths and skips non-runtime shapes", () => {
+      const text = [
+        "'/opt/node' '/x/.grounder/runtime/dist/cli.js' note a",
+        "'/opt/node' '/x/.grounder/runtime/dist/cli.js' note b",
+        "npx grounder note hi",
+        "'zzzUsers/x' '/x/.grounder/runtime/dist/cli.js' note c",
+      ].join("\n");
+      expect(findRuntimeNodePathsInText(text)).toEqual(["/opt/node"]);
     });
   });
 

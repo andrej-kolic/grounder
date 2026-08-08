@@ -1,6 +1,11 @@
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { hookFileHasGrounderEntry, isHookRuntimeStale } from "../agents/hook-runtime.js";
+import {
+  extractRuntimeNodePath,
+  findRuntimeNodePathsInText,
+  hookFileGrounderPeekCommands,
+  isHookRuntimeStale,
+} from "../agents/hook-runtime.js";
 import type { AgentAdapter } from "../agents/index.js";
 import { resolveAgents } from "../agents/index.js";
 import { findGitRoot } from "../connector/git.js";
@@ -23,7 +28,7 @@ import {
   resolveVaultRoot,
 } from "../connector/vault.js";
 import { VERSION } from "../index.js";
-import { fileExists } from "../util/fs.js";
+import { fileExists, isExecutable } from "../util/fs.js";
 import { flagBool, parseArgs } from "../util/parse-args.js";
 import { projectsParent } from "../vault/layout.js";
 import { type CheckResult, failCheck, okCheck, warnCheck } from "./check.js";
@@ -42,6 +47,16 @@ const MIGRATE_FORCE = "grounder migrate --force";
 const MIGRATE_HOOKS = "grounder migrate --hooks";
 const REPO_INIT = "grounder init";
 const UPGRADE_GROUNDER = "upgrade grounder";
+
+/** First baked Node path that is missing or not executable; `null` if all ok / none found. */
+async function firstDanglingRuntimeNode(nodePaths: Iterable<string>): Promise<string | null> {
+  for (const nodePath of nodePaths) {
+    if (!(await isExecutable(nodePath))) {
+      return nodePath;
+    }
+  }
+  return null;
+}
 
 /**
  * Commands installed before Grounder 0.3 have no per-file content hash, so
@@ -274,7 +289,30 @@ async function checkAgentArtifacts(
     const id = `agent-${agent.id}`;
 
     if (presentCount === expected.length) {
-      if (commandsSchemaAhead(agent, state, stateReadable)) {
+      // Missing/non-executable baked Node in slash-command markdown → fail.
+      // Do not compare to process.execPath. Legacy npx / non-runtime shapes skip.
+      const texts = await Promise.all(
+        expected.map(async (p) => {
+          try {
+            return await readFile(p, "utf8");
+          } catch {
+            return "";
+          }
+        }),
+      );
+      const danglingNode = await firstDanglingRuntimeNode(
+        texts.flatMap((text) => findRuntimeNodePathsInText(text)),
+      );
+
+      if (danglingNode) {
+        checks.push(
+          failCheck(
+            id,
+            `${agent.name} command Node interpreter missing or not executable (${danglingNode})`,
+            MIGRATE,
+          ),
+        );
+      } else if (commandsSchemaAhead(agent, state, stateReadable)) {
         const recorded = recordedCommandsSchema(state, agent.id);
         checks.push(
           failCheck(
@@ -345,12 +383,34 @@ async function checkAgentHooks(
     }
 
     const expected = agent.expectedHookArtifacts(homeDir);
-    const present = await Promise.all(expected.map((p) => hookFileHasGrounderEntry(p)));
+    const peekCommandsByFile = await Promise.all(
+      expected.map((p) => hookFileGrounderPeekCommands(p)),
+    );
+    const present = peekCommandsByFile.map((cmds) => cmds.length > 0);
     const id = `agent-${agent.id}-hooks`;
 
     if (present.every(Boolean) && expected.length > 0) {
       anyHooksInstalled = true;
-      if (hooksSchemaAhead(agent, state, stateReadable)) {
+
+      // Missing/non-executable baked Node → fail. Do not compare to
+      // process.execPath: a different-but-still-present install is fine.
+      // Legacy `npx` entries have no absolute interpreter (extract → null) — skip.
+      const danglingNode = await firstDanglingRuntimeNode(
+        peekCommandsByFile.flat().flatMap((cmd) => {
+          const nodePath = extractRuntimeNodePath(cmd);
+          return nodePath !== null ? [nodePath] : [];
+        }),
+      );
+
+      if (danglingNode) {
+        checks.push(
+          failCheck(
+            id,
+            `${agent.name} session hook Node interpreter missing or not executable (${danglingNode})`,
+            MIGRATE,
+          ),
+        );
+      } else if (hooksSchemaAhead(agent, state, stateReadable)) {
         const recorded = recordedHooksSchema(state, agent.id);
         checks.push(
           failCheck(

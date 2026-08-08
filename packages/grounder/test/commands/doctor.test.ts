@@ -1,8 +1,12 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { grounderTaskCommandPath } from "../../src/agents/cursor.js";
-import { grounderRuntimeDir } from "../../src/agents/hook-runtime.js";
+import {
+  cursorHooksJsonPath,
+  grounderNoteCommandPath,
+  grounderTaskCommandPath,
+} from "../../src/agents/cursor.js";
+import { grounderRuntimeDir, runtimeCliPath, shellQuote } from "../../src/agents/hook-runtime.js";
 import { runDoctorWithOptions } from "../../src/commands/doctor.js";
 import { runRepoInitWithOptions } from "../../src/commands/repo/init.js";
 import { runVaultInitWithOptions } from "../../src/commands/vault/init.js";
@@ -10,6 +14,30 @@ import { writeRepoConfig } from "../../src/connector/repo.js";
 import { statePath, writeGrounderState } from "../../src/connector/state.js";
 import { VERSION } from "../../src/index.js";
 import { captureStdout, createTempEnv } from "../helpers.js";
+
+/** Rewrite the Cursor sessionStart hook command's baked Node interpreter path. */
+async function rewriteCursorHookNodePath(homeDir: string, nodePath: string): Promise<void> {
+  const hooksPath = cursorHooksJsonPath(homeDir);
+  const parsed = JSON.parse(await readFile(hooksPath, "utf8")) as {
+    hooks?: { sessionStart?: Array<{ command?: string }> };
+  };
+  const entry = parsed.hooks?.sessionStart?.[0];
+  if (!entry || typeof entry.command !== "string") {
+    throw new Error("expected Cursor Grounder sessionStart hook");
+  }
+  entry.command = `${shellQuote(nodePath)} ${shellQuote(runtimeCliPath(homeDir))} handoff peek --json`;
+  await writeFile(hooksPath, `${JSON.stringify(parsed, null, 2)}\n`);
+}
+
+/** Replace every baked Node path in a slash-command markdown file. */
+async function rewriteCommandFileNodePaths(filePath: string, nodePath: string): Promise<void> {
+  const text = await readFile(filePath, "utf8");
+  const from = shellQuote(process.execPath);
+  if (!text.includes(from)) {
+    throw new Error(`no current execPath invocation in ${filePath}`);
+  }
+  await writeFile(filePath, text.replaceAll(from, shellQuote(nodePath)));
+}
 
 describe("commands/doctor", () => {
   let cleanup: (() => Promise<void>) | undefined;
@@ -474,6 +502,109 @@ describe("commands/doctor", () => {
       "hook runtime stale or missing (re-run after upgrading, especially bare npx) → grounder migrate",
     );
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
+  });
+
+  it("fails when the session hook Node interpreter is missing", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const missingNode = path.join(env.home, "no-such-node");
+    await rewriteCursorHookNodePath(env.home, missingNode);
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(1);
+    expect(out).toContain("fail  agent-cursor-hooks");
+    expect(out).toContain("Node interpreter missing or not executable");
+    expect(out).toContain(missingNode);
+    expect(out).toContain("→ grounder migrate");
+  });
+
+  it("does not flag a different-but-still-executable Node path in the session hook", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    // Any absolute executable is fine — doctor must not require process.execPath.
+    expect(process.execPath).not.toBe("/bin/sh");
+    await rewriteCursorHookNodePath(env.home, "/bin/sh");
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("ok    agent-cursor-hooks");
+    expect(out).not.toContain("Node interpreter missing or not executable");
+  });
+
+  it("fails when a slash-command Node interpreter is missing", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const missingNode = path.join(env.home, "no-such-node");
+    await rewriteCommandFileNodePaths(grounderNoteCommandPath(env.home), missingNode);
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(1);
+    expect(out).toContain("fail  agent-cursor");
+    expect(out).toContain("command Node interpreter missing or not executable");
+    expect(out).toContain(missingNode);
+    expect(out).toContain("→ grounder migrate");
+  });
+
+  it("does not flag a different-but-still-executable Node path in slash commands", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    expect(process.execPath).not.toBe("/bin/sh");
+    await rewriteCommandFileNodePaths(grounderNoteCommandPath(env.home), "/bin/sh");
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("ok    agent-cursor");
+    expect(out).not.toContain("command Node interpreter missing or not executable");
   });
 
   it("skips project checks with --global", async () => {
