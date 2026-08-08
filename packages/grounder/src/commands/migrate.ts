@@ -2,6 +2,7 @@ import { type AgentAdapter, ALL_AGENTS, resolveAgents } from "../agents/index.js
 import { readHomeConfig, withHomeDir } from "../connector/home.js";
 import { assertAgentSchemasSupported, readGrounderState, statePath } from "../connector/state.js";
 import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
+import { helpExitCode } from "../help.js";
 import { flagBool, flagStrings, parseArgs } from "../util/parse-args.js";
 import { applyAgentInstalls } from "./apply-agent-installs.js";
 
@@ -49,6 +50,11 @@ export async function resolveMigrateAgents(
 }
 
 export async function runMigrate(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "migrate");
+  if (helpCode !== null) {
+    return helpCode;
+  }
+
   const { flags, repeated } = parseArgs(argv);
   const agents = flagStrings(repeated, "agent");
   return runMigrateWithOptions({

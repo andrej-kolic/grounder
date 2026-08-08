@@ -1,5 +1,6 @@
 import { withHomeDir } from "../../connector/home.js";
 import { resolveLogsDir } from "../../connector/vault.js";
+import { helpExitCode } from "../../help.js";
 import { requireLinkedProject } from "../require-linked.js";
 
 export interface PathLogsOptions {
@@ -7,7 +8,12 @@ export interface PathLogsOptions {
   homeDir?: string;
 }
 
-export async function runPathLogs(_argv: string[]): Promise<number> {
+export async function runPathLogs(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "path logs");
+  if (helpCode !== null) {
+    return helpCode;
+  }
+
   return runPathLogsWithOptions({});
 }
 

@@ -27,7 +27,7 @@ Or run without installing:
 npx grounder --help
 ```
 
-`grounder -h` prints the full reference; `grounder -v` prints the installed version.
+`grounder -h` prints a short synopsis; `grounder --help` (or `grounder help`) prints the full reference; `grounder -v` prints the installed version.
 
 ## Upgrading
 
@@ -77,10 +77,10 @@ Both commands preview what they'll write and ask to confirm; add `--yes` to skip
 No agent, or want to write by hand? The same actions are plain CLI commands:
 
 ```bash
-grounder note "Investigate auth middleware"      # ad-hoc note
-grounder handoff "# Handoff: ...\n\n## Next\n1. ..."  # session checkpoint
-grounder handoff list                            # newest handoffs, for manual hydrate
-grounder plan "# Goal\n\nShip it" --title phase-1  # named living plan
+grounder note "Investigate auth middleware"           # ad-hoc note
+grounder handoff $'# Handoff: ...\n\n## Next\n1. ...' # session checkpoint
+grounder handoff list                                 # newest handoffs, for manual hydrate
+grounder plan $'# Goal\n\nShip it' --title phase-1    # named living plan
 ```
 
 Notes land in `<vault>/10-Projects/{projectId}/notes/`.  

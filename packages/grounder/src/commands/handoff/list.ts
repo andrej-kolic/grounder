@@ -1,5 +1,6 @@
 import { withHomeDir } from "../../connector/home.js";
 import { resolveLogsDir } from "../../connector/vault.js";
+import { helpExitCode } from "../../help.js";
 import { flagBool, parseArgs } from "../../util/parse-args.js";
 import { findUsableHandoff } from "../../vault/find-usable-handoff.js";
 import { listHandoffs } from "../../vault/list-handoffs.js";
@@ -36,6 +37,11 @@ function usageError(): number {
  * @returns Exit code (`0` on success, `1` on usage or config errors).
  */
 export async function runHandoffList(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "handoff list");
+  if (helpCode !== null) {
+    return helpCode;
+  }
+
   const { positional, flags } = parseArgs(argv);
   if (positional.length > 0) {
     return usageError();

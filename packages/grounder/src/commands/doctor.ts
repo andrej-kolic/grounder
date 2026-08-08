@@ -27,6 +27,7 @@ import {
   resolvePlansDir,
   resolveVaultRoot,
 } from "../connector/vault.js";
+import { helpExitCode } from "../help.js";
 import { VERSION } from "../index.js";
 import { fileExists, isExecutable } from "../util/fs.js";
 import { flagBool, parseArgs } from "../util/parse-args.js";
@@ -578,6 +579,11 @@ async function runProjectChecks(
 }
 
 export async function runDoctor(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "doctor");
+  if (helpCode !== null) {
+    return helpCode;
+  }
+
   const { flags } = parseArgs(argv);
   return runDoctorWithOptions({ global: flagBool(flags, "global") });
 }
