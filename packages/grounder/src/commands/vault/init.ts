@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import { installHookRuntime, runtimeCliPath } from "../../agents/hook-runtime.js";
+import { runtimeCliPath } from "../../agents/hook-runtime.js";
 import { resolveAgents } from "../../agents/index.js";
 import {
   homeConfigPath,
@@ -11,6 +11,7 @@ import { flagBool, flagStrings, parseArgs } from "../../util/parse-args.js";
 import { resolveUserPath } from "../../util/path.js";
 import { confirm } from "../../util/prompt.js";
 import { projectsParent } from "../../vault/layout.js";
+import { applyAgentInstalls } from "../apply-agent-installs.js";
 
 export interface VaultInitOptions {
   vaultPath: string;
@@ -101,37 +102,12 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
     process.stdout.write("✓ Wrote home config\n");
     process.stdout.write(`✓ Vault scaffold: ${projectsDir}\n`);
 
-    if (agents.length > 0) {
-      // Slash commands (and, if requested, session hooks) both point at this —
-      // materialize once, before any agent-specific install runs.
-      const runtime = await installHookRuntime({ homeDir });
-      const runtimeLabel =
-        runtime.status === "skipped"
-          ? "already exists (skipped)"
-          : `installed (${runtime.mode}): ${runtime.cliPath}`;
-      process.stdout.write(`✓ Grounder runtime ${runtimeLabel}\n`);
-    }
-
-    for (const agent of agents) {
-      const result = await agent.install({ force, homeDir });
-      for (const [artifactPath, status] of Object.entries(result.artifacts)) {
-        const label =
-          status === "skipped" ? "already exists (skipped)" : `installed: ${artifactPath}`;
-        process.stdout.write(`✓ ${agent.name} command ${label}\n`);
-      }
-      if (Object.keys(result.artifacts).length === 0) {
-        process.stdout.write(`✓ ${agent.name}: no artifacts to install yet\n`);
-      }
-
-      if (hooks && agent.installHooks) {
-        const hookResult = await agent.installHooks({ force, homeDir });
-        for (const [artifactPath, status] of Object.entries(hookResult.artifacts)) {
-          const label =
-            status === "skipped" ? "already exists (skipped)" : `installed: ${artifactPath}`;
-          process.stdout.write(`✓ ${agent.name} hook ${label}\n`);
-        }
-      }
-    }
+    await applyAgentInstalls({
+      agents,
+      force,
+      hooks,
+      homeDir,
+    });
 
     return 0;
   });

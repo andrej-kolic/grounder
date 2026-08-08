@@ -9,6 +9,7 @@ import {
 } from "../../../src/commands/handoff/peek.js";
 import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
 import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
+import { writeGrounderState } from "../../../src/connector/state.js";
 import { captureStdout, createTempEnv, withGroundedHome } from "../../helpers.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -406,5 +407,64 @@ body
       additional_context:
         '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.',
     });
+  });
+
+  it("appends migrate nudge when install schemas are stale", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await writeGrounderState(
+      {
+        grounderVersion: "0.2.0",
+        agents: { cursor: { commandsSchema: 0, hooksSchema: 0, files: {} } },
+      },
+      env.home,
+    );
+
+    const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
+    await writeFile(
+      path.join(logsDir, "2026-06-26-150000-auth.md"),
+      `---
+created: "2026-06-26T15:00:00.000Z"
+title: "auth"
+---
+
+body
+`,
+      "utf8",
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runHandoffPeekWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe(
+      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n[grounder] Install outdated — run: grounder migrate.\n',
+    );
+  });
+
+  it("prints migrate-only teaser when schemas are stale and there is no handoff", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await writeGrounderState(
+      {
+        grounderVersion: "0.2.0",
+        agents: { cursor: { commandsSchema: 0, files: {} } },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runHandoffPeekWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe("[grounder] Install outdated — run: grounder migrate.\n");
   });
 });

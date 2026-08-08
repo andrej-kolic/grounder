@@ -1,4 +1,5 @@
 import path from "node:path";
+import { ALL_AGENTS } from "../agents/index.js";
 import { currentBranch, findGitRoot } from "../connector/git.js";
 import { type HomeConfig, homeConfigPath, readHomeConfig, withHomeDir } from "../connector/home.js";
 import {
@@ -7,12 +8,16 @@ import {
   readRepoConfig,
   repoConfigPath,
 } from "../connector/repo.js";
+import { isInstallSchemaStale, readGrounderState, statePath } from "../connector/state.js";
+import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
 import {
   resolveLogsDir,
   resolveNotesDir,
   resolvePlansDir,
   resolveVaultRoot,
 } from "../connector/vault.js";
+import { VERSION } from "../index.js";
+import { packageVersionNotice } from "./package-version-notice.js";
 
 export interface StatusOptions {
   cwd?: string;
@@ -23,6 +28,9 @@ const LABEL_WIDTH = 12;
 const VAULT_INIT = "grounder vault init <path>";
 const REPO_INIT = "grounder init";
 const REPO_INIT_FORCE = "grounder init --force";
+const MIGRATE = "grounder migrate";
+const MIGRATE_FORCE = "grounder migrate --force";
+const UPGRADE_GROUNDER = "upgrade grounder";
 
 function section(title: string): string {
   return `${title}\n`;
@@ -53,13 +61,39 @@ async function tryReadHome(): Promise<{ home: HomeConfig | null; invalid: string
   }
 }
 
-async function tryReadRepo(
-  linkedRoot: string,
-): Promise<{ repo: RepoConfig | null; invalid: string | null }> {
+async function tryReadRepo(linkedRoot: string): Promise<{
+  repo: RepoConfig | null;
+  invalid: string | null;
+  unsupported: boolean;
+}> {
   try {
-    return { repo: await readRepoConfig(linkedRoot), invalid: null };
+    return { repo: await readRepoConfig(linkedRoot), invalid: null, unsupported: false };
   } catch (error: unknown) {
-    return { repo: null, invalid: errorDetail(error) };
+    return {
+      repo: null,
+      invalid: errorDetail(error),
+      unsupported: isUnsupportedSchemaError(error),
+    };
+  }
+}
+
+async function writeInstallStateLine(homeDir?: string): Promise<void> {
+  try {
+    const state = await readGrounderState(homeDir);
+    if (!state) {
+      process.stdout.write(statusLine("State:", `missing → run: ${MIGRATE_FORCE}`));
+      return;
+    }
+    process.stdout.write(statusLine("State:", statePath(homeDir)));
+    const packageNotice = packageVersionNotice(VERSION, state.grounderVersion);
+    if (packageNotice) {
+      process.stdout.write(statusLine("Package:", packageNotice.status));
+    }
+    if (isInstallSchemaStale(state, ALL_AGENTS)) {
+      process.stdout.write(statusLine("Schemas:", `stale → run: ${MIGRATE}`));
+    }
+  } catch {
+    process.stdout.write(statusLine("State:", `invalid → run: ${MIGRATE_FORCE}`));
   }
 }
 
@@ -73,9 +107,13 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
     const { home, invalid: homeInvalid } = await tryReadHome();
     const gitRoot = await findGitRoot(cwd);
     const linkedRoot = await findLinkedRepoRoot(cwd, gitRoot);
-    const { repo, invalid: repoInvalid } = linkedRoot
+    const {
+      repo,
+      invalid: repoInvalid,
+      unsupported: repoUnsupported,
+    } = linkedRoot
       ? await tryReadRepo(linkedRoot)
-      : { repo: null, invalid: null };
+      : { repo: null, invalid: null, unsupported: false };
 
     process.stdout.write(section("Machine"));
     if (homeInvalid) {
@@ -85,6 +123,7 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
     } else {
       process.stdout.write(statusLine("Config:", homeConfigPath()));
       process.stdout.write(statusLine("Vault:", resolveVaultRoot(home)));
+      await writeInstallStateLine(options.homeDir);
     }
 
     process.stdout.write("\n");
@@ -99,13 +138,22 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
     }
 
     if (repoInvalid || !repo) {
-      const fix = home ? REPO_INIT_FORCE : VAULT_INIT;
-      process.stdout.write(statusLine("Linked:", `incomplete → run: ${fix}`));
+      const fix = repoUnsupported ? UPGRADE_GROUNDER : home ? REPO_INIT_FORCE : VAULT_INIT;
+      process.stdout.write(
+        statusLine(
+          "Linked:",
+          repoUnsupported ? `unsupported → ${fix}` : `incomplete → run: ${fix}`,
+        ),
+      );
       process.stdout.write(statusLine("Folder:", linkedRoot));
       process.stdout.write(
         statusLine(
           "Config:",
-          repoInvalid ? `invalid → run: ${REPO_INIT_FORCE}` : `missing → run: ${REPO_INIT}`,
+          repoUnsupported
+            ? `unsupported → ${UPGRADE_GROUNDER}`
+            : repoInvalid
+              ? `invalid → run: ${REPO_INIT_FORCE}`
+              : `missing → run: ${REPO_INIT}`,
         ),
       );
       await writeGitLine(gitRoot);

@@ -147,6 +147,34 @@ export function isGrounderPeekHookCommand(command: unknown): boolean {
   );
 }
 
+/** True when any nested `command` field in parsed JSON is Grounder's peek hook. */
+export function jsonContainsGrounderPeekCommand(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(jsonContainsGrounderPeekCommand);
+  }
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if (isGrounderPeekHookCommand(obj.command)) {
+      return true;
+    }
+    return Object.values(obj).some(jsonContainsGrounderPeekCommand);
+  }
+  return false;
+}
+
+/** True when a hooks/settings JSON file contains Grounder's peek hook entry. */
+export async function hookFileHasGrounderEntry(filePath: string): Promise<boolean> {
+  try {
+    if (!(await fileExists(filePath))) {
+      return false;
+    }
+    const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
+    return jsonContainsGrounderPeekCommand(parsed);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Best-effort: is `root` inside a throwaway cache (npx / pnpm dlx), where
  * content can be evicted or swapped for a *different* version at any time?

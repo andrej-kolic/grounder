@@ -1,20 +1,33 @@
-import { readFile, stat } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import path from "node:path";
-import { isGrounderPeekHookCommand, isHookRuntimeStale } from "../agents/hook-runtime.js";
+import { hookFileHasGrounderEntry, isHookRuntimeStale } from "../agents/hook-runtime.js";
+import type { AgentAdapter } from "../agents/index.js";
 import { resolveAgents } from "../agents/index.js";
 import { findGitRoot } from "../connector/git.js";
 import { homeConfigPath, readHomeConfig, withHomeDir } from "../connector/home.js";
 import { findLinkedRepoRoot, readRepoConfig } from "../connector/repo.js";
+import {
+  type GrounderState,
+  isHooksSchemaAhead,
+  isHooksSchemaBehind,
+  readGrounderState,
+  recordedCommandsSchema,
+  recordedHooksSchema,
+  statePath,
+} from "../connector/state.js";
+import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
 import {
   resolveLogsDir,
   resolveNotesDir,
   resolvePlansDir,
   resolveVaultRoot,
 } from "../connector/vault.js";
+import { VERSION } from "../index.js";
 import { fileExists } from "../util/fs.js";
 import { flagBool, parseArgs } from "../util/parse-args.js";
 import { projectsParent } from "../vault/layout.js";
 import { type CheckResult, failCheck, okCheck, warnCheck } from "./check.js";
+import { packageVersionNotice } from "./package-version-notice.js";
 
 export interface DoctorOptions {
   cwd?: string;
@@ -24,9 +37,19 @@ export interface DoctorOptions {
 }
 
 const VAULT_INIT = "grounder vault init <path>";
-const VAULT_INIT_FORCE = "grounder vault init <path> --force";
-const VAULT_INIT_HOOKS = "grounder vault init <path> --hooks";
+const MIGRATE = "grounder migrate";
+const MIGRATE_FORCE = "grounder migrate --force";
+const MIGRATE_HOOKS = "grounder migrate --hooks";
 const REPO_INIT = "grounder init";
+const UPGRADE_GROUNDER = "upgrade grounder";
+
+/**
+ * Commands installed before Grounder 0.3 have no per-file content hash, so
+ * migrate cannot tell stock files from user edits — `--force` is required once.
+ */
+function commandsMigrateHint(recordedSchema: number): string {
+  return recordedSchema === 0 ? MIGRATE_FORCE : MIGRATE;
+}
 
 async function isDirectory(dirPath: string): Promise<boolean> {
   try {
@@ -134,26 +157,113 @@ async function checkProjectsDir(vaultRoot: string | null): Promise<CheckResult> 
 }
 
 /**
- * True when `filePath` still contains the pre-runtime literal `npx grounder`
- * invocation (installed before command templates switched to the shared
- * `~/.grounder/runtime` mechanism). `installCommand` skips existing files
- * without `--force`, so upgrading alone never rewrites these.
+ * Load `~/.grounder/state.json` for doctor.
+ * Missing → warn (legacy / pre-ledger); corrupt → fail; present → ok.
  */
-async function commandFileUsesNpx(filePath: string): Promise<boolean> {
+async function loadInstallState(homeDir?: string): Promise<{
+  state: GrounderState | null;
+  check: CheckResult;
+}> {
+  const filePath = statePath(homeDir);
   try {
-    const content = await readFile(filePath, "utf8");
-    return /\bnpx\s+grounder\b/.test(content);
-  } catch {
-    return false;
+    const state = await readGrounderState(homeDir);
+    if (!state) {
+      return {
+        state: null,
+        check: warnCheck(
+          "install-state",
+          "install state missing (pre-ledger / never migrated)",
+          MIGRATE_FORCE,
+        ),
+      };
+    }
+    return {
+      state,
+      check: okCheck("install-state", `install state present (${filePath})`),
+    };
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return {
+      state: null,
+      check: failCheck(
+        "install-state",
+        `install state invalid: ${detail}`,
+        `fix or remove ${filePath}, then ${MIGRATE_FORCE}`,
+      ),
+    };
   }
 }
 
-async function anyCommandFileUsesNpx(filePaths: string[]): Promise<boolean> {
-  const results = await Promise.all(filePaths.map(commandFileUsesNpx));
-  return results.some(Boolean);
+/** Warn when package version disagrees with the last migrate/vault-init ledger write. */
+function checkPackageVersion(state: GrounderState | null): CheckResult | null {
+  if (!state) {
+    return null;
+  }
+  const notice = packageVersionNotice(VERSION, state.grounderVersion);
+  if (!notice) {
+    return null;
+  }
+  return warnCheck("package-version", notice.message, notice.fix);
 }
 
-async function checkAgentArtifacts(homeDir?: string): Promise<CheckResult[]> {
+function commandsSchemaStale(
+  agent: AgentAdapter,
+  state: GrounderState | null,
+  /** When false, state was unreadable — don't invent a schema-0 warn. */
+  stateReadable: boolean,
+): boolean {
+  if (!stateReadable) {
+    return false;
+  }
+  return recordedCommandsSchema(state, agent.id) < agent.commandsSchema;
+}
+
+function commandsSchemaAhead(
+  agent: AgentAdapter,
+  state: GrounderState | null,
+  stateReadable: boolean,
+): boolean {
+  if (!stateReadable) {
+    return false;
+  }
+  return recordedCommandsSchema(state, agent.id) > agent.commandsSchema;
+}
+
+/**
+ * Whether installed session hooks are behind this Grounder.
+ * Only call when those hook files are already present.
+ *
+ * No hooks version in state counts as version 0, so older hook installs still
+ * suggest migrate. Peek/status use {@link isInstallSchemaStale} instead, which
+ * does not treat "hooks never enabled" as behind.
+ */
+function hooksSchemaStale(
+  agent: AgentAdapter,
+  state: GrounderState | null,
+  stateReadable: boolean,
+): boolean {
+  if (!stateReadable || agent.hooksSchema === undefined) {
+    return false;
+  }
+  return isHooksSchemaBehind(state?.agents[agent.id]?.hooksSchema, agent.hooksSchema);
+}
+
+function hooksSchemaAhead(
+  agent: AgentAdapter,
+  state: GrounderState | null,
+  stateReadable: boolean,
+): boolean {
+  if (!stateReadable || agent.hooksSchema === undefined) {
+    return false;
+  }
+  return isHooksSchemaAhead(state?.agents[agent.id]?.hooksSchema, agent.hooksSchema);
+}
+
+async function checkAgentArtifacts(
+  state: GrounderState | null,
+  stateReadable: boolean,
+  homeDir?: string,
+): Promise<CheckResult[]> {
   const agents = await resolveAgents();
   const checks: CheckResult[] = [];
 
@@ -164,12 +274,22 @@ async function checkAgentArtifacts(homeDir?: string): Promise<CheckResult[]> {
     const id = `agent-${agent.id}`;
 
     if (presentCount === expected.length) {
-      if (await anyCommandFileUsesNpx(expected)) {
+      if (commandsSchemaAhead(agent, state, stateReadable)) {
+        const recorded = recordedCommandsSchema(state, agent.id);
+        checks.push(
+          failCheck(
+            id,
+            `${agent.name} commands schema newer than this grounder (recorded ${recorded}, supported ${agent.commandsSchema})`,
+            UPGRADE_GROUNDER,
+          ),
+        );
+      } else if (commandsSchemaStale(agent, state, stateReadable)) {
+        const recorded = recordedCommandsSchema(state, agent.id);
         checks.push(
           warnCheck(
             id,
-            `${agent.name} command file(s) still invoke npx grounder (pre-runtime) — migrate`,
-            VAULT_INIT_FORCE,
+            `${agent.name} commands schema stale (recorded ${recorded}, current ${agent.commandsSchema}) — migrate`,
+            commandsMigrateHint(recorded),
           ),
         );
       } else {
@@ -178,7 +298,7 @@ async function checkAgentArtifacts(homeDir?: string): Promise<CheckResult[]> {
       continue;
     }
 
-    const fix = `${VAULT_INIT_FORCE} (or --agent=${agent.id})`;
+    const fix = `${MIGRATE_FORCE} (or --agent=${agent.id})`;
     if (presentCount === 0) {
       checks.push(warnCheck(id, `${agent.name} detected but no Grounder command files`, fix));
     } else {
@@ -196,33 +316,6 @@ async function checkAgentArtifacts(homeDir?: string): Promise<CheckResult[]> {
   return checks;
 }
 
-/** True when any nested `command` field is Grounder's peek hook (Cursor or Claude shape). */
-function jsonContainsGrounderPeekCommand(value: unknown): boolean {
-  if (Array.isArray(value)) {
-    return value.some(jsonContainsGrounderPeekCommand);
-  }
-  if (value && typeof value === "object") {
-    const obj = value as Record<string, unknown>;
-    if (isGrounderPeekHookCommand(obj.command)) {
-      return true;
-    }
-    return Object.values(obj).some(jsonContainsGrounderPeekCommand);
-  }
-  return false;
-}
-
-async function hookFileHasGrounderEntry(filePath: string): Promise<boolean> {
-  try {
-    if (!(await fileExists(filePath))) {
-      return false;
-    }
-    const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
-    return jsonContainsGrounderPeekCommand(parsed);
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Warn-only: session hooks are opt-in. Missing entry never fails doctor.
  * One check per detected agent that declares `expectedHookArtifacts`.
@@ -232,7 +325,11 @@ async function hookFileHasGrounderEntry(filePath: string): Promise<boolean> {
  * installed — stale mainly for bare-npx copy installs after an upgrade
  * (symlink installs stay current without re-init).
  */
-async function checkAgentHooks(homeDir?: string): Promise<CheckResult[]> {
+async function checkAgentHooks(
+  state: GrounderState | null,
+  stateReadable: boolean,
+  homeDir?: string,
+): Promise<CheckResult[]> {
   const agents = await resolveAgents();
   const checks: CheckResult[] = [];
   let anyHooksInstalled = false;
@@ -253,10 +350,30 @@ async function checkAgentHooks(homeDir?: string): Promise<CheckResult[]> {
 
     if (present.every(Boolean) && expected.length > 0) {
       anyHooksInstalled = true;
-      checks.push(okCheck(id, `${agent.name} session hook installed`));
+      if (hooksSchemaAhead(agent, state, stateReadable)) {
+        const recorded = recordedHooksSchema(state, agent.id);
+        checks.push(
+          failCheck(
+            id,
+            `${agent.name} hooks schema newer than this grounder (recorded ${recorded}, supported ${agent.hooksSchema})`,
+            UPGRADE_GROUNDER,
+          ),
+        );
+      } else if (hooksSchemaStale(agent, state, stateReadable)) {
+        const recorded = recordedHooksSchema(state, agent.id);
+        checks.push(
+          warnCheck(
+            id,
+            `${agent.name} hooks schema stale (recorded ${recorded}, current ${agent.hooksSchema}) — migrate`,
+            MIGRATE,
+          ),
+        );
+      } else {
+        checks.push(okCheck(id, `${agent.name} session hook installed`));
+      }
     } else {
       checks.push(
-        warnCheck(id, `${agent.name} detected but no Grounder session hook`, VAULT_INIT_HOOKS),
+        warnCheck(id, `${agent.name} detected but no Grounder session hook`, MIGRATE_HOOKS),
       );
     }
   }
@@ -267,7 +384,7 @@ async function checkAgentHooks(homeDir?: string): Promise<CheckResult[]> {
         warnCheck(
           "hook-runtime",
           "hook runtime stale or missing (re-run after upgrading, especially bare npx)",
-          VAULT_INIT,
+          MIGRATE,
         ),
       );
     } else {
@@ -285,11 +402,23 @@ async function runMachineChecks(homeDir?: string): Promise<{
   const { check: homeCheck, home } = await checkHomeConfig();
   const { check: vaultCheck, vaultRoot } = await checkVault(home);
   const projectsCheck = await checkProjectsDir(vaultRoot);
-  const agentChecks = await checkAgentArtifacts(homeDir);
-  const hookChecks = await checkAgentHooks(homeDir);
+  const { state, check: stateCheck } = await loadInstallState(homeDir);
+  // Corrupt ledger: don't invent schema-0 migrate warns on top of the fail.
+  const stateReadable = stateCheck.level !== "fail";
+  const packageVersionCheck = checkPackageVersion(state);
+  const agentChecks = await checkAgentArtifacts(state, stateReadable, homeDir);
+  const hookChecks = await checkAgentHooks(state, stateReadable, homeDir);
 
   return {
-    checks: [homeCheck, vaultCheck, projectsCheck, ...agentChecks, ...hookChecks],
+    checks: [
+      homeCheck,
+      vaultCheck,
+      projectsCheck,
+      stateCheck,
+      ...(packageVersionCheck ? [packageVersionCheck] : []),
+      ...agentChecks,
+      ...hookChecks,
+    ],
     home,
   };
 }
@@ -316,6 +445,7 @@ async function runProjectChecks(
     );
 
     let repo: Awaited<ReturnType<typeof readRepoConfig>> = null;
+    let repoUnsupported = false;
     try {
       repo = await readRepoConfig(linkedRoot);
       if (!repo) {
@@ -331,18 +461,27 @@ async function runProjectChecks(
       }
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
-      checks.push(
-        failCheck(
-          "repo-config-valid",
-          `invalid repo config: ${detail}`,
-          `Fix or re-run ${REPO_INIT} --force`,
-        ),
-      );
+      if (isUnsupportedSchemaError(error)) {
+        repoUnsupported = true;
+        checks.push(failCheck("repo-config-valid", detail, UPGRADE_GROUNDER));
+      } else {
+        checks.push(
+          failCheck(
+            "repo-config-valid",
+            `invalid repo config: ${detail}`,
+            `Fix or re-run ${REPO_INIT} --force`,
+          ),
+        );
+      }
     }
 
     if (!home || !repo) {
-      const reason = !home ? "no home config" : "no valid repo config";
-      const fix = !home ? VAULT_INIT : REPO_INIT;
+      const reason = !home
+        ? "no home config"
+        : repoUnsupported
+          ? "unsupported repo config version"
+          : "no valid repo config";
+      const fix = !home ? VAULT_INIT : repoUnsupported ? UPGRADE_GROUNDER : REPO_INIT;
       checks.push(failCheck("notes-dir", `cannot resolve notes/ (${reason})`, fix));
       checks.push(failCheck("logs-dir", `cannot resolve logs/ (${reason})`, fix));
       checks.push(failCheck("plans-dir", `cannot resolve plans/ (${reason})`, fix));

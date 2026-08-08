@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { resolveAgents } from "../../src/agents/index.js";
+import { ALL_AGENTS, resolveAgents } from "../../src/agents/index.js";
 import { createTempEnv } from "../helpers.js";
 
 describe("agents/index - resolveAgents", () => {
@@ -16,10 +16,16 @@ describe("agents/index - resolveAgents", () => {
     else process.env.GROUNDER_HOME = prevHome;
   });
 
+  it("lists every known agent in ALL_AGENTS", () => {
+    expect(ALL_AGENTS.map((a) => a.id).sort()).toEqual(["claude", "cursor"]);
+  });
+
   it("returns explicitly requested adapters by id", async () => {
     const agents = await resolveAgents(["cursor"]);
     expect(agents).toHaveLength(1);
     expect(agents[0].id).toBe("cursor");
+    expect(agents[0].commandsSchema).toBe(1);
+    expect(agents[0].hooksSchema).toBe(1);
   });
 
   it("throws on unknown agent id", async () => {

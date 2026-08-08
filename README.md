@@ -61,3 +61,7 @@ git push origin v0.1.0
 ## Architecture
 
 Agent-agnostic core (`connector/`, `vault/`, `commands/`) plus a pluggable `agents/` adapter registry for Cursor, Claude Code, and future targets. Templates: `packages/grounder/templates/agents/{id}/`.
+
+Design notes for contributors (not user how-tos):
+
+- [Schema versioning and install migration](docs/architecture/schema-versioning.md) — `state.json`, hash drift, `grounder migrate`, forward-compat

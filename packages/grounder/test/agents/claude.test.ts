@@ -87,7 +87,7 @@ describe("agents/claude", () => {
       expect(await readFile(noteDest, "utf8")).not.toContain("{{GROUNDER_CLI}}");
     });
 
-    it("skips existing files and creates missing ones", async () => {
+    it("protects untracked/custom files and creates missing ones", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
 
@@ -100,7 +100,7 @@ describe("agents/claude", () => {
       const handoffDest = grounderTaskHandoffCommandPath(env.home);
       const taskDest = grounderTaskCommandPath(env.home);
 
-      expect(result.artifacts[noteDest]).toBe("skipped");
+      expect(result.artifacts[noteDest]).toBe("modified");
       expect(result.artifacts[planDest]).toBe("created");
       expect(result.artifacts[handoffDest]).toBe("created");
       expect(result.artifacts[taskDest]).toBe("created");
@@ -111,7 +111,7 @@ describe("agents/claude", () => {
       expect(await readFile(taskDest, "utf8")).toContain(`${cli} handoff list`);
     });
 
-    it("skips if already exists and force is false", async () => {
+    it("skips when already current (hash matches, content unchanged)", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
 

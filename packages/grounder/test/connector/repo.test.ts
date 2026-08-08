@@ -8,6 +8,7 @@ import {
   repoConfigPath,
   writeRepoConfig,
 } from "../../src/connector/repo.js";
+import { UnsupportedSchemaError } from "../../src/connector/unsupported-schema.js";
 import { createTempEnv } from "../helpers.js";
 
 describe("connector/repo", () => {
@@ -59,5 +60,36 @@ describe("connector/repo", () => {
 
     expect(config).toEqual({ version: 1, projectId: "my-app" });
     expect(repoConfigPath(env.repo)).toBe(path.join(env.repo, ".grounder.json"));
+  });
+
+  it("rejects newer repo config version with upgrade hint", async () => {
+    const env = await createTempEnv();
+    cleanup = env.cleanup;
+
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(
+      repoConfigPath(env.repo),
+      `${JSON.stringify({ version: 2, projectId: "my-app" }, null, 2)}\n`,
+      "utf8",
+    );
+
+    await expect(readRepoConfig(env.repo)).rejects.toBeInstanceOf(UnsupportedSchemaError);
+    await expect(readRepoConfig(env.repo)).rejects.toThrow(/Upgrade grounder/);
+  });
+
+  it("rejects corrupt repo config without upgrade hint", async () => {
+    const env = await createTempEnv();
+    cleanup = env.cleanup;
+
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(repoConfigPath(env.repo), '{"version":1}\n', "utf8");
+
+    await expect(readRepoConfig(env.repo)).rejects.toThrow(/Invalid repo config/);
+    try {
+      await readRepoConfig(env.repo);
+      expect.unreachable("expected throw");
+    } catch (error) {
+      expect(error).not.toBeInstanceOf(UnsupportedSchemaError);
+    }
   });
 });

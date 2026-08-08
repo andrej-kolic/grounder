@@ -13,6 +13,8 @@ Grounder is a Node CLI (`packages/grounder`) that wires project folders to perso
 ```text
 connector/          # repo ↔ vault wiring (config stores + resolution)
   home.ts             # ~/.grounder/config.json
+  state.ts            # ~/.grounder/state.json install ledger (schemas + file hashes)
+  unsupported-schema.ts # forward-compat hard stop (newer on-disk schema)
   repo.ts             # .grounder.json marker, findLinkedRepoRoot
   linked.ts           # resolveLinkedProject (home + marker Result)
   vault.ts            # resolveVaultRoot, resolveNotesDir/LogsDir/PlansDir (config-aware)
@@ -36,9 +38,14 @@ commands/             # mirrors CLI structure
   path/notes.ts       # grounder path notes
   path/logs.ts        # grounder path logs
   path/plans.ts       # grounder path plans
+  doctor.ts           # grounder doctor
+  migrate.ts          # grounder migrate (refresh install after upgrade)
+  apply-agent-installs.ts # shared agent install loop (vault init + migrate)
+  upgrade-banner.ts   # stderr notice when package version ahead of ledger
 agents/               # AgentAdapter registry (pluggable install targets)
   types.ts            # AgentAdapter interface
   index.ts            # resolveAgents(), detect
+  install-command.ts  # shared slash-command install + hash drift detection
   hook-runtime.ts     # ~/.grounder/runtime for session hooks (symlink durable source / copy npx cache)
   cursor.ts           # Cursor adapter
   claude.ts           # Claude Code adapter

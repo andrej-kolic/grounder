@@ -13,7 +13,7 @@ AI coding agents forget everything between sessions. Grounder gives them persist
 
 **Requirements:** Node.js 18+ and an Obsidian vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
 
-**Contents:** [Install](#install) · [Quickstart](#quickstart) · [Setup overview](#setup-overview) · [Commands](#commands) · [Configuration](#configuration) · [Agents](#agents) · [Session-start hooks](#session-start-hooks) · [Troubleshooting](#troubleshooting)
+**Contents:** [Install](#install) · [Upgrading](#upgrading) · [Quickstart](#quickstart) · [Setup overview](#setup-overview) · [Commands](#commands) · [Configuration](#configuration) · [Agents](#agents) · [Session-start hooks](#session-start-hooks) · [Troubleshooting](#troubleshooting)
 
 ## Install
 
@@ -28,6 +28,16 @@ npx grounder --help
 ```
 
 `grounder -h` prints the full reference; `grounder -v` prints the installed version.
+
+## Upgrading
+
+After upgrading the package, refresh agent installs:
+
+```bash
+grounder migrate
+```
+
+Run `grounder doctor` if you’re unsure — it hints when plain `migrate` is enough vs `migrate --force` (needed **once** when upgrading from Grounder before 0.3, or when command files were edited locally). Most grounder commands and session-start teasers will also tell you when a migrate is due. Flag details: [Migrate flags](#migrate-flags).
 
 ## Quickstart
 
@@ -122,6 +132,7 @@ grounder path logs           Print resolved logs directory
 grounder path plans          Print resolved plans directory
 grounder status              Snapshot of machine + project link + resolved paths
 grounder doctor              Health checks with fix hints
+grounder migrate             Refresh agent install after upgrading grounder
 ```
 
 ### Init flags
@@ -129,11 +140,22 @@ grounder doctor              Health checks with fix hints
 | Flag | Commands | Description |
 | --- | --- | --- |
 | `--yes` | `vault init`, `init` | Skip confirmation prompts |
-| `--force` | `vault init`, `init` | Overwrite existing generated files |
+| `--force` | `vault init`, `init`, `migrate` | Overwrite existing generated / locally-modified files |
 | `--id <id>` | `init` | Override detected project id |
 | `--vault <path>` | `init` | Override home vault root for this run |
-| `--agent <id>` | `vault init` | Install for a specific agent (repeatable; default: auto-detect). Supported: `cursor`, `claude` |
-| `--hooks` | `vault init` | Also install session-start teaser hooks (opt-in; see [Session-start hooks](#session-start-hooks)) |
+| `--agent <id>` | `vault init`, `migrate` | Install for a specific agent (repeatable; default: auto-detect). Supported: `cursor`, `claude` |
+| `--hooks` | `vault init`, `migrate` | Also install session-start teaser hooks (opt-in; see [Session-start hooks](#session-start-hooks)) |
+
+### Migrate flags
+
+| Flag | Description |
+| --- | --- |
+| `--force` | Overwrite slash command files you edited locally; also needed **once** when upgrading from Grounder before 0.3 |
+| `--dry-run` | Preview without writing |
+| `--agent <id>` | Limit to a specific agent (repeatable) |
+| `--hooks` | Install hooks even if they were never installed before |
+
+See [Upgrading](#upgrading) for the usual post-package-upgrade flow. Untouched command files update automatically; locally edited ones (and pre-0.3 installs with no ledger) are skipped unless you pass `--force`.
 
 ### Note / handoff flags
 
@@ -211,10 +233,9 @@ No `--agent` flag: auto-detect installed agents. Explicit install:
 grounder vault init <path-to-your-vault> --agent=cursor --agent=claude
 ```
 
-Slash commands invoke `~/.grounder/runtime/dist/cli.js` directly (not `npx`) — see [Session-start hooks](#session-start-hooks) for how that runtime stays current. `vault init` never rewrites an existing command file without `--force`, so:
+Slash commands invoke `~/.grounder/runtime/dist/cli.js` directly (not `npx`) — see [Session-start hooks](#session-start-hooks) for how that runtime stays current. Command files that still match what Grounder last wrote are refreshed by `grounder migrate` without `--force`. Locally edited files are left alone unless you pass `--force`.
 
-- Editing a template and re-running `vault init` — rarely needed; the runtime path itself doesn't change.
-- **Upgrading from a grounder version older than this mechanism** — command files installed back then still contain a literal `npx grounder …` call and are *not* rewritten by a plain re-run. Run `grounder vault init <path> --force` once to migrate them; `grounder doctor` flags any agent with a command file still invoking `npx grounder`.
+After upgrading the package, see [Upgrading](#upgrading). `vault init --force` still works for scripts that already use it; it shares the same install path as `migrate`.
 
 Templates live under `templates/agents/{id}/`. Adding another agent means one adapter file + one template directory — `vault init` stays agent-blind.
 
@@ -243,11 +264,11 @@ What hooks do **not** do:
 Hooks *and* slash commands both run `~/.grounder/runtime/dist/cli.js` directly (never `npx`) — `vault init` materializes it, regardless of whether `--hooks` is passed:
 
 - **Real install** (`npm i -g grounder`, `pnpm add -g grounder`, or a monorepo checkout) → symlinked. Upgrading overwrites the same path in place, so both stay current with **no re-run needed**.
-- **Bare `npx grounder vault init …`** (nothing installed) → copied, since each `npx` invocation resolves to a disposable, version-pinned cache dir that can't be symlinked durably. Re-run `grounder vault init <vault>` after upgrading grounder to refresh (no `--force` needed).
+- **Bare `npx grounder vault init …`** (nothing installed) → copied, since each `npx` invocation resolves to a disposable, version-pinned cache dir that can't be symlinked durably. Re-run `grounder migrate` (or `vault init`) after upgrading grounder to refresh (no `--force` needed).
 
 If you want the runtime to stay current with zero maintenance, install grounder rather than using bare `npx` for this step.
 
-That refresh only touches the shared runtime, not installed command files — see the migration note in [Agents](#agents) if `doctor` flags a command file still invoking `npx grounder` literally.
+That refresh only touches the shared runtime, not installed command files — see [Upgrading](#upgrading) if `doctor` flags stale command schemas.
 
 ## Troubleshooting
 
@@ -258,11 +279,11 @@ That refresh only touches the shared runtime, not installed command files — se
 | Machine setup only (no project yet) | `grounder doctor --global` |
 | Home config / vault missing | `grounder vault init <path>` |
 | No `.grounder.json` / notes / logs / plans dirs | `grounder init` |
-| Agent slash commands stale or partial | `grounder vault init <path> --force` (or `--agent=<id>`) |
-| Session-start teaser missing (optional) | `grounder vault init <path> --hooks` — `doctor` warns when absent |
-| Shared runtime stale after upgrade (bare npx install) | `grounder vault init <path>` — `doctor` warns when `hook-runtime` is stale |
-| Command file still literally invokes `npx grounder` (installed before this release) | `grounder vault init <path> --force` — `doctor` warns per agent when detected |
-| Switched Node version / nvm environment (command files invoke the old `node`) | `grounder vault init <path> --force` — command files bake in the `node` path at install time; session hooks self-heal on the next `vault init` without `--force` |
+| Agent slash commands stale (`doctor` warns) | `grounder migrate` — if migrate skips everything as “locally modified”, use `grounder migrate --force` once (typical when upgrading from before 0.3) |
+| Session-start teaser missing (optional) | `grounder migrate --hooks` — `doctor` warns when absent |
+| Shared runtime stale after upgrade (bare npx install) | `grounder migrate` — `doctor` warns when `hook-runtime` is stale |
+| Migrate skips all commands as locally modified (first run after upgrade) | `grounder migrate --force` once, then plain `migrate` on later upgrades |
+| Switched Node version / nvm environment (command files invoke the old `node`) | `grounder migrate` (add `--force` if files were edited or you’re still on a pre-0.3 install) |
 
 ## Development
 

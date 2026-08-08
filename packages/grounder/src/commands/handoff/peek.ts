@@ -1,7 +1,9 @@
 import path from "node:path";
 import { readCursorHookWorkspaceRoot } from "../../agents/cursor-hook-input.js";
+import { ALL_AGENTS } from "../../agents/index.js";
 import { withHomeDir } from "../../connector/home.js";
 import { resolveLinkedProject } from "../../connector/linked.js";
+import { isInstallSchemaStale, readGrounderState } from "../../connector/state.js";
 import { resolveLogsDir } from "../../connector/vault.js";
 import { parseHandoffFrontmatter } from "../../util/frontmatter.js";
 import { flagBool, parseArgs } from "../../util/parse-args.js";
@@ -19,6 +21,8 @@ export interface HandoffPeekOptions {
    */
   json?: boolean;
 }
+
+const MIGRATE_TEASER = "[grounder] Install outdated — run: grounder migrate.";
 
 /** `YYYY-MM-DD-HHmm` or `YYYY-MM-DD-HHmmss`, optionally followed by `-slug`. */
 const TIMESTAMP_STEM = /^(\d{4}-\d{2}-\d{2})-\d{4}(?:\d{2})?(?:-(.*))?$/;
@@ -83,9 +87,43 @@ function resolveCursorHookCwd(stdinWorkspaceRoot: string | undefined): string | 
 }
 
 /**
+ * Whether to print the "run grounder migrate" line from session peek.
+ * Only looks at `~/.grounder/state.json` — does not open Cursor/Claude files.
+ *
+ * If hooks were never enabled (no hooks version in state), that is not "out of
+ * date" here. Doctor is the place that checks whether hook files exist on disk.
+ * If state is missing or unreadable, stay quiet — doctor reports that.
+ */
+async function schemaMigrateNeeded(homeDir?: string): Promise<boolean> {
+  try {
+    const state = await readGrounderState(homeDir);
+    return isInstallSchemaStale(state, ALL_AGENTS);
+  } catch {
+    return false;
+  }
+}
+
+function composeTeaser(
+  handoffLine: string | undefined,
+  migrateNeeded: boolean,
+): string | undefined {
+  if (handoffLine && migrateNeeded) {
+    return `${handoffLine}\n${MIGRATE_TEASER}`;
+  }
+  if (handoffLine) {
+    return handoffLine;
+  }
+  if (migrateNeeded) {
+    return MIGRATE_TEASER;
+  }
+  return undefined;
+}
+
+/**
  * CLI entry for `grounder handoff peek`.
- * Silent by default: prints nothing and exits 0 when unlinked, empty, or on any error.
- * Used by session-start hooks — must never crash or print noise.
+ * Silent by default: prints nothing and exits 0 when unlinked, empty, or on any error
+ * (unless install schemas are stale — then a one-line migrate nudge).
+ * Used by session-start hooks — must never crash or print noise on stderr.
  * Reads Cursor hook stdin for `workspace_roots[0]` when present; falls back to
  * `CURSOR_PROJECT_DIR` (user-level hooks often run with cwd under `~/.cursor`).
  * Pass `--json` for Cursor's `additional_context` stdout contract.
@@ -106,13 +144,15 @@ export async function runHandoffPeek(argv: string[]): Promise<number> {
  * files and falls back to the next-newest — the same selection `grounder handoff list
  * --head` uses, so the teaser and `/grounder-task` never disagree about which handoff
  * is current.
+ * Also checks `state.json` and may add a one-line "run grounder migrate" hint
+ * for people who never run doctor.
  * Uses {@link resolveLinkedProject} directly (not `requireLinkedProject`) so failures stay silent.
  * @returns Always `0`.
  */
 export async function runHandoffPeekWithOptions(options: HandoffPeekOptions = {}): Promise<number> {
   try {
     return await withHomeDir(options.homeDir, async () => {
-      let teaser: string | undefined;
+      let handoffLine: string | undefined;
       try {
         const resolved = await resolveLinkedProject(options.cwd ?? process.cwd());
         if (resolved.ok) {
@@ -123,14 +163,16 @@ export async function runHandoffPeekWithOptions(options: HandoffPeekOptions = {}
             const label = fm.title?.trim() || labelFromHandoffFilename(usable.path);
             const createdDate = formatCreatedDate(fm.created, usable.path);
             if (createdDate) {
-              teaser = `[grounder] Latest handoff: "${label}" (${createdDate}). Run /grounder-task to load it, or ignore if unrelated.`;
+              handoffLine = `[grounder] Latest handoff: "${label}" (${createdDate}). Run /grounder-task to load it, or ignore if unrelated.`;
             }
           }
         }
       } catch {
-        teaser = undefined;
+        handoffLine = undefined;
       }
-      writePeekOutput(teaser, options.json);
+
+      const migrateNeeded = await schemaMigrateNeeded(options.homeDir);
+      writePeekOutput(composeTeaser(handoffLine, migrateNeeded), options.json);
       return 0;
     });
   } catch {
