@@ -3,9 +3,11 @@
 [![npm version](https://img.shields.io/npm/v/grounder.svg)](https://www.npmjs.com/package/grounder)
 [![license](https://img.shields.io/npm/l/grounder.svg)](../../LICENSE)
 
-Cursor and Claude Code forget everything between sessions — and don't share anything with each other. Grounder gives both the same structured memory: handoffs, plans, and notes written as plain markdown to a personal Obsidian vault, so context survives a session end, a switch between agents, or a new laptop.
+**Open, structured memory shared across agents and sessions.**
 
-Grounder isn't an auto-capture / RAG tool. There's no vector DB, no background indexing, and nothing gets injected into context without you or the agent asking for it. Instead of remembering *everything ever said*, it gives each session one deliberate, human-readable checkpoint to write and read — a file you can open in Obsidian, diff, edit, or delete.
+AI coding agents forget everything the moment a session ends, and Cursor and Claude Code don't share anything with each other either. Grounder fixes both: handoffs, plans, and notes written as plain markdown to a personal Obsidian vault you own, so context survives a session end, a switch between agents, or a new laptop — and any agent you add later reads the same files.
+
+Grounder isn't an auto-capture / RAG tool, and it isn't trying to remember *everything ever said*. There's no vector DB, no background indexing, and nothing gets injected without you or the agent asking for it. One small, deliberate checkpoint replaces an agent re-deriving context by grepping the repo, or you re-explaining it from scratch — a fraction of the tokens, and a file you can open in Obsidian, diff, edit, or delete yourself.
 
 ## Demo
 
@@ -15,6 +17,7 @@ _Recording pending — asciinema/GIF of the session loop: `/grounder-task` → w
 - **Vault you own** — notes, handoffs, and plans live outside the repo in your Obsidian vault, under your control, and never get committed; only a small `projectId` marker is safe to commit
 - **Structured handoffs** — end a session with a Done/Next/Blockers/Decisions checkpoint; resume next time by hydrating from it
 - **Named plans** — living docs under `plans/` you update in place (`--force` to overwrite; unlike dated notes/handoffs)
+- **Fewer tokens per session** — one Done/Next/Blockers checkpoint stands in for an agent re-reading the repo or you re-explaining context by hand
 - **Zero per-project install** — slash commands run through a small per-machine runtime that `vault init` keeps current; nothing to add to the repo besides the marker file
 
 **Requirements:** Node.js 18+ and an Obsidian vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
