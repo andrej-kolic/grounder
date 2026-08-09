@@ -332,9 +332,8 @@ That refresh only touches the shared runtime, not installed command files — se
 
 ## Roadmap
 
-- **Auto-draft handoff on session end** (under consideration) — a hook that has the agent write the same structured Done/Next/Blockers checkpoint automatically, instead of requiring `/grounder-task-handoff`. Still a plain markdown file in the vault, not a new capture format — whether this ships at all isn't decided yet.
-
-**Not planned:** a parallel auto-capture folder, or semantic search over everything ever said. That's a different product (RAG-style auto-memory) — see the note at the top of this README for why Grounder is deliberately not going there.
+- **Support for Copilot, Codex, and other popular agents** — expand beyond Cursor and Claude Code so more agent tools can use the same vault memory.
+- **Auto-draft handoff on session end** (under consideration) — a hook that has the agent write the same structured Done/Next/Blockers checkpoint automatically, instead of requiring `/grounder-task-handoff`.
 
 ## Development
 
