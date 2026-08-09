@@ -1,7 +1,7 @@
 {
   "name": "grounder",
   "version": "0.3.1",
-  "description": "Connect git projects to Obsidian dev vaults for AI agent memory",
+  "description": "Markdown-native memory for Cursor and Claude Code — session handoffs and plans in a vault you own",
   "type": "module",
   "bin": {
     "grounder": "./dist/cli.js"
@@ -23,7 +23,9 @@
   "keywords": [
     "obsidian",
     "cursor",
-    "mcp",
+    "claude-code",
+    "handoff",
+    "developer-tools",
     "ai",
     "cli"
   ],
