@@ -3,17 +3,23 @@
 [![npm version](https://img.shields.io/npm/v/grounder.svg)](https://www.npmjs.com/package/grounder)
 [![license](https://img.shields.io/npm/l/grounder.svg)](../../LICENSE)
 
-AI coding agents forget everything between sessions. Grounder gives them persistent memory in a personal Obsidian vault — notes, handoffs, and plans live outside the repo, under your control, and never get committed.
+Cursor and Claude Code forget everything between sessions — and don't share anything with each other. Grounder gives both the same structured memory: handoffs, plans, and notes written as plain markdown to a personal Obsidian vault, so context survives a session end, a switch between agents, or a new laptop.
 
-- **Private by default** — vault notes live outside the project tree; only a small `projectId` marker is safe to commit
-- **Built for agents** — installs `/grounder-note`, `/grounder-task`, `/grounder-task-handoff`, `/grounder-plan` slash commands in Cursor and Claude Code
+Grounder isn't an auto-capture / RAG tool. There's no vector DB, no background indexing, and nothing gets injected into context without you or the agent asking for it. Instead of remembering *everything ever said*, it gives each session one deliberate, human-readable checkpoint to write and read — a file you can open in Obsidian, diff, edit, or delete.
+
+## Demo
+
+_Recording pending — asciinema/GIF of the session loop: `/grounder-task` → work → `/grounder-task-handoff` → new session → `/grounder-task`, showing the checkpoint file in the vault along the way._
+
+- **Cross-agent** — Cursor and Claude Code read and write the same vault; switch agents mid-project without losing context
+- **Vault you own** — notes, handoffs, and plans live outside the repo in your Obsidian vault, under your control, and never get committed; only a small `projectId` marker is safe to commit
 - **Structured handoffs** — end a session with a Done/Next/Blockers/Decisions checkpoint; resume next time by hydrating from it
 - **Named plans** — living docs under `plans/` you update in place (`--force` to overwrite; unlike dated notes/handoffs)
 - **Zero per-project install** — slash commands run through a small per-machine runtime that `vault init` keeps current; nothing to add to the repo besides the marker file
 
 **Requirements:** Node.js 18+ and an Obsidian vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
 
-**Contents:** [Install](#install) · [Upgrading](#upgrading) · [Quickstart](#quickstart) · [Setup overview](#setup-overview) · [Commands](#commands) · [Configuration](#configuration) · [Agents](#agents) · [Session-start hooks](#session-start-hooks) · [Troubleshooting](#troubleshooting)
+**Contents:** [Install](#install) · [Upgrading](#upgrading) · [Quickstart](#quickstart) · [Setup overview](#setup-overview) · [Commands](#commands) · [Configuration](#configuration) · [Agents](#agents) · [Session-start hooks](#session-start-hooks) · [Troubleshooting](#troubleshooting) · [Roadmap](#roadmap)
 
 ## Install
 
@@ -286,6 +292,12 @@ That refresh only touches the shared runtime, not installed command files — se
 | Shared runtime stale after upgrade (bare npx install) | `grounder migrate` — `doctor` warns when `hook-runtime` is stale |
 | Migrate skips all commands as locally modified (first run after upgrade) | `grounder migrate --force` once, then plain `migrate` on later upgrades |
 | Node binary gone / not executable (`doctor` fails on hook or command interpreter path) | `grounder migrate` (add `--force` if command files were edited or you’re still on a pre-0.3 install) |
+
+## Roadmap
+
+- **Auto-draft handoff on session end** (under consideration) — a hook that has the agent write the same structured Done/Next/Blockers checkpoint automatically, instead of requiring `/grounder-task-handoff`. Still a plain markdown file in the vault, not a new capture format — whether this ships at all isn't decided yet.
+
+**Not planned:** a parallel auto-capture folder, or semantic search over everything ever said. That's a different product (RAG-style auto-memory) — see the note at the top of this README for why Grounder is deliberately not going there.
 
 ## Development
 
