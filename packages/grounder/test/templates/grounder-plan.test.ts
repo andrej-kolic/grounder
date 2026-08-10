@@ -8,10 +8,9 @@ const templatesRoot = path.resolve(
   "../../templates/agents",
 );
 
-const planTemplates = [
-  path.join(templatesRoot, "cursor/commands/grounder-plan.md"),
-  path.join(templatesRoot, "claude/commands/grounder-plan.md"),
-] as const;
+const cursorPlanTemplate = path.join(templatesRoot, "cursor/commands/grounder-plan.md");
+const claudePlanTemplate = path.join(templatesRoot, "claude/commands/grounder-plan.md");
+const planTemplates = [cursorPlanTemplate, claudePlanTemplate] as const;
 
 describe("templates/grounder-plan", () => {
   it("documents path update, plan list lookup, and title-only create", async () => {
@@ -31,7 +30,7 @@ describe("templates/grounder-plan", () => {
   });
 
   it("Cursor plan requires unrestricted shell permissions", async () => {
-    const body = await readFile(planTemplates[0], "utf8");
+    const body = await readFile(cursorPlanTemplate, "utf8");
     expect(body).toContain('required_permissions: ["all"]');
   });
 });

@@ -34,6 +34,18 @@ Resolve the target, then **state it plainly before writing** — `Updating plan 
 
 A match counts only if its title actually corresponds to what the user named — not just "it's the only plan in the project." No name given and exactly one plan exists → that counts too. Otherwise (no match, several matches, or a name that doesn't correspond to any existing plan) → ask; never guess.
 
+Cases 1 and 2 (update) — run:
+
+```bash
+{{GROUNDER_CLI}} plan "$(cat <<'EOF'
+# Plan: …
+…
+EOF
+)" --path <path>
+```
+
+`--path` must resolve under this project's `plans/` dir; it always overwrites (no `--force`).
+
 **3. No path, no update intent → genuinely new plan.** Derive a `--title` (the user's explicit name, else a short kebab-case slug from the plan's title/goal) and write immediately — don't ask about the name itself.
 
 ```bash
@@ -41,16 +53,10 @@ A match counts only if its title actually corresponds to what the user named —
 # Plan: …
 …
 EOF
-)" --path <path>   # case 1/2 — update
-# or
-{{GROUNDER_CLI}} plan "$(cat <<'EOF'
-# Plan: …
-…
-EOF
-)" --title <name>  # case 3 — create
+)" --title <name>
 ```
 
-`--path` must resolve under this project's `plans/` dir. If `--title` collides with an existing plan (non-zero exit; stderr names the conflict), ask: overwrite (`--force`) or a different name. `--force` only resolves that collision — **never** use it to update a plan you meant to target with `--path`.
+If `--title` collides with an existing plan (non-zero exit; stderr names the conflict), ask: overwrite (`--force`) or a different name. `--force` only resolves that collision — **never** use it to update a plan you meant to target with `--path`.
 
 Run from the linked project folder or any subdirectory beneath it.
 The vault is outside the workspace — grant shell permissions if Claude Code prompts you.

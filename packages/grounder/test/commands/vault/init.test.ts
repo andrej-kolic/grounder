@@ -83,8 +83,14 @@ describe("commands/vault/init", () => {
     expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain(
       'required_permissions: ["all"]',
     );
+    expect(await readFile(grounderPlanCommandPath(env.home), "utf8")).toContain(
+      'required_permissions: ["all"]',
+    );
     expect(await readFile(grounderTaskHandoffCommandPath(env.home), "utf8")).toContain(
       `${cli} handoff`,
+    );
+    expect(await readFile(grounderTaskHandoffCommandPath(env.home), "utf8")).toContain(
+      'required_permissions: ["all"]',
     );
     expect(await readGrounderState(env.home)).toEqual({
       grounderVersion: VERSION,
