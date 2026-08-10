@@ -142,7 +142,7 @@ grounder handoff list        Print recent handoff paths (newest first)
 grounder handoff list --head Print only the newest usable handoff path
 grounder handoff peek        One-line latest-handoff teaser (used by session hooks)
 grounder plan <text>         Write/update a named plan under vault plans/
-grounder plan list           Print recent plans (title + path, newest first)
+grounder plan list           Print recent plans (numbered title + path, newest first)
 grounder path notes          Print resolved notes directory
 grounder path logs           Print resolved logs directory
 grounder path plans          Print resolved plans directory

@@ -66,9 +66,13 @@ export async function runPlanList(argv: string[]): Promise<number> {
 
 /**
  * Resolves the linked project, lists recent plans under `plans/` (newest first).
- * Prints each as a two-line block — filename stem (title) then the indented
- * absolute path — separated by a blank line; empty when no plans. Same
- * vault/link prerequisites as `grounder plan`.
+ * Prints each as a numbered two-line block — `N. ` + filename stem (title),
+ * then the indented absolute path — separated by a blank line; empty when no
+ * plans. The number is positional within this listing only (not a stable
+ * identifier — a later `plan list` call may renumber if plans change) and
+ * exists purely so a human or agent can refer to "plan 2" in the same
+ * conversation without retyping the path. Same vault/link prerequisites as
+ * `grounder plan`.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runPlanListWithOptions(options: PlanListOptions = {}): Promise<number> {
@@ -88,7 +92,7 @@ export async function runPlanListWithOptions(options: PlanListOptions = {}): Pro
         process.stdout.write("\n");
       }
       const stem = path.basename(filePath, ".md");
-      process.stdout.write(`${stem}\n  ${filePath}\n`);
+      process.stdout.write(`${index + 1}. ${stem}\n  ${filePath}\n`);
     });
     return 0;
   });

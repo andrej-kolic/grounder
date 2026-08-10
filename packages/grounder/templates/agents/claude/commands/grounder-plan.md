@@ -32,9 +32,9 @@ Resolve the target, then **state it plainly before writing** — `Updating plan 
 {{GROUNDER_CLI}} plan list --limit 5
 ```
 
-Each result prints as a two-line block — title (filename stem) on the first line, the absolute path indented beneath it.
+Each result prints as a numbered two-line block — `N. ` + title (filename stem) on the first line, the absolute path indented beneath it.
 
-A match counts only if its title actually corresponds to what the user named — not just "it's the only plan in the project." No name given and exactly one plan exists → that counts too. Otherwise (no match, several matches, or a name that doesn't correspond to any existing plan) → ask; never guess.
+A match counts only if its title actually corresponds to what the user named — not just "it's the only plan in the project." No name given and exactly one plan exists → that counts too. If the user refers to a plan by the number shown in *this* listing (e.g. "update plan 2"), that counts as a match too — resolve it to the path from this same output, don't reuse a number from an earlier listing in the conversation (it's positional, not a stable id, and can shift if plans changed since). Otherwise (no match, several matches, or a name/number that doesn't correspond to any existing plan) → ask; never guess.
 
 Cases 1 and 2 (update) — run:
 
