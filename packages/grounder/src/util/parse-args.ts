@@ -7,6 +7,8 @@ export interface ParsedArgs {
 
 /** Long options only: `--title`, `--dry-run`. Not `---` / markdown / YAML bodies. */
 const LONG_OPTION = /^--[a-zA-Z][\w-]*$/;
+/** Short options only: `-f`, `-fy`. Not markdown bullets like `- item`. */
+const SHORT_OPTION = /^-[a-zA-Z]+$/;
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const positional: string[] = [];
@@ -34,7 +36,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
       } else {
         flags.set(key, true);
       }
-    } else if (arg.startsWith("-") && !arg.startsWith("--") && arg.length > 1) {
+    } else if (SHORT_OPTION.test(arg)) {
       for (const char of arg.slice(1)) {
         flags.set(char, true);
       }

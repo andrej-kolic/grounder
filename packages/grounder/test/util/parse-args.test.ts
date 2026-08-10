@@ -35,6 +35,19 @@ describe("util/parse-args", () => {
     });
   });
 
+  it("keeps markdown bullet bodies starting with a single dash as positional", () => {
+    const body = "- a markdown bullet\n- another";
+    expect(mapsOf([body, "--title", "my-note"])).toEqual({
+      positional: [body],
+      flags: { title: "my-note" },
+      repeated: { title: ["my-note"] },
+    });
+  });
+
+  it("does not treat malformed short tokens as flags", () => {
+    expect(mapsOf(["-1", "- item", "-."]).positional).toEqual(["-1", "- item", "-."]);
+  });
+
   it("keeps YAML frontmatter bodies starting with --- as positional", () => {
     const body = "---\ntitle: x\n---\n\n# Plan";
     expect(mapsOf([body, "--title", "my-plan"])).toEqual({
