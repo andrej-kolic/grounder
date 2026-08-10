@@ -1,3 +1,4 @@
+import path from "node:path";
 import { withHomeDir } from "../../connector/home.js";
 import { resolvePlansDir } from "../../connector/vault.js";
 import { helpExitCode } from "../../help.js";
@@ -64,9 +65,10 @@ export async function runPlanList(argv: string[]): Promise<number> {
 }
 
 /**
- * Resolves the linked project, lists recent plan paths under `plans/` (newest first).
- * Prints one absolute path per line; empty when no plans. Same vault/link
- * prerequisites as `grounder plan`.
+ * Resolves the linked project, lists recent plans under `plans/` (newest first).
+ * Prints each as a two-line block — filename stem (title) then the indented
+ * absolute path — separated by a blank line; empty when no plans. Same
+ * vault/link prerequisites as `grounder plan`.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runPlanListWithOptions(options: PlanListOptions = {}): Promise<number> {
@@ -81,9 +83,13 @@ export async function runPlanListWithOptions(options: PlanListOptions = {}): Pro
       limit: options.limit ?? DEFAULT_LIMIT,
     });
 
-    for (const filePath of paths) {
-      process.stdout.write(`${filePath}\n`);
-    }
+    paths.forEach((filePath, index) => {
+      if (index > 0) {
+        process.stdout.write("\n");
+      }
+      const stem = path.basename(filePath, ".md");
+      process.stdout.write(`${stem}\n  ${filePath}\n`);
+    });
     return 0;
   });
 }

@@ -32,6 +32,8 @@ Resolve the target, then **state it plainly before writing** — `Updating plan 
 {{GROUNDER_CLI}} plan list --limit 5
 ```
 
+Each result prints as a two-line block — title (filename stem) on the first line, the absolute path indented beneath it.
+
 A match counts only if its title actually corresponds to what the user named — not just "it's the only plan in the project." No name given and exactly one plan exists → that counts too. Otherwise (no match, several matches, or a name that doesn't correspond to any existing plan) → ask; never guess.
 
 Cases 1 and 2 (update) — run:

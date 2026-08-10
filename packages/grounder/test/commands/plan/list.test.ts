@@ -29,7 +29,7 @@ describe("commands/plan/list", () => {
     }
   });
 
-  it("prints newest plan paths first", async () => {
+  it("prints newest plans first as title + path blocks", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
@@ -50,7 +50,7 @@ describe("commands/plan/list", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toBe([newer, older, ""].join("\n"));
+    expect(out).toBe(`document 1\n  ${newer}\n\nolder\n  ${older}\n`);
   });
 
   it("prints nothing and exits 0 when plans are empty", async () => {
@@ -93,10 +93,10 @@ describe("commands/plan/list", () => {
     );
 
     expect(code).toBe(0);
-    expect(out.trim()).toBe(c);
+    expect(out).toBe(`c\n  ${c}\n`);
   });
 
-  it("cli prints paths and honors --limit", async () => {
+  it("cli prints title + path blocks and honors --limit", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -114,7 +114,7 @@ describe("commands/plan/list", () => {
     const result = runCli(["plan", "list", "--limit", "1"], withGroundedHome(env.home), env.repo);
 
     expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe(newer);
+    expect(result.stdout).toBe(`newer\n  ${newer}\n`);
   });
 
   it("returns usage error for invalid --limit", async () => {
@@ -150,6 +150,6 @@ describe("commands/plan/list", () => {
     );
 
     expect(code).toBe(0);
-    expect(out.trim()).toBe(planPath);
+    expect(out).toBe(`phase-1\n  ${planPath}\n`);
   });
 });
