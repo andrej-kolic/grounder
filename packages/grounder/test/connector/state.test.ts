@@ -285,7 +285,7 @@ describe("connector/state", () => {
     ).toBe(false);
   });
 
-  it("isHooksSchemaBehind treats a missing hooks version as 0 (for doctor when hooks exist)", () => {
+  it("isHooksSchemaBehind treats a missing hooks version as 0 when hooks exist on disk", () => {
     expect(isHooksSchemaBehind(undefined, 1)).toBe(true);
     expect(isHooksSchemaBehind(0, 1)).toBe(true);
     expect(isHooksSchemaBehind(1, 1)).toBe(false);

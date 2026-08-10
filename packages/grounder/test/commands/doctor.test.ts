@@ -1,7 +1,8 @@
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  cursor,
   cursorHooksJsonPath,
   grounderNoteCommandPath,
   grounderTaskCommandPath,
@@ -401,6 +402,68 @@ describe("commands/doctor", () => {
     expect(out).toContain("→ grounder migrate --force");
     expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
+  });
+
+  it("warns when command drift dry-run throws", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const install = vi.spyOn(cursor, "install").mockRejectedValue(new Error("boom"));
+    try {
+      const { code, out } = await captureStdout(() =>
+        runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+      );
+
+      expect(code).toBe(0);
+      expect(out).toContain("warn  agent-cursor");
+      expect(out).toContain("Cursor: could not verify command drift (boom)");
+      expect(out).toContain("→ grounder migrate");
+      expect(out).toContain("ok    agent-cursor-hooks");
+      expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
+    } finally {
+      install.mockRestore();
+    }
+  });
+
+  it("warns when session hook drift dry-run throws", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const installHooks = vi
+      .spyOn(cursor, "installHooks")
+      .mockRejectedValue(new Error("hooks boom"));
+    try {
+      const { code, out } = await captureStdout(() =>
+        runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+      );
+
+      expect(code).toBe(0);
+      expect(out).toContain("ok    agent-cursor");
+      expect(out).toContain("warn  agent-cursor-hooks");
+      expect(out).toContain("Cursor: could not verify session hook drift (hooks boom)");
+      expect(out).toContain("→ grounder migrate");
+      expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
+    } finally {
+      installHooks.mockRestore();
+    }
   });
 
   it("fails when install state is corrupt", async () => {

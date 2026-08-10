@@ -323,8 +323,11 @@ async function checkAgentArtifacts(
               `${agent.name} command files up to date`,
             ),
           );
-        } catch {
-          checks.push(okCheck(id, `${agent.name} command files present`));
+        } catch (error: unknown) {
+          const detail = error instanceof Error ? error.message : String(error);
+          checks.push(
+            warnCheck(id, `${agent.name}: could not verify command drift (${detail})`, MIGRATE),
+          );
         }
       } else {
         checks.push(okCheck(id, `${agent.name} command files present`));
@@ -427,8 +430,15 @@ async function checkAgentHooks(
               `${agent.name} session hook up to date`,
             ),
           );
-        } catch {
-          checks.push(okCheck(id, `${agent.name} session hook installed`));
+        } catch (error: unknown) {
+          const detail = error instanceof Error ? error.message : String(error);
+          checks.push(
+            warnCheck(
+              id,
+              `${agent.name}: could not verify session hook drift (${detail})`,
+              MIGRATE,
+            ),
+          );
         }
       } else {
         checks.push(okCheck(id, `${agent.name} session hook installed`));

@@ -175,8 +175,8 @@ export async function recordAgentInstall(opts: RecordAgentInstallOptions): Promi
  *
  * Session hooks: if an agent has no `hooksSchema` in state, that means hooks
  * were never turned on for them. That is not "behind" — otherwise peek would
- * keep telling people who never enabled hooks to run migrate. When hooks
- * actually exist on disk, doctor uses {@link isHooksSchemaBehind} instead.
+ * keep telling people who never enabled hooks to run migrate. Doctor verifies
+ * on-disk command/hook drift via migrate dry-run instead of this helper.
  */
 export function isInstallSchemaStale(
   state: GrounderState | null,
@@ -207,11 +207,12 @@ export function isInstallSchemaStale(
 
 /**
  * True when session-hook install info is behind what this Grounder expects.
- * Call only after you already know Grounder hooks exist on disk (doctor).
+ * Call only after you already know Grounder hooks exist on disk.
  *
  * If state never stored a hooks version, treat that as version 0 so older
- * hook installs still get a migrate hint. Peek/status must not use this —
- * use {@link isInstallSchemaStale}, which leaves "hooks never enabled" alone.
+ * hook installs still count as behind. Peek/status must not use this — use
+ * {@link isInstallSchemaStale}, which leaves "hooks never enabled" alone.
+ * Doctor prefers migrate dry-run over this schema-number check.
  */
 export function isHooksSchemaBehind(
   recorded: number | undefined,
