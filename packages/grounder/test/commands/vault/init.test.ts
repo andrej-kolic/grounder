@@ -81,10 +81,16 @@ describe("commands/vault/init", () => {
     const cli = runtimeInvocation(env.home);
     expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain(`${cli} note`);
     expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toContain(
-      "approve shell permissions",
+      'required_permissions: ["all"]',
+    );
+    expect(await readFile(grounderPlanCommandPath(env.home), "utf8")).toContain(
+      'required_permissions: ["all"]',
     );
     expect(await readFile(grounderTaskHandoffCommandPath(env.home), "utf8")).toContain(
       `${cli} handoff`,
+    );
+    expect(await readFile(grounderTaskHandoffCommandPath(env.home), "utf8")).toContain(
+      'required_permissions: ["all"]',
     );
     expect(await readGrounderState(env.home)).toEqual({
       grounderVersion: VERSION,
