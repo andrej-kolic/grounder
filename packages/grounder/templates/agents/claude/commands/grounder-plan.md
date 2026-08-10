@@ -22,7 +22,9 @@ Build a markdown body with these sections:
 …
 ```
 
-Resolve the target, then **state it plainly before writing** — `Updating plan at <path>.` or `Creating new plan titled <title>.` This is a visible record, not a blocking confirmation — updates overwrite with no `--force`, so get the match right.
+**Special case: the instruction asks to view existing plans, not name a new topic** (`list`, `list 3 oldest`, `show plans`, etc.) → run `{{GROUNDER_CLI}} plan list --limit <N>` (N = count named, else 5; ignore order words like "oldest" — output is always newest-first, never resort or relabel it) and stop — no plan write, no title. Lead with `Most recent <N> plans (there may be more):` if the result has exactly N items, else `All <count> plan(s):`.
+
+Otherwise, resolve the target, then **state it plainly before writing** — `Updating plan at <path>.` or `Creating new plan titled <title>.` This is a visible record, not a blocking confirmation — updates overwrite with no `--force`, so get the match right.
 
 **1. Known path** (attached/open in chat, or printed by an earlier `grounder plan` this conversation) → update it directly.
 
