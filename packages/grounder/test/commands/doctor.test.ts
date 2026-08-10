@@ -638,14 +638,15 @@ describe("commands/doctor", () => {
     );
 
     expect(code).toBe(0);
-    // Stale runtime makes installHooks dry-run report would-update as well.
-    expect(out).toContain("warn  agent-cursor-hooks");
-    expect(out).toContain("would update on next migrate");
+    // Stale runtime alone would also make installHooks dry-run say would-update;
+    // doctor keeps a single actionable warn on hook-runtime.
+    expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).toContain("warn  hook-runtime");
     expect(out).toContain(
       "hook runtime stale or missing (re-run after upgrading, especially bare npx) → grounder migrate",
     );
-    expect(out).toMatch(/^\d+ passed, 0 failed, 2 warned$/m);
+    expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
+    expect(out).not.toContain("would update on next migrate");
   });
 
   it("fails when the session hook Node interpreter is missing", async () => {

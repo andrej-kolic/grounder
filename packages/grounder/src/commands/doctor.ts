@@ -375,6 +375,9 @@ async function checkAgentHooks(
     agents.map((agent) => Promise.all(agent.expectedArtifacts(homeDir).map((p) => fileExists(p)))),
   );
   const anyCommandsInstalled = commandsPresent.some((present) => present.some(Boolean));
+  // Shared runtime staleness alone makes installHooks dry-run report would-update;
+  // keep that as a single hook-runtime warn below instead of doubling up.
+  const runtimeStale = await isHookRuntimeStale(homeDir);
 
   for (const agent of agents) {
     if (!agent.expectedHookArtifacts) {
@@ -418,6 +421,8 @@ async function checkAgentHooks(
             UPGRADE_GROUNDER,
           ),
         );
+      } else if (runtimeStale) {
+        checks.push(okCheck(id, `${agent.name} session hook installed`));
       } else if (stateReadable && agent.installHooks) {
         try {
           const preview = await agent.installHooks({ force: false, dryRun: true, homeDir });
@@ -451,7 +456,7 @@ async function checkAgentHooks(
   }
 
   if (anyHooksInstalled || anyCommandsInstalled) {
-    if (await isHookRuntimeStale(homeDir)) {
+    if (runtimeStale) {
       checks.push(
         warnCheck(
           "hook-runtime",
