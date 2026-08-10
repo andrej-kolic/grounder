@@ -506,6 +506,30 @@ describe("commands/plan", () => {
     expect(result.stdout).toContain("/plans/phase-1.md");
   });
 
+  it("cli accepts a body that starts with YAML frontmatter ---", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const body = "---\nextra: true\n---\n\n# Goal\n\nShip it";
+    const result = runCli(
+      ["plan", body, "--title", "frontmatter-body"],
+      withGroundedHome(env.home),
+      env.repo,
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("/plans/frontmatter-body.md");
+    const planPath = path.join(env.vault, "10-Projects", "my-app", "plans", "frontmatter-body.md");
+    const content = await readFile(planPath, "utf8");
+    expect(content).toContain("extra: true");
+    expect(content).toContain("# Goal");
+    expect(content).toContain("Ship it");
+  });
+
   it("cli refuses overwrite without --force", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;

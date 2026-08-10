@@ -5,6 +5,9 @@ export interface ParsedArgs {
   repeated: Map<string, string[]>;
 }
 
+/** Long options only: `--title`, `--dry-run`. Not `---` / markdown / YAML bodies. */
+const LONG_OPTION = /^--[a-zA-Z][\w-]*$/;
+
 export function parseArgs(argv: string[]): ParsedArgs {
   const positional: string[] = [];
   const flags = new Map<string, string | boolean>();
@@ -12,7 +15,14 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg.startsWith("--")) {
+
+    // POSIX end-of-options: everything after is positional (including leading --).
+    if (arg === "--") {
+      positional.push(...argv.slice(i + 1));
+      break;
+    }
+
+    if (LONG_OPTION.test(arg)) {
       const key = arg.slice(2);
       const next = argv[i + 1];
       if (next !== undefined && !next.startsWith("-")) {
@@ -24,7 +34,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
       } else {
         flags.set(key, true);
       }
-    } else if (arg.startsWith("-") && arg.length > 1) {
+    } else if (arg.startsWith("-") && !arg.startsWith("--") && arg.length > 1) {
       for (const char of arg.slice(1)) {
         flags.set(char, true);
       }
