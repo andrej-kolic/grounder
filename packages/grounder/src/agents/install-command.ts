@@ -9,7 +9,6 @@ import type { AgentInstallOptions, ArtifactStatus } from "./types.js";
 
 export interface InstallCommandFileOptions extends AgentInstallOptions {
   agentId: string;
-  commandsSchema: number;
   templateDir: string;
   commandsDir: string;
   filename: string;

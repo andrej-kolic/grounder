@@ -270,7 +270,6 @@ export const cursor: AgentAdapter = {
       const { dest, status, hash } = await installCommandFile({
         ...opts,
         agentId: cursor.id,
-        commandsSchema: cursor.commandsSchema,
         templateDir,
         commandsDir: cursorCommandsDir(opts.homeDir),
         filename,

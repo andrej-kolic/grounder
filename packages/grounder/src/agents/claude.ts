@@ -317,7 +317,6 @@ export const claude: AgentAdapter = {
       const { dest, status, hash } = await installCommandFile({
         ...opts,
         agentId: claude.id,
-        commandsSchema: claude.commandsSchema,
         templateDir,
         commandsDir: claudeCommandsDir(opts.homeDir),
         filename,
