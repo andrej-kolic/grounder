@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   assertAgentSchemasSupported,
   isHooksSchemaAhead,
-  isHooksSchemaBehind,
   isInstallSchemaStale,
   readGrounderState,
   recordAgentInstall,
@@ -285,13 +284,7 @@ describe("connector/state", () => {
     ).toBe(false);
   });
 
-  it("isHooksSchemaBehind treats a missing hooks version as 0 when hooks exist on disk", () => {
-    expect(isHooksSchemaBehind(undefined, 1)).toBe(true);
-    expect(isHooksSchemaBehind(0, 1)).toBe(true);
-    expect(isHooksSchemaBehind(1, 1)).toBe(false);
-    expect(isHooksSchemaBehind(2, 1)).toBe(false);
-    expect(isHooksSchemaBehind(0, undefined)).toBe(false);
-
+  it("isHooksSchemaAhead ignores a missing hooks version", () => {
     expect(isHooksSchemaAhead(undefined, 1)).toBe(false);
     expect(isHooksSchemaAhead(2, 1)).toBe(true);
     expect(isHooksSchemaAhead(1, 1)).toBe(false);

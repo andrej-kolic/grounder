@@ -207,25 +207,6 @@ export function isInstallSchemaStale(
 }
 
 /**
- * True when session-hook install info is behind what this Grounder expects.
- * Call only after you already know Grounder hooks exist on disk.
- *
- * If state never stored a hooks version, treat that as version 0 so older
- * hook installs still count as behind. Peek/status must not use this — use
- * {@link isInstallSchemaStale}, which leaves "hooks never enabled" alone.
- * Doctor prefers migrate dry-run over this schema-number check.
- */
-export function isHooksSchemaBehind(
-  recorded: number | undefined,
-  expected: number | undefined,
-): boolean {
-  if (expected === undefined) {
-    return false;
-  }
-  return (recorded ?? 0) < expected;
-}
-
-/**
  * True when state says hooks are newer than this Grounder understands.
  * No stored hooks version is not "newer".
  */
