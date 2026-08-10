@@ -14,7 +14,6 @@ import { findLinkedRepoRoot, readRepoConfig } from "../connector/repo.js";
 import {
   type GrounderState,
   isHooksSchemaAhead,
-  isHooksSchemaBehind,
   readGrounderState,
   recordedCommandsSchema,
   recordedHooksSchema,
@@ -33,6 +32,7 @@ import { fileExists, isExecutable } from "../util/fs.js";
 import { flagBool, parseArgs } from "../util/parse-args.js";
 import { projectsParent } from "../vault/layout.js";
 import { type CheckResult, failCheck, okCheck, warnCheck } from "./check.js";
+import { fixArrow, writeSection } from "./output.js";
 import { packageVersionNotice } from "./package-version-notice.js";
 
 export interface DoctorOptions {
@@ -59,14 +59,6 @@ async function firstDanglingRuntimeNode(nodePaths: Iterable<string>): Promise<st
   return null;
 }
 
-/**
- * Commands installed before Grounder 0.3 have no per-file content hash, so
- * migrate cannot tell stock files from user edits — `--force` is required once.
- */
-function commandsMigrateHint(recordedSchema: number): string {
-  return recordedSchema === 0 ? MIGRATE_FORCE : MIGRATE;
-}
-
 async function isDirectory(dirPath: string): Promise<boolean> {
   try {
     const info = await stat(dirPath);
@@ -79,12 +71,11 @@ async function isDirectory(dirPath: string): Promise<boolean> {
 function formatCheck(check: CheckResult): string {
   const level = check.level.padEnd(4);
   const id = check.id.padEnd(18);
-  const fix = check.fix ? ` → ${check.fix}` : "";
-  return `  ${level}  ${id}  ${check.message}${fix}\n`;
+  return `  ${level}  ${id}  ${check.message}${fixArrow(check.fix)}\n`;
 }
 
-function writeSection(title: string, checks: CheckResult[]): void {
-  process.stdout.write(`${title}\n`);
+function writeChecks(title: string, checks: CheckResult[]): void {
+  writeSection(title);
   for (const check of checks) {
     process.stdout.write(formatCheck(check));
   }
@@ -222,18 +213,6 @@ function checkPackageVersion(state: GrounderState | null): CheckResult | null {
   return warnCheck("package-version", notice.message, notice.fix);
 }
 
-function commandsSchemaStale(
-  agent: AgentAdapter,
-  state: GrounderState | null,
-  /** When false, state was unreadable — don't invent a schema-0 warn. */
-  stateReadable: boolean,
-): boolean {
-  if (!stateReadable) {
-    return false;
-  }
-  return recordedCommandsSchema(state, agent.id) < agent.commandsSchema;
-}
-
 function commandsSchemaAhead(
   agent: AgentAdapter,
   state: GrounderState | null,
@@ -245,25 +224,6 @@ function commandsSchemaAhead(
   return recordedCommandsSchema(state, agent.id) > agent.commandsSchema;
 }
 
-/**
- * Whether installed session hooks are behind this Grounder.
- * Only call when those hook files are already present.
- *
- * No hooks version in state counts as version 0, so older hook installs still
- * suggest migrate. Peek/status use {@link isInstallSchemaStale} instead, which
- * does not treat "hooks never enabled" as behind.
- */
-function hooksSchemaStale(
-  agent: AgentAdapter,
-  state: GrounderState | null,
-  stateReadable: boolean,
-): boolean {
-  if (!stateReadable || agent.hooksSchema === undefined) {
-    return false;
-  }
-  return isHooksSchemaBehind(state?.agents[agent.id]?.hooksSchema, agent.hooksSchema);
-}
-
 function hooksSchemaAhead(
   agent: AgentAdapter,
   state: GrounderState | null,
@@ -273,6 +233,35 @@ function hooksSchemaAhead(
     return false;
   }
   return isHooksSchemaAhead(state?.agents[agent.id]?.hooksSchema, agent.hooksSchema);
+}
+
+/**
+ * Map migrate dry-run artifact statuses onto a doctor check.
+ * `modified` needs `--force`; `overwritten` would auto-update on plain migrate.
+ */
+function checkFromInstallPreview(
+  id: string,
+  agentName: string,
+  kind: string,
+  preview: { artifacts: Record<string, string> },
+  upToDateMessage: string,
+): CheckResult {
+  const statuses = Object.values(preview.artifacts);
+  const modified = statuses.filter((s) => s === "modified").length;
+  const stale = statuses.filter((s) => s === "overwritten").length;
+
+  if (modified === 0 && stale === 0) {
+    return okCheck(id, upToDateMessage);
+  }
+  if (modified === 0) {
+    return warnCheck(id, `${agentName}: ${stale} ${kind} would update on next migrate`, MIGRATE);
+  }
+  return warnCheck(
+    id,
+    `${agentName}: ${modified} ${kind} locally modified (needs --force to refresh)` +
+      (stale > 0 ? `, ${stale} would auto-update` : ""),
+    MIGRATE_FORCE,
+  );
 }
 
 async function checkAgentArtifacts(
@@ -322,15 +311,21 @@ async function checkAgentArtifacts(
             UPGRADE_GROUNDER,
           ),
         );
-      } else if (commandsSchemaStale(agent, state, stateReadable)) {
-        const recorded = recordedCommandsSchema(state, agent.id);
-        checks.push(
-          warnCheck(
-            id,
-            `${agent.name} commands schema stale (recorded ${recorded}, current ${agent.commandsSchema}) — migrate`,
-            commandsMigrateHint(recorded),
-          ),
-        );
+      } else if (stateReadable) {
+        try {
+          const preview = await agent.install({ force: false, dryRun: true, homeDir });
+          checks.push(
+            checkFromInstallPreview(
+              id,
+              agent.name,
+              "command file(s)",
+              preview,
+              `${agent.name} command files up to date`,
+            ),
+          );
+        } catch {
+          checks.push(okCheck(id, `${agent.name} command files present`));
+        }
       } else {
         checks.push(okCheck(id, `${agent.name} command files present`));
       }
@@ -420,15 +415,21 @@ async function checkAgentHooks(
             UPGRADE_GROUNDER,
           ),
         );
-      } else if (hooksSchemaStale(agent, state, stateReadable)) {
-        const recorded = recordedHooksSchema(state, agent.id);
-        checks.push(
-          warnCheck(
-            id,
-            `${agent.name} hooks schema stale (recorded ${recorded}, current ${agent.hooksSchema}) — migrate`,
-            MIGRATE,
-          ),
-        );
+      } else if (stateReadable && agent.installHooks) {
+        try {
+          const preview = await agent.installHooks({ force: false, dryRun: true, homeDir });
+          checks.push(
+            checkFromInstallPreview(
+              id,
+              agent.name,
+              "session hook file(s)",
+              preview,
+              `${agent.name} session hook up to date`,
+            ),
+          );
+        } catch {
+          checks.push(okCheck(id, `${agent.name} session hook installed`));
+        }
       } else {
         checks.push(okCheck(id, `${agent.name} session hook installed`));
       }
@@ -458,6 +459,8 @@ async function checkAgentHooks(
 
 async function runMachineChecks(homeDir?: string): Promise<{
   checks: CheckResult[];
+  state: GrounderState | null;
+  stateReadable: boolean;
   home: Awaited<ReturnType<typeof readHomeConfig>>;
 }> {
   const { check: homeCheck, home } = await checkHomeConfig();
@@ -467,8 +470,6 @@ async function runMachineChecks(homeDir?: string): Promise<{
   // Corrupt ledger: don't invent schema-0 migrate warns on top of the fail.
   const stateReadable = stateCheck.level !== "fail";
   const packageVersionCheck = checkPackageVersion(state);
-  const agentChecks = await checkAgentArtifacts(state, stateReadable, homeDir);
-  const hookChecks = await checkAgentHooks(state, stateReadable, homeDir);
 
   return {
     checks: [
@@ -477,11 +478,21 @@ async function runMachineChecks(homeDir?: string): Promise<{
       projectsCheck,
       stateCheck,
       ...(packageVersionCheck ? [packageVersionCheck] : []),
-      ...agentChecks,
-      ...hookChecks,
     ],
+    state,
+    stateReadable,
     home,
   };
+}
+
+async function runAgentChecks(
+  state: GrounderState | null,
+  stateReadable: boolean,
+  homeDir?: string,
+): Promise<CheckResult[]> {
+  const agentChecks = await checkAgentArtifacts(state, stateReadable, homeDir);
+  const hookChecks = await checkAgentHooks(state, stateReadable, homeDir);
+  return [...agentChecks, ...hookChecks];
 }
 
 async function runProjectChecks(
@@ -592,14 +603,22 @@ export async function runDoctor(argv: string[]): Promise<number> {
 export async function runDoctorWithOptions(options: DoctorOptions = {}): Promise<number> {
   return withHomeDir(options.homeDir, async () => {
     const cwd = path.resolve(options.cwd ?? process.cwd());
-    const { checks: machineChecks, home } = await runMachineChecks(options.homeDir);
+    const {
+      checks: machineChecks,
+      state,
+      stateReadable,
+      home,
+    } = await runMachineChecks(options.homeDir);
+    const agentChecks = await runAgentChecks(state, stateReadable, options.homeDir);
     const projectChecks = options.global ? [] : await runProjectChecks(cwd, home);
-    const checks = [...machineChecks, ...projectChecks];
+    const checks = [...machineChecks, ...agentChecks, ...projectChecks];
 
-    writeSection("Machine", machineChecks);
+    writeChecks("Machine", machineChecks);
+    process.stdout.write("\n");
+    writeChecks("Agents", agentChecks);
     if (!options.global) {
       process.stdout.write("\n");
-      writeSection("Project", projectChecks);
+      writeChecks("Project", projectChecks);
     }
     process.stdout.write("\n");
     process.stdout.write(summarize(checks));
