@@ -41,6 +41,8 @@ commands/             # mirrors CLI structure
   path/logs.ts        # grounder path logs
   path/plans.ts       # grounder path plans
   doctor.ts           # grounder doctor
+  status.ts           # grounder status
+  output.ts           # shared section/fix-hint formatting (doctor + status)
   migrate.ts          # grounder migrate (refresh install after upgrade)
   apply-agent-installs.ts # shared agent install loop (vault init + migrate)
   upgrade-banner.ts   # stderr notice when package version ahead of ledger

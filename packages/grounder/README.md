@@ -309,7 +309,7 @@ Hooks *and* slash commands both run `~/.grounder/runtime/dist/cli.js` directly (
 
 If you want the runtime to stay current with zero maintenance, install grounder rather than using bare `npx` for this step.
 
-That refresh only touches the shared runtime, not installed command files — see [Upgrading](#upgrading) if `doctor` flags stale command schemas.
+That refresh only touches the shared runtime, not installed command files — see [Upgrading](#upgrading) if `doctor` flags command drift.
 
 ## Troubleshooting
 
@@ -321,7 +321,7 @@ That refresh only touches the shared runtime, not installed command files — se
 | Machine setup only (no project yet)                                                    | `grounder doctor --global`                                                                                                                           |
 | Home config / vault missing                                                            | `grounder vault init <path>`                                                                                                                         |
 | No `.grounder.json` / notes / logs / plans dirs                                        | `grounder init`                                                                                                                                      |
-| Agent slash commands stale (`doctor` warns)                                            | `grounder migrate` — if migrate skips everything as “locally modified”, use `grounder migrate --force` once (typical when upgrading from before 0.3) |
+| Agent slash commands drifted (`doctor` warns)                                          | Follow the hint: plain `grounder migrate` when files would auto-update; `grounder migrate --force` when locally modified (also typical once when upgrading from before 0.3) |
 | Session-start teaser missing (optional)                                                | `grounder migrate --hooks` — `doctor` warns when absent                                                                                              |
 | Shared runtime stale after upgrade (bare npx install)                                  | `grounder migrate` — `doctor` warns when `hook-runtime` is stale                                                                                     |
 | Migrate skips all commands as locally modified (first run after upgrade)               | `grounder migrate --force` once, then plain `migrate` on later upgrades                                                                              |
