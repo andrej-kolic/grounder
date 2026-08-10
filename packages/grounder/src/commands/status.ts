@@ -88,7 +88,9 @@ async function writeInstallStateLine(homeDir?: string): Promise<void> {
       process.stdout.write(statusLine("Package:", packageNotice.status));
     }
     if (isInstallSchemaStale(state, ALL_AGENTS)) {
-      process.stdout.write(statusLine("Schemas:", `stale → ${MIGRATE}`));
+      process.stdout.write(statusLine("Schemas:", `ledger stale → ${MIGRATE}`));
+    } else {
+      process.stdout.write(statusLine("Schemas:", "current"));
     }
   } catch {
     process.stdout.write(statusLine("State:", `invalid → ${MIGRATE_FORCE}`));

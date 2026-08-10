@@ -42,7 +42,7 @@ describe("commands/status", () => {
     expect(out).toContain(`  Vault:      ${env.vault}`);
     expect(out).toContain(`  State:      ${statePath(env.home)}`);
     expect(out).not.toContain("Package:");
-    expect(out).not.toContain("Schemas:");
+    expect(out).toContain("  Schemas:    current");
     expect(out).toContain("Project\n");
     expect(out).toContain("  Linked:     yes");
     expect(out).toContain(`  Folder:     ${env.repo}`);
@@ -107,7 +107,7 @@ describe("commands/status", () => {
     expect(code).toBe(0);
     expect(out).toContain(`  State:      ${statePath(env.home)}`);
     expect(out).toContain("  Package:    configuration outdated — run: grounder migrate");
-    expect(out).not.toContain("Schemas:");
+    expect(out).toContain("  Schemas:    current");
     expect(VERSION).not.toBe("0.1.0");
   });
 
@@ -166,7 +166,7 @@ describe("commands/status", () => {
     expect(code).toBe(0);
     expect(out).toContain(`  State:      ${statePath(env.home)}`);
     expect(out).not.toContain("Package:");
-    expect(out).toContain("  Schemas:    stale → grounder migrate");
+    expect(out).toContain("  Schemas:    ledger stale → grounder migrate");
   });
 
   it("reports missing vault when neither vault nor project is configured", async () => {

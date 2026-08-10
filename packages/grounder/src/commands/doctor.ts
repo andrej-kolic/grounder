@@ -224,6 +224,17 @@ function commandsSchemaAhead(
   return recordedCommandsSchema(state, agent.id) > agent.commandsSchema;
 }
 
+function commandsSchemaBehind(
+  agent: AgentAdapter,
+  state: GrounderState | null,
+  stateReadable: boolean,
+): boolean {
+  if (!stateReadable || !state?.agents[agent.id]) {
+    return false;
+  }
+  return recordedCommandsSchema(state, agent.id) < agent.commandsSchema;
+}
+
 function hooksSchemaAhead(
   agent: AgentAdapter,
   state: GrounderState | null,
@@ -233,6 +244,47 @@ function hooksSchemaAhead(
     return false;
   }
   return isHooksSchemaAhead(state?.agents[agent.id]?.hooksSchema, agent.hooksSchema);
+}
+
+/** Match {@link isInstallSchemaStale}: only when a hooks version was recorded. */
+function hooksSchemaBehindInLedger(
+  agent: AgentAdapter,
+  state: GrounderState | null,
+  stateReadable: boolean,
+): boolean {
+  if (!stateReadable || agent.hooksSchema === undefined) {
+    return false;
+  }
+  const recorded = state?.agents[agent.id]?.hooksSchema;
+  if (recorded === undefined) {
+    return false;
+  }
+  return recorded < agent.hooksSchema;
+}
+
+/**
+ * When on-disk files already match templates but `state.json` schema numbers
+ * lag, surface the same migrate hint `status` shows for ledger staleness.
+ */
+function applyLedgerSchemaLag(
+  check: CheckResult,
+  opts: {
+    id: string;
+    agentName: string;
+    kind: "commands" | "hooks";
+    recorded: number;
+    current: number;
+    behind: boolean;
+  },
+): CheckResult {
+  if (check.level !== "ok" || !opts.behind) {
+    return check;
+  }
+  return warnCheck(
+    opts.id,
+    `${opts.agentName}: ${opts.kind} schema behind in ledger (recorded ${opts.recorded}, current ${opts.current}; files match)`,
+    MIGRATE,
+  );
 }
 
 /**
@@ -331,14 +383,22 @@ async function checkAgentArtifacts(
       } else if (stateReadable) {
         try {
           const preview = await agent.install({ force: false, dryRun: true, homeDir });
+          const previewCheck = checkFromInstallPreview(
+            id,
+            agent.name,
+            "command file(s)",
+            preview,
+            `${agent.name} command files up to date`,
+          );
           checks.push(
-            checkFromInstallPreview(
+            applyLedgerSchemaLag(previewCheck, {
               id,
-              agent.name,
-              "command file(s)",
-              preview,
-              `${agent.name} command files up to date`,
-            ),
+              agentName: agent.name,
+              kind: "commands",
+              recorded: recordedCommandsSchema(state, agent.id),
+              current: agent.commandsSchema,
+              behind: commandsSchemaBehind(agent, state, stateReadable),
+            }),
           );
         } catch (error: unknown) {
           const detail = error instanceof Error ? error.message : String(error);
@@ -443,14 +503,22 @@ async function checkAgentHooks(
       } else if (stateReadable && agent.installHooks) {
         try {
           const preview = await agent.installHooks({ force: false, dryRun: true, homeDir });
+          const previewCheck = checkFromInstallPreview(
+            id,
+            agent.name,
+            "session hook file(s)",
+            preview,
+            `${agent.name} session hook up to date`,
+          );
           checks.push(
-            checkFromInstallPreview(
+            applyLedgerSchemaLag(previewCheck, {
               id,
-              agent.name,
-              "session hook file(s)",
-              preview,
-              `${agent.name} session hook up to date`,
-            ),
+              agentName: agent.name,
+              kind: "hooks",
+              recorded: recordedHooksSchema(state, agent.id),
+              current: agent.hooksSchema ?? 0,
+              behind: hooksSchemaBehindInLedger(agent, state, stateReadable),
+            }),
           );
         } catch (error: unknown) {
           const detail = error instanceof Error ? error.message : String(error);

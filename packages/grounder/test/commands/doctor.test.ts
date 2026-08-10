@@ -404,6 +404,88 @@ describe("commands/doctor", () => {
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });
 
+  it("warns when ledger commands schema lags but command files already match", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const state = await readGrounderState(env.home);
+    if (!state?.agents.cursor) {
+      throw new Error("expected cursor install state after vault init");
+    }
+    await writeGrounderState(
+      {
+        ...state,
+        agents: {
+          ...state.agents,
+          cursor: { ...state.agents.cursor, commandsSchema: 1 },
+        },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("warn  agent-cursor");
+    expect(out).toContain(
+      "Cursor: commands schema behind in ledger (recorded 1, current 2; files match)",
+    );
+    expect(out).toContain("→ grounder migrate");
+    expect(out).toContain("ok    agent-cursor-hooks");
+    expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
+  });
+
+  it("warns when ledger hooks schema lags but session hook already matches", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const state = await readGrounderState(env.home);
+    if (!state?.agents.cursor) {
+      throw new Error("expected cursor install state after vault init");
+    }
+    await writeGrounderState(
+      {
+        ...state,
+        agents: {
+          ...state.agents,
+          cursor: { ...state.agents.cursor, hooksSchema: 0 },
+        },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("ok    agent-cursor");
+    expect(out).toContain("warn  agent-cursor-hooks");
+    expect(out).toContain(
+      "Cursor: hooks schema behind in ledger (recorded 0, current 1; files match)",
+    );
+    expect(out).toContain("→ grounder migrate");
+    expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
+  });
+
   it("warns when command drift dry-run throws", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;

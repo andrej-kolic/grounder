@@ -176,7 +176,8 @@ export async function recordAgentInstall(opts: RecordAgentInstallOptions): Promi
  * Session hooks: if an agent has no `hooksSchema` in state, that means hooks
  * were never turned on for them. That is not "behind" — otherwise peek would
  * keep telling people who never enabled hooks to run migrate. Doctor verifies
- * on-disk command/hook drift via migrate dry-run instead of this helper.
+ * on-disk command/hook drift via migrate dry-run, and also warns when files
+ * already match but these ledger schema numbers still lag.
  */
 export function isInstallSchemaStale(
   state: GrounderState | null,
