@@ -253,7 +253,7 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
 export const cursor: AgentAdapter = {
   id: "cursor",
   name: "Cursor",
-  commandsSchema: 1,
+  commandsSchema: 2,
   hooksSchema: 1,
 
   async isInstalled(): Promise<boolean> {

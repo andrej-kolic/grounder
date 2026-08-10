@@ -94,7 +94,7 @@ describe("commands/status", () => {
       {
         grounderVersion: "0.1.0",
         agents: {
-          cursor: { commandsSchema: 1, hooksSchema: 1, files: {} },
+          cursor: { commandsSchema: 2, hooksSchema: 1, files: {} },
         },
       },
       env.home,
@@ -125,7 +125,7 @@ describe("commands/status", () => {
       {
         grounderVersion: "99.0.0",
         agents: {
-          cursor: { commandsSchema: 1, hooksSchema: 1, files: {} },
+          cursor: { commandsSchema: 2, hooksSchema: 1, files: {} },
         },
       },
       env.home,

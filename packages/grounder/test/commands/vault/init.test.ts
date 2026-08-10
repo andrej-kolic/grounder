@@ -25,7 +25,7 @@ import { captureStdout, createTempEnv } from "../../helpers.js";
 
 async function expectedFileLedger(
   paths: string[],
-  schema = 1,
+  schema = 2,
 ): Promise<Record<string, { schema: number; hash: string }>> {
   const files: Record<string, { schema: number; hash: string }> = {};
   for (const p of paths) {
@@ -96,7 +96,7 @@ describe("commands/vault/init", () => {
       grounderVersion: VERSION,
       agents: {
         cursor: {
-          commandsSchema: 1,
+          commandsSchema: 2,
           files: await expectedFileLedger(cursor.expectedArtifacts(env.home)),
         },
       },
@@ -194,12 +194,12 @@ describe("commands/vault/init", () => {
         grounderVersion: VERSION,
         agents: {
           cursor: {
-            commandsSchema: 1,
+            commandsSchema: 2,
             hooksSchema: 1,
             files: await expectedFileLedger(cursor.expectedArtifacts(env.home)),
           },
           claude: {
-            commandsSchema: 1,
+            commandsSchema: 2,
             hooksSchema: 1,
             files: await expectedFileLedger(claude.expectedArtifacts(env.home)),
           },

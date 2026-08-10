@@ -24,7 +24,7 @@ describe("agents/index - resolveAgents", () => {
     const agents = await resolveAgents(["cursor"]);
     expect(agents).toHaveLength(1);
     expect(agents[0].id).toBe("cursor");
-    expect(agents[0].commandsSchema).toBe(1);
+    expect(agents[0].commandsSchema).toBe(2);
     expect(agents[0].hooksSchema).toBe(1);
   });
 

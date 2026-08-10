@@ -300,7 +300,7 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
 export const claude: AgentAdapter = {
   id: "claude",
   name: "Claude Code",
-  commandsSchema: 1,
+  commandsSchema: 2,
   hooksSchema: 1,
 
   async isInstalled(): Promise<boolean> {

@@ -228,7 +228,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("warn  install-state");
     expect(out).toContain("install state missing (pre-ledger / never migrated)");
     expect(out).toContain("warn  agent-cursor");
-    expect(out).toContain("commands schema stale (recorded 0, current 1) — migrate");
+    expect(out).toContain("commands schema stale (recorded 0, current 2) — migrate");
     expect(out).toContain("grounder migrate --force");
     expect(out).toContain("warn  agent-cursor-hooks");
     expect(out).toContain("hooks schema stale (recorded 0, current 1) — migrate");
@@ -262,7 +262,7 @@ describe("commands/doctor", () => {
 
     expect(code).toBe(0);
     expect(out).toContain("warn  agent-cursor");
-    expect(out).toContain("commands schema stale (recorded 0, current 1) — migrate");
+    expect(out).toContain("commands schema stale (recorded 0, current 2) — migrate");
     expect(out).toContain("grounder migrate --force");
     expect(out).not.toContain("package-version");
     expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
@@ -284,7 +284,7 @@ describe("commands/doctor", () => {
       {
         grounderVersion: "0.1.0",
         agents: {
-          cursor: { commandsSchema: 1, hooksSchema: 1, files: {} },
+          cursor: { commandsSchema: 2, hooksSchema: 1, files: {} },
         },
       },
       env.home,
@@ -322,7 +322,7 @@ describe("commands/doctor", () => {
       {
         grounderVersion: "99.0.0",
         agents: {
-          cursor: { commandsSchema: 1, hooksSchema: 1, files: {} },
+          cursor: { commandsSchema: 2, hooksSchema: 1, files: {} },
         },
       },
       env.home,
@@ -354,7 +354,7 @@ describe("commands/doctor", () => {
       {
         grounderVersion: VERSION,
         agents: {
-          cursor: { commandsSchema: 1, hooksSchema: 0, files: {} },
+          cursor: { commandsSchema: 2, hooksSchema: 0, files: {} },
         },
       },
       env.home,
@@ -427,7 +427,7 @@ describe("commands/doctor", () => {
 
     expect(code).toBe(1);
     expect(out).toContain("fail  agent-cursor");
-    expect(out).toContain("commands schema newer than this grounder (recorded 99, supported 1)");
+    expect(out).toContain("commands schema newer than this grounder (recorded 99, supported 2)");
     expect(out).toContain("fail  agent-cursor-hooks");
     expect(out).toContain("hooks schema newer than this grounder (recorded 50, supported 1)");
     expect(out).toContain("upgrade grounder");
