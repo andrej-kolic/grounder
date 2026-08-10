@@ -22,7 +22,7 @@ Build a markdown body with these sections:
 …
 ```
 
-Resolve the target, then **always state it plainly before writing** — `Updating plan at <path>.` or `Creating new plan titled <title>.` Updates overwrite with no `--force`, so the user needs a chance to catch a wrong target before it runs — never skip this line.
+Resolve the target, then **state it plainly before writing** — `Updating plan at <path>.` or `Creating new plan titled <title>.` This is a visible record, not a blocking confirmation — updates overwrite with no `--force`, so get the match right.
 
 **1. Known path** (attached/open in chat, or printed by an earlier `grounder plan` this conversation) → update it directly.
 
@@ -32,7 +32,7 @@ Resolve the target, then **always state it plainly before writing** — `Updatin
 {{GROUNDER_CLI}} plan list --limit 5
 ```
 
-Exactly one match (or only one plan exists in the project) → treat as case 1. None or several match → ask the user to pick; never guess.
+A match counts only if its title actually corresponds to what the user named — not just "it's the only plan in the project." No name given and exactly one plan exists → that counts too. Otherwise (no match, several matches, or a name that doesn't correspond to any existing plan) → ask; never guess.
 
 **3. No path, no update intent → genuinely new plan.** Derive a `--title` (the user's explicit name, else a short kebab-case slug from the plan's title/goal) and write immediately — don't ask about the name itself.
 

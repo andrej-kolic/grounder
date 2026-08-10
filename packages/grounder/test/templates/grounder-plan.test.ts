@@ -17,9 +17,11 @@ describe("templates/grounder-plan", () => {
   it("documents path update, plan list lookup, and title-only create", async () => {
     for (const filePath of planTemplates) {
       const body = await readFile(filePath, "utf8");
-      expect(body).toContain("always state it plainly before writing");
+      expect(body).toContain("state it plainly before writing");
+      expect(body).toContain("not a blocking confirmation");
       expect(body).toContain("printed by an earlier `grounder plan` this conversation");
       expect(body).toContain("plan list --limit 5");
+      expect(body).toContain('not just "it\'s the only plan in the project."');
       expect(body).toContain("never guess");
       expect(body).toContain("genuinely new plan");
       expect(body).toContain("--path <path>");
