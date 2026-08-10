@@ -158,7 +158,7 @@ flowchart TD
 
 | Concern | Location |
 | --- | --- |
-| Install "out of date?" helpers | `connector/state.ts` — `isInstallSchemaStale` for peek/status (state file only; hooks never enabled ≠ out of date). `isHooksSchemaBehind` for doctor when hook files already exist |
+| Install "out of date?" helpers | `connector/state.ts` — `isInstallSchemaStale` for peek/status (state file only; hooks never enabled ≠ out of date). Doctor uses migrate dry-run for on-disk drift, plus ledger schema-lag when files already match |
 | Shared “newer schema” error type | `connector/unsupported-schema.ts` |
 | Repo marker version guard | `connector/repo.ts` |
 | Hash of rendered command bytes | `util/hash.ts` + `agents/install-command.ts` |

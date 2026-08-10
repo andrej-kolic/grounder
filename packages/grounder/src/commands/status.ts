@@ -18,6 +18,7 @@ import {
 } from "../connector/vault.js";
 import { helpExitCode } from "../help.js";
 import { VERSION } from "../index.js";
+import { writeSection } from "./output.js";
 import { packageVersionNotice } from "./package-version-notice.js";
 
 export interface StatusOptions {
@@ -32,10 +33,6 @@ const REPO_INIT_FORCE = "grounder init --force";
 const MIGRATE = "grounder migrate";
 const MIGRATE_FORCE = "grounder migrate --force";
 const UPGRADE_GROUNDER = "upgrade grounder";
-
-function section(title: string): string {
-  return `${title}\n`;
-}
 
 function statusLine(label: string, value: string): string {
   return `  ${label.padEnd(LABEL_WIDTH)}${value}\n`;
@@ -82,7 +79,7 @@ async function writeInstallStateLine(homeDir?: string): Promise<void> {
   try {
     const state = await readGrounderState(homeDir);
     if (!state) {
-      process.stdout.write(statusLine("State:", `missing → run: ${MIGRATE_FORCE}`));
+      process.stdout.write(statusLine("State:", `missing → ${MIGRATE_FORCE}`));
       return;
     }
     process.stdout.write(statusLine("State:", statePath(homeDir)));
@@ -91,10 +88,12 @@ async function writeInstallStateLine(homeDir?: string): Promise<void> {
       process.stdout.write(statusLine("Package:", packageNotice.status));
     }
     if (isInstallSchemaStale(state, ALL_AGENTS)) {
-      process.stdout.write(statusLine("Schemas:", `stale → run: ${MIGRATE}`));
+      process.stdout.write(statusLine("Schemas:", `ledger stale → ${MIGRATE}`));
+    } else {
+      process.stdout.write(statusLine("Schemas:", "current"));
     }
   } catch {
-    process.stdout.write(statusLine("State:", `invalid → run: ${MIGRATE_FORCE}`));
+    process.stdout.write(statusLine("State:", `invalid → ${MIGRATE_FORCE}`));
   }
 }
 
@@ -121,11 +120,11 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
       ? await tryReadRepo(linkedRoot)
       : { repo: null, invalid: null, unsupported: false };
 
-    process.stdout.write(section("Machine"));
+    writeSection("Machine");
     if (homeInvalid) {
-      process.stdout.write(statusLine("Config:", `invalid → run: ${VAULT_INIT}`));
+      process.stdout.write(statusLine("Config:", `invalid → ${VAULT_INIT}`));
     } else if (!home) {
-      process.stdout.write(statusLine("Config:", `missing → run: ${VAULT_INIT}`));
+      process.stdout.write(statusLine("Config:", `missing → ${VAULT_INIT}`));
     } else {
       process.stdout.write(statusLine("Config:", homeConfigPath()));
       process.stdout.write(statusLine("Vault:", resolveVaultRoot(home)));
@@ -133,12 +132,12 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
     }
 
     process.stdout.write("\n");
-    process.stdout.write(section("Project"));
+    writeSection("Project");
 
     if (!linkedRoot) {
       process.stdout.write(statusLine("Linked:", "no"));
       if (home) {
-        process.stdout.write(statusLine("Config:", `missing → run: ${REPO_INIT}`));
+        process.stdout.write(statusLine("Config:", `missing → ${REPO_INIT}`));
       }
       return 0;
     }
@@ -146,10 +145,7 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
     if (repoInvalid || !repo) {
       const fix = repoUnsupported ? UPGRADE_GROUNDER : home ? REPO_INIT_FORCE : VAULT_INIT;
       process.stdout.write(
-        statusLine(
-          "Linked:",
-          repoUnsupported ? `unsupported → ${fix}` : `incomplete → run: ${fix}`,
-        ),
+        statusLine("Linked:", repoUnsupported ? `unsupported → ${fix}` : `incomplete → ${fix}`),
       );
       process.stdout.write(statusLine("Folder:", linkedRoot));
       process.stdout.write(
@@ -158,8 +154,8 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
           repoUnsupported
             ? `unsupported → ${UPGRADE_GROUNDER}`
             : repoInvalid
-              ? `invalid → run: ${REPO_INIT_FORCE}`
-              : `missing → run: ${REPO_INIT}`,
+              ? `invalid → ${REPO_INIT_FORCE}`
+              : `missing → ${REPO_INIT}`,
         ),
       );
       await writeGitLine(gitRoot);
@@ -167,7 +163,7 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
     }
 
     if (!home) {
-      process.stdout.write(statusLine("Linked:", `incomplete → run: ${VAULT_INIT}`));
+      process.stdout.write(statusLine("Linked:", `incomplete → ${VAULT_INIT}`));
       process.stdout.write(statusLine("Folder:", linkedRoot));
       process.stdout.write(statusLine("Config:", repoConfigPath(linkedRoot)));
       process.stdout.write(statusLine("Id:", repo.projectId));

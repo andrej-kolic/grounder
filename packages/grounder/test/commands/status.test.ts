@@ -42,7 +42,7 @@ describe("commands/status", () => {
     expect(out).toContain(`  Vault:      ${env.vault}`);
     expect(out).toContain(`  State:      ${statePath(env.home)}`);
     expect(out).not.toContain("Package:");
-    expect(out).not.toContain("Schemas:");
+    expect(out).toContain("  Schemas:    current");
     expect(out).toContain("Project\n");
     expect(out).toContain("  Linked:     yes");
     expect(out).toContain(`  Folder:     ${env.repo}`);
@@ -77,7 +77,7 @@ describe("commands/status", () => {
 
     expect(code).toBe(0);
     expect(out).toContain(`  Vault:      ${env.vault}`);
-    expect(out).toContain("  State:      missing → run: grounder migrate --force");
+    expect(out).toContain("  State:      missing → grounder migrate --force");
   });
 
   it("reports package lag when grounderVersion is behind the running package", async () => {
@@ -107,7 +107,7 @@ describe("commands/status", () => {
     expect(code).toBe(0);
     expect(out).toContain(`  State:      ${statePath(env.home)}`);
     expect(out).toContain("  Package:    configuration outdated — run: grounder migrate");
-    expect(out).not.toContain("Schemas:");
+    expect(out).toContain("  Schemas:    current");
     expect(VERSION).not.toBe("0.1.0");
   });
 
@@ -166,7 +166,7 @@ describe("commands/status", () => {
     expect(code).toBe(0);
     expect(out).toContain(`  State:      ${statePath(env.home)}`);
     expect(out).not.toContain("Package:");
-    expect(out).toContain("  Schemas:    stale → run: grounder migrate");
+    expect(out).toContain("  Schemas:    ledger stale → grounder migrate");
   });
 
   it("reports missing vault when neither vault nor project is configured", async () => {
@@ -179,7 +179,7 @@ describe("commands/status", () => {
 
     expect(code).toBe(0);
     expect(out).toContain("Machine\n");
-    expect(out).toContain("  Config:     missing → run: grounder vault init <path>");
+    expect(out).toContain("  Config:     missing → grounder vault init <path>");
     expect(out).not.toContain("Vault:");
     expect(out).not.toContain("State:");
     expect(out).toContain("Project\n");
@@ -198,8 +198,8 @@ describe("commands/status", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain("  Config:     missing → run: grounder vault init <path>");
-    expect(out).toContain("  Linked:     incomplete → run: grounder vault init <path>");
+    expect(out).toContain("  Config:     missing → grounder vault init <path>");
+    expect(out).toContain("  Linked:     incomplete → grounder vault init <path>");
     expect(out).toContain(`  Folder:     ${env.repo}`);
     expect(out).toContain(`  Config:     ${path.join(env.repo, ".grounder.json")}`);
     expect(out).toContain("  Id:         my-app");
@@ -223,10 +223,10 @@ describe("commands/status", () => {
     expect(out).toContain("Machine\n");
     expect(out).toContain(`  Config:     ${homeConfigPath(env.home)}`);
     expect(out).toContain(`  Vault:      ${env.vault}`);
-    expect(out).toContain("  State:      missing → run: grounder migrate --force");
+    expect(out).toContain("  State:      missing → grounder migrate --force");
     expect(out).toContain("Project\n");
     expect(out).toContain("  Linked:     no");
-    expect(out).toContain("  Config:     missing → run: grounder init");
+    expect(out).toContain("  Config:     missing → grounder init");
   });
 
   it("reports invalid home config without aborting", async () => {
@@ -242,10 +242,10 @@ describe("commands/status", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain("  Config:     invalid → run: grounder vault init <path>");
+    expect(out).toContain("  Config:     invalid → grounder vault init <path>");
     expect(out).not.toContain("Vault:");
     expect(out).not.toContain("State:");
-    expect(out).toContain("  Linked:     incomplete → run: grounder vault init <path>");
+    expect(out).toContain("  Linked:     incomplete → grounder vault init <path>");
     expect(out).toContain(`  Folder:     ${env.repo}`);
     expect(out).toContain("  Id:         my-app");
   });
@@ -264,9 +264,9 @@ describe("commands/status", () => {
     expect(code).toBe(0);
     expect(out).toContain(`  Config:     ${homeConfigPath(env.home)}`);
     expect(out).toContain(`  Vault:      ${env.vault}`);
-    expect(out).toContain("  Linked:     incomplete → run: grounder init --force");
+    expect(out).toContain("  Linked:     incomplete → grounder init --force");
     expect(out).toContain(`  Folder:     ${env.repo}`);
-    expect(out).toContain("  Config:     invalid → run: grounder init --force");
+    expect(out).toContain("  Config:     invalid → grounder init --force");
     expect(out).not.toContain("Notes:");
     expect(out).not.toContain("Plans:");
     expect(out).not.toContain("Id:");
