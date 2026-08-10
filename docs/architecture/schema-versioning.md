@@ -43,7 +43,7 @@ We do **not** pin a per-project Grounder version (Corepack-style). Install state
 
 1. **Owned fragments** (hooks entry, runtime, ledger): always refresh on `vault init` / `migrate`. No `--force` required.
 2. **Command markdown**: chezmoi-style drift detection.
-   - On write, record per file: `hash` (exact rendered bytes Grounder wrote — not the raw template) and `schema` (that file’s schema at write time).
+   - On write, record per file: `hash` (exact rendered bytes Grounder wrote — not the raw template).
    - Later: on-disk hash == recorded hash → file untouched → safe auto-update without `--force`.
    - On-disk hash != recorded (or no recorded hash) → treat as user-edited / legacy → leave alone; report; require `--force` to overwrite.
 
@@ -73,7 +73,6 @@ Module: [`connector/state.ts`](../../packages/grounder/src/connector/state.ts).
       "hooksSchema": 1,
       "files": {
         "/Users/x/.cursor/commands/grounder-note.md": {
-          "schema": 1,
           "hash": "sha256:…"
         }
       }
@@ -82,22 +81,21 @@ Module: [`connector/state.ts`](../../packages/grounder/src/connector/state.ts).
 }
 ```
 
-#### Per-file `schema` vs `hash`
+#### Per-file `hash`
 
-Each entry under `files` has two fields. Do not confuse them:
+Each entry under `files` carries a content hash:
 
 | Field | Means |
 | --- | --- |
 | `hash` | Bytes Grounder last wrote. Used to detect local edits. |
-| `schema` | **This file’s** schema when it was last written — not the agent’s latest. Files can differ after a partial migrate. |
 
-Agent-level `commandsSchema` / `hooksSchema` are the rollup used by peek, doctor “stale?”, and most migrate decisions. Per-file `schema` is stored so each file keeps its own version; today it is also checked on forward-compat (file newer than this binary understands).
+Agent-level `commandsSchema` / `hooksSchema` are the rollup used by peek, doctor “stale?”, migrate decisions, and forward-compat hard stops. File entries used to also carry a `schema` (mirroring the agent’s); it was dropped because nothing consulted a lower per-file schema and the higher-schema check duplicated the agent-level one. Legacy on-disk `schema` keys are ignored.
 
 Invariants:
 
 - Missing file or missing agent entry → treat recorded schema as **0** (legacy).
 - Agent schema **less than** this binary’s adapter → stale → user should `grounder migrate`.
-- Agent schema **greater than** this binary’s adapter (or a per-file `schema` greater than this binary supports) → **forward-compat hard stop** (`UnsupportedSchemaError`: upgrade grounder). Same idea for `.grounder.json`’s `version` vs `SUPPORTED_REPO_VERSION` in [`connector/repo.ts`](../../packages/grounder/src/connector/repo.ts).
+- Agent schema **greater than** this binary’s adapter → **forward-compat hard stop** (`UnsupportedSchemaError`: upgrade grounder). Same idea for `.grounder.json`’s `version` vs `SUPPORTED_REPO_VERSION` in [`connector/repo.ts`](../../packages/grounder/src/connector/repo.ts).
 - Ledger agent ids this binary does not know → skip with a stderr warning on `migrate` (still refresh known agents); explicit `--agent=<unknown>` still errors.
 - Corrupt ledger → fail with a clear “fix or remove, then migrate” message (distinct from “newer than me”).
 - `migrate` / vault init **must not** advance `commandsSchema` when every command artifact was left as `modified` (legacy or local edits). Runtime/`grounderVersion` (and hooks, when refreshed) may still update; doctor keeps the schema-stale / `--force` hint until a real command write lands.

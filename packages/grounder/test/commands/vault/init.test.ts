@@ -23,13 +23,10 @@ import { fileExists } from "../../../src/util/fs.js";
 import { hashContent } from "../../../src/util/hash.js";
 import { captureStdout, createTempEnv } from "../../helpers.js";
 
-async function expectedFileLedger(
-  paths: string[],
-  schema = 2,
-): Promise<Record<string, { schema: number; hash: string }>> {
-  const files: Record<string, { schema: number; hash: string }> = {};
+async function expectedFileLedger(paths: string[]): Promise<Record<string, { hash: string }>> {
+  const files: Record<string, { hash: string }> = {};
   for (const p of paths) {
-    files[p] = { schema, hash: hashContent(await readFile(p, "utf8")) };
+    files[p] = { hash: hashContent(await readFile(p, "utf8")) };
   }
   return files;
 }

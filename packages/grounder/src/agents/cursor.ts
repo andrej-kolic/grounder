@@ -265,19 +265,18 @@ export const cursor: AgentAdapter = {
 
   async install(opts: AgentInstallOptions): Promise<AgentInstallResult> {
     const artifacts: Record<string, ArtifactStatus> = {};
-    const files: Record<string, { schema: number; hash: string }> = {};
+    const files: Record<string, { hash: string }> = {};
     for (const filename of COMMANDS) {
       const { dest, status, hash } = await installCommandFile({
         ...opts,
         agentId: cursor.id,
-        commandsSchema: cursor.commandsSchema,
         templateDir,
         commandsDir: cursorCommandsDir(opts.homeDir),
         filename,
       });
       artifacts[dest] = status;
       if (hash) {
-        files[dest] = { schema: cursor.commandsSchema, hash };
+        files[dest] = { hash };
       }
     }
     await recordCommandFileHashes({
