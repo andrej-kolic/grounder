@@ -16,5 +16,5 @@ From the linked project folder or any subdirectory beneath it:
 
 5. Summarize briefly what is next (from the handoff `## Next` section when present), then start work.
 
-The vault is outside the workspace — approve shell permissions if Cursor prompts you.
+Run {{GROUNDER_CLI}} with `required_permissions: ["all"]` (vault is outside the workspace).
 Use free-text after `/grounder-task` as optional focus (session name, index, or task hint).

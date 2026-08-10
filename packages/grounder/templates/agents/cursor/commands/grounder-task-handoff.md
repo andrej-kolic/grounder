@@ -48,7 +48,7 @@ EOF
 )"
 ```
 
-The vault is outside the workspace — approve shell permissions if Cursor prompts you.
+Run {{GROUNDER_CLI}} with `required_permissions: ["all"]` (vault is outside the workspace).
 
 Do not compute vault paths or write files yourself — the CLI handles it.
 Report the CLI output path from stdout to the user.

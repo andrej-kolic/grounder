@@ -22,44 +22,38 @@ Build a markdown body with these sections:
 …
 ```
 
-Update vs create — never guess a `--title` for an update:
+Resolve the target, then **always state it plainly before writing** — `Updating plan at <path>.` or `Creating new plan titled <title>.` Updates overwrite with no `--force`, so the user needs a chance to catch a wrong target before it runs — never skip this line.
 
-**1. Path known** (attached/open in chat, or printed by an earlier `grounder plan` this conversation): update that exact file.
+**1. Known path** (attached/open in chat, or printed by an earlier `grounder plan` this conversation) → update it directly.
 
-```bash
-{{GROUNDER_CLI}} plan "$(cat <<'EOF'
-# Plan: …
-…
-EOF
-)" --path <path-to-existing-plan.md>
-```
-
-`--path` must resolve under this project's `plans/` dir; it always overwrites (no `--force`).
-
-**2. Path unknown** (e.g. "update the plan" with nothing attached and no prior path this conversation): look it up, then update as in (1).
+**2. No path, but update intent** (e.g. "update/continue/revise the plan", or a name that sounds like an existing one) → look it up first:
 
 ```bash
 {{GROUNDER_CLI}} plan list --limit 5
 ```
 
-Pick the path matching the user's intent; ask if none or several match.
+Exactly one match (or only one plan exists in the project) → treat as case 1. None or several match → ask the user to pick; never guess.
 
-**3. Genuinely new plan** (not an update): derive a `--title`.
-- If the instruction names one explicitly (e.g. `save as "implementation-phase-1"` or `…phase-1.md`), use it (strip a trailing `.md`).
-- Otherwise derive a short kebab-case name from the plan's title/goal and confirm it with the user before writing.
+**3. No path, no update intent → genuinely new plan.** Derive a `--title` (the user's explicit name, else a short kebab-case slug from the plan's title/goal) and write immediately — don't ask about the name itself.
 
 ```bash
 {{GROUNDER_CLI}} plan "$(cat <<'EOF'
 # Plan: …
 …
 EOF
-)" --title <name>
+)" --path <path>   # case 1/2 — update
+# or
+{{GROUNDER_CLI}} plan "$(cat <<'EOF'
+# Plan: …
+…
+EOF
+)" --title <name>  # case 3 — create
 ```
 
-If the CLI refuses because that name already exists (non-zero exit; stderr names the conflict), tell the user and ask whether to overwrite (`--force`) or pick a different name. `--force` only resolves this title collision — it is never how you update a plan you already meant to target (use `--path` for that). **Never** silently pass `--force`.
+`--path` must resolve under this project's `plans/` dir. If `--title` collides with an existing plan (non-zero exit; stderr names the conflict), ask: overwrite (`--force`) or a different name. `--force` only resolves that collision — **never** use it to update a plan you meant to target with `--path`.
 
 Run from the linked project folder or any subdirectory beneath it.
-The vault is outside the workspace — approve shell permissions if Cursor prompts you.
+Run {{GROUNDER_CLI}} with `required_permissions: ["all"]` (vault is outside the workspace).
 
 Do not compute vault paths or write files yourself — the CLI handles it.
-Report the CLI output path from stdout to the user.
+Report the exact path the CLI prints on stdout — it confirms the real outcome, not just the intent.
