@@ -434,6 +434,41 @@ describe("commands/doctor", () => {
     }
   });
 
+  it("warns when command dry-run reports created artifacts", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const install = vi.spyOn(cursor, "install").mockResolvedValue({
+      artifacts: {
+        "/tmp/grounder-note.md": "created",
+        "/tmp/grounder-task.md": "skipped",
+      },
+    });
+    try {
+      const { code, out } = await captureStdout(() =>
+        runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+      );
+
+      expect(code).toBe(0);
+      expect(out).toContain("warn  agent-cursor");
+      expect(out).toContain("Cursor: 1 command file(s) would install on next migrate");
+      expect(out).toContain("→ grounder migrate");
+      expect(out).toContain("ok    agent-cursor-hooks");
+      expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
+    } finally {
+      install.mockRestore();
+    }
+  });
+
   it("warns when session hook drift dry-run throws", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;

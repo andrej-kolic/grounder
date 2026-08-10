@@ -6,7 +6,7 @@ import {
   hookFileGrounderPeekCommands,
   isHookRuntimeStale,
 } from "../agents/hook-runtime.js";
-import type { AgentAdapter } from "../agents/index.js";
+import type { AgentAdapter, AgentInstallResult } from "../agents/index.js";
 import { resolveAgents } from "../agents/index.js";
 import { findGitRoot } from "../connector/git.js";
 import { homeConfigPath, readHomeConfig, withHomeDir } from "../connector/home.js";
@@ -237,31 +237,48 @@ function hooksSchemaAhead(
 
 /**
  * Map migrate dry-run artifact statuses onto a doctor check.
- * `modified` needs `--force`; `overwritten` would auto-update on plain migrate.
+ * `modified` needs `--force`; `overwritten` / `created` would write on plain migrate.
+ * Only `skipped` counts as up to date.
  */
 function checkFromInstallPreview(
   id: string,
   agentName: string,
   kind: string,
-  preview: { artifacts: Record<string, string> },
+  preview: AgentInstallResult,
   upToDateMessage: string,
 ): CheckResult {
   const statuses = Object.values(preview.artifacts);
   const modified = statuses.filter((s) => s === "modified").length;
-  const stale = statuses.filter((s) => s === "overwritten").length;
+  const created = statuses.filter((s) => s === "created").length;
+  const overwritten = statuses.filter((s) => s === "overwritten").length;
+  const wouldWrite = created + overwritten;
 
-  if (modified === 0 && stale === 0) {
+  if (modified === 0 && wouldWrite === 0) {
     return okCheck(id, upToDateMessage);
   }
   if (modified === 0) {
-    return warnCheck(id, `${agentName}: ${stale} ${kind} would update on next migrate`, MIGRATE);
+    return warnCheck(
+      id,
+      `${agentName}: ${pendingWriteMessage(kind, created, overwritten)}`,
+      MIGRATE,
+    );
   }
   return warnCheck(
     id,
     `${agentName}: ${modified} ${kind} locally modified (needs --force to refresh)` +
-      (stale > 0 ? `, ${stale} would auto-update` : ""),
+      (wouldWrite > 0 ? `, ${wouldWrite} would auto-update` : ""),
     MIGRATE_FORCE,
   );
+}
+
+function pendingWriteMessage(kind: string, created: number, overwritten: number): string {
+  if (created > 0 && overwritten > 0) {
+    return `${created + overwritten} ${kind} would install or update on next migrate`;
+  }
+  if (created > 0) {
+    return `${created} ${kind} would install on next migrate`;
+  }
+  return `${overwritten} ${kind} would update on next migrate`;
 }
 
 async function checkAgentArtifacts(
