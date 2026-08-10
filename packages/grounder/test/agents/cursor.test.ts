@@ -152,7 +152,6 @@ describe("agents/cursor", () => {
         throw new Error("expected cursor state after install");
       }
       state.agents.cursor.files[noteDest] = {
-        schema: 1,
         hash: hashContent(staleBody),
       };
       await writeGrounderState(state, env.home);

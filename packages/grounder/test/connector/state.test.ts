@@ -176,7 +176,7 @@ describe("connector/state", () => {
       commandsSchema: 1,
       grounderVersion: "0.3.0",
       files: {
-        "/tmp/a.md": { schema: 1, hash: "sha256:aaa" },
+        "/tmp/a.md": { hash: "sha256:aaa" },
       },
       homeDir: env.home,
     });
@@ -185,15 +185,15 @@ describe("connector/state", () => {
       commandsSchema: 1,
       grounderVersion: "0.3.0",
       files: {
-        "/tmp/b.md": { schema: 1, hash: "sha256:bbb" },
+        "/tmp/b.md": { hash: "sha256:bbb" },
       },
       homeDir: env.home,
     });
 
     const state = await readGrounderState(env.home);
     expect(state?.agents.cursor?.files).toEqual({
-      "/tmp/a.md": { schema: 1, hash: "sha256:aaa" },
-      "/tmp/b.md": { schema: 1, hash: "sha256:bbb" },
+      "/tmp/a.md": { hash: "sha256:aaa" },
+      "/tmp/b.md": { hash: "sha256:bbb" },
     });
     expect(recordedFileHash(state, "cursor", "/tmp/a.md")).toBe("sha256:aaa");
   });
@@ -315,21 +315,6 @@ describe("connector/state", () => {
         [{ id: "cursor", name: "Cursor", commandsSchema: 1, hooksSchema: 1 }],
       ),
     ).toThrow(/hooks schema 50.*Upgrade grounder/);
-
-    expect(() =>
-      assertAgentSchemasSupported(
-        {
-          grounderVersion: "9.9.9",
-          agents: {
-            cursor: {
-              commandsSchema: 1,
-              files: { "/tmp/x.md": { schema: 7, hash: "sha256:x" } },
-            },
-          },
-        },
-        [{ id: "cursor", name: "Cursor", commandsSchema: 1 }],
-      ),
-    ).toThrow(/file .* schema 7.*Upgrade grounder/);
 
     expect(() =>
       assertAgentSchemasSupported(state, [

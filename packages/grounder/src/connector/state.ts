@@ -14,7 +14,6 @@ export interface AgentSchemaSupport {
 
 /** Per-file install record for chezmoi-style drift detection on command markdown. */
 export interface AgentFileState {
-  schema: number;
   /** `sha256:…` of the exact bytes Grounder last wrote (see `hashContent`). */
   hash?: string;
 }
@@ -261,14 +260,6 @@ export function assertAgentSchemasSupported(
       throw new UnsupportedSchemaError(
         `${agent.name} hooks schema ${recorded.hooksSchema} is newer than this grounder supports (${agent.hooksSchema}). Upgrade grounder.`,
       );
-    }
-
-    for (const [filePath, file] of Object.entries(recorded.files)) {
-      if (typeof file?.schema === "number" && file.schema > agent.commandsSchema) {
-        throw new UnsupportedSchemaError(
-          `${agent.name} file ${filePath} schema ${file.schema} is newer than this grounder supports (${agent.commandsSchema}). Upgrade grounder.`,
-        );
-      }
     }
   }
 }

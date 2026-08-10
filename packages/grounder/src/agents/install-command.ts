@@ -79,7 +79,7 @@ export async function installCommandFile(
 export async function recordCommandFileHashes(opts: {
   agentId: string;
   commandsSchema: number;
-  files: Record<string, { schema: number; hash: string }>;
+  files: Record<string, { hash: string }>;
   homeDir?: string;
   dryRun?: boolean;
 }): Promise<void> {
