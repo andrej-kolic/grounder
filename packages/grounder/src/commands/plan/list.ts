@@ -12,7 +12,7 @@ const DEFAULT_LIMIT = 5;
 export interface PlanListOptions {
   /** Directory used to find the linked repo (default: `process.cwd()`). */
   cwd?: string;
-  /** Max paths to print, newest first (default: 5). */
+  /** Max plans to print, newest first (default: 5). */
   limit?: number;
   /** Override home dir / `GROUNDER_HOME` (tests). */
   homeDir?: string;
@@ -86,12 +86,14 @@ export function formatPlanListHeader(count: number, limit: number): string {
  * Resolves the linked project, lists recent plans under `plans/` (newest first).
  * Prints a count header (blank line after when non-empty), then each plan as a
  * numbered two-line block — `N. ` + filename stem (title), then the indented
- * absolute path — separated by a blank line. When `plans/` is empty, prints
- * `No plans.` only. The number is positional within this listing only (not a
- * stable identifier — a later `plan list` call may renumber if plans change)
- * and exists purely so a human or agent can refer to "plan 2" in the same
- * conversation without retyping the path. Same vault/link prerequisites as
- * `grounder plan`.
+ * absolute path — separated by a blank line. The title line ends with two
+ * trailing spaces (a Markdown hard line break) so agents can relay stdout
+ * into chat and keep title and path on separate rendered lines. When `plans/`
+ * is empty, prints `No plans.` only. The number is positional within this
+ * listing only (not a stable identifier — a later `plan list` call may
+ * renumber if plans change) and exists purely so a human or agent can refer
+ * to "plan 2" in the same conversation without retyping the path. Same
+ * vault/link prerequisites as `grounder plan`.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runPlanListWithOptions(options: PlanListOptions = {}): Promise<number> {
@@ -112,6 +114,7 @@ export async function runPlanListWithOptions(options: PlanListOptions = {}): Pro
         process.stdout.write("\n");
       }
       const stem = path.basename(filePath, ".md");
+      // Two trailing spaces: Markdown hard break when stdout is relayed into chat.
       process.stdout.write(`${index + 1}. ${stem}  \n  ${filePath}\n`);
     });
     return 0;

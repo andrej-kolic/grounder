@@ -125,7 +125,7 @@ Subcommands:
     listUsage: "plan list",
     usage: "grounder plan list [--limit <n>]",
     flags: `Flags:
-  --limit <n>  Max paths to print (default: 5)`,
+  --limit <n>  Max plans to print (default: 5)`,
   },
   {
     id: "path notes",
