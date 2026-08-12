@@ -1,3 +1,4 @@
+import path from "node:path";
 import { withHomeDir } from "../../connector/home.js";
 import { resolveLogsDir } from "../../connector/vault.js";
 import { helpExitCode } from "../../help.js";
@@ -12,7 +13,10 @@ const DEFAULT_LIMIT = 5;
 export interface HandoffListOptions {
   /** Directory used to find the linked repo (default: `process.cwd()`). */
   cwd?: string;
-  /** Max paths to print, newest first (default: 5). */
+  /**
+   * Default list: max handoffs to print, newest first (default: 5).
+   * With `--head`: bounds the usable-handoff fallback scan only (not output count).
+   */
   limit?: number;
   /**
    * Print only the single newest *usable* handoff path (skips empty/unreadable
@@ -70,13 +74,36 @@ export async function runHandoffList(argv: string[]): Promise<number> {
   return runHandoffListWithOptions({ limit, head: flagBool(flags, "head") });
 }
 
+function handoffNoun(count: number): string {
+  return count === 1 ? "handoff" : "handoffs";
+}
+
 /**
- * Resolves the linked project, lists recent handoff paths under `logs/` (newest first).
- * Prints one absolute path per line; empty when no handoffs. Same vault/link
- * prerequisites as `grounder handoff`.
- * With `head: true`, prints only the single newest *usable* handoff path — see
- * {@link findUsableHandoff}. This is the selection `/grounder-task` should read,
- * matching what `grounder handoff peek` teases.
+ * Lead line for `handoff list` stdout: truncation signal when `count === limit`,
+ * complete inventory when fewer, or empty-dir notice.
+ */
+export function formatHandoffListHeader(count: number, limit: number): string {
+  if (count === 0) {
+    return "No handoffs.\n";
+  }
+  if (count === limit) {
+    return `Most recent ${count} ${handoffNoun(count)} (there may be more):\n\n`;
+  }
+  return `All ${count} ${handoffNoun(count)}:\n\n`;
+}
+
+/**
+ * Resolves the linked project, lists recent handoffs under `logs/` (newest first).
+ * Default: prints a count header (blank line after when non-empty), then each
+ * handoff as a numbered two-line block — `N. ` + full filename stem (including
+ * timestamp prefix), then the indented absolute path — separated by a blank
+ * line. The title line ends with two trailing spaces (a Markdown hard line
+ * break) so agents can relay stdout into chat and keep title and path on
+ * separate rendered lines. When `logs/` is empty, prints `No handoffs.` only.
+ * The number is positional within this listing only (not a stable identifier).
+ * With `head: true`, prints only the single newest *usable* handoff path (or
+ * empty stdout) — see {@link findUsableHandoff}. Same vault/link prerequisites
+ * as `grounder handoff`.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runHandoffListWithOptions(options: HandoffListOptions = {}): Promise<number> {
@@ -86,23 +113,29 @@ export async function runHandoffListWithOptions(options: HandoffListOptions = {}
       return 1;
     }
 
+    const limit = options.limit ?? DEFAULT_LIMIT;
     const logsDir = resolveLogsDir(linked.home, linked.repo);
 
     if (options.head) {
-      const usable = await findUsableHandoff(logsDir, { limit: options.limit ?? DEFAULT_LIMIT });
+      const usable = await findUsableHandoff(logsDir, { limit });
       if (usable) {
         process.stdout.write(`${usable.path}\n`);
       }
       return 0;
     }
 
-    const paths = await listHandoffs(logsDir, {
-      limit: options.limit ?? DEFAULT_LIMIT,
-    });
+    const paths = await listHandoffs(logsDir, { limit });
 
-    for (const filePath of paths) {
-      process.stdout.write(`${filePath}\n`);
-    }
+    process.stdout.write(formatHandoffListHeader(paths.length, limit));
+
+    paths.forEach((filePath, index) => {
+      if (index > 0) {
+        process.stdout.write("\n");
+      }
+      const stem = path.basename(filePath, ".md");
+      // Two trailing spaces: Markdown hard break when stdout is relayed into chat.
+      process.stdout.write(`${index + 1}. ${stem}  \n  ${filePath}\n`);
+    });
     return 0;
   });
 }
