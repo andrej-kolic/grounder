@@ -76,7 +76,19 @@ export const COMMANDS: readonly CommandMeta[] = [
     listUsage: "note <text>",
     usage: "grounder note <text> [--title <slug>]",
     flags: `Flags:
-  --title <slug> Short slug in filename (default: slugified first line)`,
+  --title <slug> Short slug in filename (default: slugified first line)
+
+Subcommands:
+  note list   Print recent notes (count header + numbered title/path, newest first)`,
+  },
+  {
+    id: "note list",
+    group: "Write",
+    summary: "Print recent notes (count header + numbered title/path, newest first)",
+    listUsage: "note list",
+    usage: "grounder note list [--limit <n>]",
+    flags: `Flags:
+  --limit <n>  Max notes to print (default: 5)`,
   },
   {
     id: "handoff",
@@ -226,6 +238,7 @@ export const DISPATCHED_COMMAND_IDS = [
   "vault init",
   "init",
   "note",
+  "note list",
   "handoff",
   "handoff list",
   "handoff peek",

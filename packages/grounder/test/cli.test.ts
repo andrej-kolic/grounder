@@ -86,6 +86,8 @@ describe("grounder cli", () => {
       [["help", "handoff", "list"], "handoff list"],
       [["plan", "list", "--help"], "plan list"],
       [["help", "plan", "list"], "plan list"],
+      [["note", "list", "--help"], "note list"],
+      [["help", "note", "list"], "note list"],
       [["handoff", "peek", "--help"], "handoff peek"],
       [["vault", "init", "--help"], "vault init"],
       [["help", "vault", "init"], "vault init"],

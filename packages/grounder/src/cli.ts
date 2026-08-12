@@ -8,6 +8,7 @@ import { runHandoffList } from "./commands/handoff/list.js";
 import { runHandoffPeek } from "./commands/handoff/peek.js";
 import { runHandoff } from "./commands/handoff.js";
 import { runMigrate } from "./commands/migrate.js";
+import { runNoteList } from "./commands/note/list.js";
 import { runNote } from "./commands/note.js";
 import { runPathLogs } from "./commands/path/logs.js";
 import { runPathNotes } from "./commands/path/notes.js";
@@ -84,6 +85,10 @@ async function main(): Promise<void> {
 
   if (command === "init") {
     process.exit(await runRepoInit(rest));
+  }
+
+  if (command === "note" && rest[0] === "list") {
+    process.exit(await runNoteList(rest.slice(1)));
   }
 
   if (command === "note") {
