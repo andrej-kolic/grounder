@@ -100,17 +100,17 @@ Subcommands:
   --title <slug> Short slug in filename (default: slugified first line)
 
 Subcommands:
-  handoff list   Print recent handoff paths (newest first)
+  handoff list   Print recent handoffs (count header + numbered title/path, newest first)
   handoff peek   One-line latest-handoff teaser (session hooks)`,
   },
   {
     id: "handoff list",
     group: "Write",
-    summary: "Print recent handoff paths (newest first)",
+    summary: "Print recent handoffs (count header + numbered title/path, newest first)",
     listUsage: "handoff list",
     usage: "grounder handoff list [--limit <n>] [--head]",
     flags: `Flags:
-  --limit <n>  Max paths to print (default: 5)
+  --limit <n>  Max handoffs to print (default: 5)
   --head       Print only the newest usable path
                (skips empty/unreadable files; same pick as handoff peek)`,
   },

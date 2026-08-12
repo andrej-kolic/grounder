@@ -25,7 +25,7 @@ describe("commands/handoff/list", () => {
     }
   });
 
-  it("prints newest handoff paths first", async () => {
+  it("prints newest handoffs first as numbered title + path blocks", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
@@ -34,8 +34,10 @@ describe("commands/handoff/list", () => {
     await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
-    await writeFile(path.join(logsDir, "2026-06-26-1430.md"), "older", "utf8");
-    await writeFile(path.join(logsDir, "2026-06-26-1500-newer.md"), "newer", "utf8");
+    const older = path.join(logsDir, "2026-06-26-1430.md");
+    const newer = path.join(logsDir, "2026-06-26-1500-newer.md");
+    await writeFile(older, "older", "utf8");
+    await writeFile(newer, "newer", "utf8");
 
     const { code, out } = await captureStdout(() =>
       runHandoffListWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -43,15 +45,11 @@ describe("commands/handoff/list", () => {
 
     expect(code).toBe(0);
     expect(out).toBe(
-      [
-        path.join(logsDir, "2026-06-26-1500-newer.md"),
-        path.join(logsDir, "2026-06-26-1430.md"),
-        "",
-      ].join("\n"),
+      `All 2 handoffs:\n\n1. 2026-06-26-1500-newer  \n  ${newer}\n\n2. 2026-06-26-1430  \n  ${older}\n`,
     );
   });
 
-  it("prints nothing and exits 0 when logs are empty", async () => {
+  it("prints No handoffs. and exits 0 when logs are empty", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
@@ -64,10 +62,10 @@ describe("commands/handoff/list", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toBe("");
+    expect(out).toBe("No handoffs.\n");
   });
 
-  it("respects --limit", async () => {
+  it("respects --limit and signals possible truncation", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
@@ -76,19 +74,24 @@ describe("commands/handoff/list", () => {
     await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
-    await writeFile(path.join(logsDir, "2026-06-26-1300.md"), "a", "utf8");
-    await writeFile(path.join(logsDir, "2026-06-26-1400.md"), "b", "utf8");
-    await writeFile(path.join(logsDir, "2026-06-26-1500.md"), "c", "utf8");
+    const a = path.join(logsDir, "2026-06-26-1300.md");
+    const b = path.join(logsDir, "2026-06-26-1400.md");
+    const c = path.join(logsDir, "2026-06-26-1500.md");
+    await writeFile(a, "a", "utf8");
+    await writeFile(b, "b", "utf8");
+    await writeFile(c, "c", "utf8");
 
     const { code, out } = await captureStdout(() =>
       runHandoffListWithOptions({ cwd: env.repo, homeDir: env.home, limit: 1 }),
     );
 
     expect(code).toBe(0);
-    expect(out.trim()).toBe(path.join(logsDir, "2026-06-26-1500.md"));
+    expect(out).toBe(
+      `Most recent 1 handoff (there may be more):\n\n1. 2026-06-26-1500  \n  ${c}\n`,
+    );
   });
 
-  it("cli prints paths and honors --limit", async () => {
+  it("cli prints count header + numbered blocks and honors --limit", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -97,7 +100,8 @@ describe("commands/handoff/list", () => {
 
     const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
     await writeFile(path.join(logsDir, "2026-06-26-1300.md"), "a", "utf8");
-    await writeFile(path.join(logsDir, "2026-06-26-1500.md"), "b", "utf8");
+    const newer = path.join(logsDir, "2026-06-26-1500.md");
+    await writeFile(newer, "b", "utf8");
 
     const result = runCli(
       ["handoff", "list", "--limit", "1"],
@@ -106,7 +110,9 @@ describe("commands/handoff/list", () => {
     );
 
     expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe(path.join(logsDir, "2026-06-26-1500.md"));
+    expect(result.stdout).toBe(
+      `Most recent 1 handoff (there may be more):\n\n1. 2026-06-26-1500  \n  ${newer}\n`,
+    );
   });
 
   it("returns usage error for invalid --limit", async () => {
@@ -203,7 +209,8 @@ describe("commands/handoff/list", () => {
     await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
-    await writeFile(path.join(logsDir, "2026-06-26-1500.md"), "x", "utf8");
+    const handoffPath = path.join(logsDir, "2026-06-26-1500.md");
+    await writeFile(handoffPath, "x", "utf8");
 
     const nested = path.join(env.repo, "src", "nested");
     await mkdir(nested, { recursive: true });
@@ -213,6 +220,6 @@ describe("commands/handoff/list", () => {
     );
 
     expect(code).toBe(0);
-    expect(out.trim()).toBe(path.join(logsDir, "2026-06-26-1500.md"));
+    expect(out).toBe(`All 1 handoff:\n\n1. 2026-06-26-1500  \n  ${handoffPath}\n`);
   });
 });

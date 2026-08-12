@@ -3,11 +3,7 @@ import { mkdir, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  formatPlanListHeader,
-  runPlanList,
-  runPlanListWithOptions,
-} from "../../../src/commands/plan/list.js";
+import { runPlanList, runPlanListWithOptions } from "../../../src/commands/plan/list.js";
 import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
 import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
 import { captureStdout, createTempEnv, withGroundedHome } from "../../helpers.js";
@@ -22,22 +18,6 @@ function runCli(args: string[], env: NodeJS.ProcessEnv, cwd?: string) {
 async function touch(filePath: string, when: Date): Promise<void> {
   await utimes(filePath, when, when);
 }
-
-describe("formatPlanListHeader", () => {
-  it("signals truncation when count equals limit", () => {
-    expect(formatPlanListHeader(5, 5)).toBe("Most recent 5 plans (there may be more):\n\n");
-    expect(formatPlanListHeader(1, 1)).toBe("Most recent 1 plan (there may be more):\n\n");
-  });
-
-  it("reports a complete inventory when under the limit", () => {
-    expect(formatPlanListHeader(2, 5)).toBe("All 2 plans:\n\n");
-    expect(formatPlanListHeader(1, 5)).toBe("All 1 plan:\n\n");
-  });
-
-  it("reports empty plans/", () => {
-    expect(formatPlanListHeader(0, 5)).toBe("No plans.\n");
-  });
-});
 
 describe("commands/plan/list", () => {
   let cleanup: (() => Promise<void>) | undefined;

@@ -1,0 +1,66 @@
+import { describe, expect, it } from "vitest";
+import {
+  formatVaultItemListHeader,
+  writeVaultItemList,
+  writeVaultItemListEntries,
+} from "../../src/commands/output.js";
+import { captureStdout } from "../helpers.js";
+
+const notes = { singular: "note", plural: "notes" } as const;
+
+describe("formatVaultItemListHeader", () => {
+  it("signals truncation when count equals limit", () => {
+    expect(formatVaultItemListHeader(5, 5, notes)).toBe(
+      "Most recent 5 notes (there may be more):\n\n",
+    );
+    expect(formatVaultItemListHeader(1, 1, notes)).toBe(
+      "Most recent 1 note (there may be more):\n\n",
+    );
+  });
+
+  it("reports a complete inventory when under the limit", () => {
+    expect(formatVaultItemListHeader(2, 5, notes)).toBe("All 2 notes:\n\n");
+    expect(formatVaultItemListHeader(1, 5, notes)).toBe("All 1 note:\n\n");
+  });
+
+  it("reports empty inventory with the plural noun", () => {
+    expect(formatVaultItemListHeader(0, 5, notes)).toBe("No notes.\n");
+    expect(formatVaultItemListHeader(0, 5, { singular: "handoff", plural: "handoffs" })).toBe(
+      "No handoffs.\n",
+    );
+  });
+});
+
+describe("writeVaultItemList", () => {
+  it("writes header plus numbered title/path blocks with Markdown hard breaks", async () => {
+    const older = "/vault/logs/2026-06-26-1430.md";
+    const newer = "/vault/logs/2026-06-26-1500-newer.md";
+
+    const { out } = await captureStdout(async () => {
+      writeVaultItemList([newer, older], 5, { singular: "handoff", plural: "handoffs" });
+      return 0;
+    });
+
+    expect(out).toBe(
+      `All 2 handoffs:\n\n1. 2026-06-26-1500-newer  \n  ${newer}\n\n2. 2026-06-26-1430  \n  ${older}\n`,
+    );
+  });
+
+  it("writes only the empty notice when there are no paths", async () => {
+    const { out } = await captureStdout(async () => {
+      writeVaultItemList([], 5, notes);
+      return 0;
+    });
+    expect(out).toBe("No notes.\n");
+  });
+});
+
+describe("writeVaultItemListEntries", () => {
+  it("separates items with a blank line", async () => {
+    const { out } = await captureStdout(async () => {
+      writeVaultItemListEntries(["/a/first.md", "/a/second.md"]);
+      return 0;
+    });
+    expect(out).toBe("1. first  \n  /a/first.md\n\n2. second  \n  /a/second.md\n");
+  });
+});

@@ -4,6 +4,7 @@ import { helpExitCode } from "../../help.js";
 import { flagBool, parseArgs } from "../../util/parse-args.js";
 import { findUsableHandoff } from "../../vault/find-usable-handoff.js";
 import { listHandoffs } from "../../vault/list-handoffs.js";
+import { writeVaultItemList } from "../output.js";
 import { requireLinkedProject } from "../require-linked.js";
 
 const DEFAULT_LIMIT = 5;
@@ -12,7 +13,10 @@ const DEFAULT_LIMIT = 5;
 export interface HandoffListOptions {
   /** Directory used to find the linked repo (default: `process.cwd()`). */
   cwd?: string;
-  /** Max paths to print, newest first (default: 5). */
+  /**
+   * Default list: max handoffs to print, newest first (default: 5).
+   * With `--head`: bounds the usable-handoff fallback scan only (not output count).
+   */
   limit?: number;
   /**
    * Print only the single newest *usable* handoff path (skips empty/unreadable
@@ -71,12 +75,17 @@ export async function runHandoffList(argv: string[]): Promise<number> {
 }
 
 /**
- * Resolves the linked project, lists recent handoff paths under `logs/` (newest first).
- * Prints one absolute path per line; empty when no handoffs. Same vault/link
- * prerequisites as `grounder handoff`.
- * With `head: true`, prints only the single newest *usable* handoff path — see
- * {@link findUsableHandoff}. This is the selection `/grounder-task` should read,
- * matching what `grounder handoff peek` teases.
+ * Resolves the linked project, lists recent handoffs under `logs/` (newest first).
+ * Default: prints a count header (blank line after when non-empty), then each
+ * handoff as a numbered two-line block — `N. ` + full filename stem (including
+ * timestamp prefix), then the indented absolute path — separated by a blank
+ * line. The title line ends with two trailing spaces (a Markdown hard line
+ * break) so agents can relay stdout into chat and keep title and path on
+ * separate rendered lines. When `logs/` is empty, prints `No handoffs.` only.
+ * The number is positional within this listing only (not a stable identifier).
+ * With `head: true`, prints only the single newest *usable* handoff path (or
+ * empty stdout) — see {@link findUsableHandoff}. Same vault/link prerequisites
+ * as `grounder handoff`.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runHandoffListWithOptions(options: HandoffListOptions = {}): Promise<number> {
@@ -86,23 +95,19 @@ export async function runHandoffListWithOptions(options: HandoffListOptions = {}
       return 1;
     }
 
+    const limit = options.limit ?? DEFAULT_LIMIT;
     const logsDir = resolveLogsDir(linked.home, linked.repo);
 
     if (options.head) {
-      const usable = await findUsableHandoff(logsDir, { limit: options.limit ?? DEFAULT_LIMIT });
+      const usable = await findUsableHandoff(logsDir, { limit });
       if (usable) {
         process.stdout.write(`${usable.path}\n`);
       }
       return 0;
     }
 
-    const paths = await listHandoffs(logsDir, {
-      limit: options.limit ?? DEFAULT_LIMIT,
-    });
-
-    for (const filePath of paths) {
-      process.stdout.write(`${filePath}\n`);
-    }
+    const paths = await listHandoffs(logsDir, { limit });
+    writeVaultItemList(paths, limit, { singular: "handoff", plural: "handoffs" });
     return 0;
   });
 }

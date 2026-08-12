@@ -1,9 +1,9 @@
-import path from "node:path";
 import { withHomeDir } from "../../connector/home.js";
 import { resolveNotesDir } from "../../connector/vault.js";
 import { helpExitCode } from "../../help.js";
 import { parseArgs } from "../../util/parse-args.js";
 import { listNotes } from "../../vault/list-notes.js";
+import { writeVaultItemList } from "../output.js";
 import { requireLinkedProject } from "../require-linked.js";
 
 const DEFAULT_LIMIT = 5;
@@ -64,24 +64,6 @@ export async function runNoteList(argv: string[]): Promise<number> {
   return runNoteListWithOptions({ limit });
 }
 
-function noteNoun(count: number): string {
-  return count === 1 ? "note" : "notes";
-}
-
-/**
- * Lead line for `note list` stdout: truncation signal when `count === limit`,
- * complete inventory when fewer, or empty-dir notice.
- */
-export function formatNoteListHeader(count: number, limit: number): string {
-  if (count === 0) {
-    return "No notes.\n";
-  }
-  if (count === limit) {
-    return `Most recent ${count} ${noteNoun(count)} (there may be more):\n\n`;
-  }
-  return `All ${count} ${noteNoun(count)}:\n\n`;
-}
-
 /**
  * Resolves the linked project, lists recent notes under `notes/` (newest first).
  * Prints a count header (blank line after when non-empty), then each note as a
@@ -103,17 +85,7 @@ export async function runNoteListWithOptions(options: NoteListOptions = {}): Pro
     const limit = options.limit ?? DEFAULT_LIMIT;
     const notesDir = resolveNotesDir(linked.home, linked.repo);
     const paths = await listNotes(notesDir, { limit });
-
-    process.stdout.write(formatNoteListHeader(paths.length, limit));
-
-    paths.forEach((filePath, index) => {
-      if (index > 0) {
-        process.stdout.write("\n");
-      }
-      const stem = path.basename(filePath, ".md");
-      // Two trailing spaces: Markdown hard break when stdout is relayed into chat.
-      process.stdout.write(`${index + 1}. ${stem}  \n  ${filePath}\n`);
-    });
+    writeVaultItemList(paths, limit, { singular: "note", plural: "notes" });
     return 0;
   });
 }

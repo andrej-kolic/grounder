@@ -3,11 +3,7 @@ import { mkdir, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  formatNoteListHeader,
-  runNoteList,
-  runNoteListWithOptions,
-} from "../../../src/commands/note/list.js";
+import { runNoteList, runNoteListWithOptions } from "../../../src/commands/note/list.js";
 import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
 import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
 import { captureStdout, createTempEnv, withGroundedHome } from "../../helpers.js";
@@ -22,22 +18,6 @@ function runCli(args: string[], env: NodeJS.ProcessEnv, cwd?: string) {
 async function touch(filePath: string, when: Date): Promise<void> {
   await utimes(filePath, when, when);
 }
-
-describe("formatNoteListHeader", () => {
-  it("signals truncation when count equals limit", () => {
-    expect(formatNoteListHeader(5, 5)).toBe("Most recent 5 notes (there may be more):\n\n");
-    expect(formatNoteListHeader(1, 1)).toBe("Most recent 1 note (there may be more):\n\n");
-  });
-
-  it("reports a complete inventory when under the limit", () => {
-    expect(formatNoteListHeader(2, 5)).toBe("All 2 notes:\n\n");
-    expect(formatNoteListHeader(1, 5)).toBe("All 1 note:\n\n");
-  });
-
-  it("reports empty notes/", () => {
-    expect(formatNoteListHeader(0, 5)).toBe("No notes.\n");
-  });
-});
 
 describe("commands/note/list", () => {
   let cleanup: (() => Promise<void>) | undefined;
