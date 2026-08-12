@@ -116,16 +116,16 @@ Subcommands:
   --force        With --title: overwrite an existing plan (preserves created)
 
 Subcommands:
-  plan list   Print recent plan paths (newest first)`,
+  plan list   Print recent plans (count header + numbered title/path, newest first)`,
   },
   {
     id: "plan list",
     group: "Write",
-    summary: "Print recent plan paths (newest first)",
+    summary: "Print recent plans (count header + numbered title/path, newest first)",
     listUsage: "plan list",
     usage: "grounder plan list [--limit <n>]",
     flags: `Flags:
-  --limit <n>  Max paths to print (default: 5)`,
+  --limit <n>  Max plans to print (default: 5)`,
   },
   {
     id: "path notes",

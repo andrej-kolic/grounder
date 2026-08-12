@@ -22,7 +22,9 @@ Build a markdown body with these sections:
 …
 ```
 
-Resolve the target, then **state it plainly before writing** — `Updating plan at <path>.` or `Creating new plan titled <title>.` This is a visible record, not a blocking confirmation — updates overwrite with no `--force`, so get the match right.
+**Special case: the instruction asks to view existing plans, not name a new topic** (`list`, `list 3 oldest`, `show plans`, etc.) → run `{{GROUNDER_CLI}} plan list --limit <N>` (N = count named, else 5; ignore order words like "oldest" — output is always newest-first, never resort or relabel it) and stop — no plan write, no title. Relay the CLI stdout as-is (it already includes the count header).
+
+Otherwise, resolve the target, then **state it plainly before writing** — `Updating plan at <path>.` or `Creating new plan titled <title>.` This is a visible record, not a blocking confirmation — updates overwrite with no `--force`, so get the match right.
 
 **1. Known path** (attached/open in chat, or printed by an earlier `grounder plan` this conversation) → update it directly.
 
@@ -32,7 +34,9 @@ Resolve the target, then **state it plainly before writing** — `Updating plan 
 {{GROUNDER_CLI}} plan list --limit 5
 ```
 
-A match counts only if its title actually corresponds to what the user named — not just "it's the only plan in the project." No name given and exactly one plan exists → that counts too. Otherwise (no match, several matches, or a name that doesn't correspond to any existing plan) → ask; never guess.
+CLI output starts with a count header, then each result as a numbered two-line block — `N. ` + title (filename stem) on the first line, the absolute path indented beneath it.
+
+A match counts only if its title actually corresponds to what the user named — not just "it's the only plan in the project." No name given and exactly one plan exists → that counts too. If the user refers to a plan by the number shown in *this* listing (e.g. "update plan 2"), that counts as a match too — resolve it to the path from this same output, don't reuse a number from an earlier listing in the conversation (it's positional, not a stable id, and can shift if plans changed since). Otherwise (no match, several matches, or a name/number that doesn't correspond to any existing plan) → ask; never guess.
 
 Cases 1 and 2 (update) — run:
 

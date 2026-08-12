@@ -1,3 +1,4 @@
+import path from "node:path";
 import { withHomeDir } from "../../connector/home.js";
 import { resolvePlansDir } from "../../connector/vault.js";
 import { helpExitCode } from "../../help.js";
@@ -11,7 +12,7 @@ const DEFAULT_LIMIT = 5;
 export interface PlanListOptions {
   /** Directory used to find the linked repo (default: `process.cwd()`). */
   cwd?: string;
-  /** Max paths to print, newest first (default: 5). */
+  /** Max plans to print, newest first (default: 5). */
   limit?: number;
   /** Override home dir / `GROUNDER_HOME` (tests). */
   homeDir?: string;
@@ -63,10 +64,36 @@ export async function runPlanList(argv: string[]): Promise<number> {
   return runPlanListWithOptions({ limit });
 }
 
+function planNoun(count: number): string {
+  return count === 1 ? "plan" : "plans";
+}
+
 /**
- * Resolves the linked project, lists recent plan paths under `plans/` (newest first).
- * Prints one absolute path per line; empty when no plans. Same vault/link
- * prerequisites as `grounder plan`.
+ * Lead line for `plan list` stdout: truncation signal when `count === limit`,
+ * complete inventory when fewer, or empty-dir notice.
+ */
+export function formatPlanListHeader(count: number, limit: number): string {
+  if (count === 0) {
+    return "No plans.\n";
+  }
+  if (count === limit) {
+    return `Most recent ${count} ${planNoun(count)} (there may be more):\n\n`;
+  }
+  return `All ${count} ${planNoun(count)}:\n\n`;
+}
+
+/**
+ * Resolves the linked project, lists recent plans under `plans/` (newest first).
+ * Prints a count header (blank line after when non-empty), then each plan as a
+ * numbered two-line block — `N. ` + filename stem (title), then the indented
+ * absolute path — separated by a blank line. The title line ends with two
+ * trailing spaces (a Markdown hard line break) so agents can relay stdout
+ * into chat and keep title and path on separate rendered lines. When `plans/`
+ * is empty, prints `No plans.` only. The number is positional within this
+ * listing only (not a stable identifier — a later `plan list` call may
+ * renumber if plans change) and exists purely so a human or agent can refer
+ * to "plan 2" in the same conversation without retyping the path. Same
+ * vault/link prerequisites as `grounder plan`.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runPlanListWithOptions(options: PlanListOptions = {}): Promise<number> {
@@ -76,14 +103,20 @@ export async function runPlanListWithOptions(options: PlanListOptions = {}): Pro
       return 1;
     }
 
+    const limit = options.limit ?? DEFAULT_LIMIT;
     const plansDir = resolvePlansDir(linked.home, linked.repo);
-    const paths = await listPlans(plansDir, {
-      limit: options.limit ?? DEFAULT_LIMIT,
-    });
+    const paths = await listPlans(plansDir, { limit });
 
-    for (const filePath of paths) {
-      process.stdout.write(`${filePath}\n`);
-    }
+    process.stdout.write(formatPlanListHeader(paths.length, limit));
+
+    paths.forEach((filePath, index) => {
+      if (index > 0) {
+        process.stdout.write("\n");
+      }
+      const stem = path.basename(filePath, ".md");
+      // Two trailing spaces: Markdown hard break when stdout is relayed into chat.
+      process.stdout.write(`${index + 1}. ${stem}  \n  ${filePath}\n`);
+    });
     return 0;
   });
 }
