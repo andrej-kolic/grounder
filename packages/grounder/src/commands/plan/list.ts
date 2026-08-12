@@ -64,13 +64,32 @@ export async function runPlanList(argv: string[]): Promise<number> {
   return runPlanListWithOptions({ limit });
 }
 
+function planNoun(count: number): string {
+  return count === 1 ? "plan" : "plans";
+}
+
+/**
+ * Lead line for `plan list` stdout: truncation signal when `count === limit`,
+ * complete inventory when fewer, or empty-dir notice.
+ */
+export function formatPlanListHeader(count: number, limit: number): string {
+  if (count === 0) {
+    return "No plans.\n";
+  }
+  if (count === limit) {
+    return `Most recent ${count} ${planNoun(count)} (there may be more):\n\n`;
+  }
+  return `All ${count} ${planNoun(count)}:\n\n`;
+}
+
 /**
  * Resolves the linked project, lists recent plans under `plans/` (newest first).
- * Prints each as a numbered two-line block — `N. ` + filename stem (title),
- * then the indented absolute path — separated by a blank line; empty when no
- * plans. The number is positional within this listing only (not a stable
- * identifier — a later `plan list` call may renumber if plans change) and
- * exists purely so a human or agent can refer to "plan 2" in the same
+ * Prints a count header (blank line after when non-empty), then each plan as a
+ * numbered two-line block — `N. ` + filename stem (title), then the indented
+ * absolute path — separated by a blank line. When `plans/` is empty, prints
+ * `No plans.` only. The number is positional within this listing only (not a
+ * stable identifier — a later `plan list` call may renumber if plans change)
+ * and exists purely so a human or agent can refer to "plan 2" in the same
  * conversation without retyping the path. Same vault/link prerequisites as
  * `grounder plan`.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
@@ -82,10 +101,11 @@ export async function runPlanListWithOptions(options: PlanListOptions = {}): Pro
       return 1;
     }
 
+    const limit = options.limit ?? DEFAULT_LIMIT;
     const plansDir = resolvePlansDir(linked.home, linked.repo);
-    const paths = await listPlans(plansDir, {
-      limit: options.limit ?? DEFAULT_LIMIT,
-    });
+    const paths = await listPlans(plansDir, { limit });
+
+    process.stdout.write(formatPlanListHeader(paths.length, limit));
 
     paths.forEach((filePath, index) => {
       if (index > 0) {

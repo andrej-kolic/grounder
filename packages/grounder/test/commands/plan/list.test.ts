@@ -3,7 +3,11 @@ import { mkdir, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { runPlanList, runPlanListWithOptions } from "../../../src/commands/plan/list.js";
+import {
+  formatPlanListHeader,
+  runPlanList,
+  runPlanListWithOptions,
+} from "../../../src/commands/plan/list.js";
 import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
 import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
 import { captureStdout, createTempEnv, withGroundedHome } from "../../helpers.js";
@@ -18,6 +22,22 @@ function runCli(args: string[], env: NodeJS.ProcessEnv, cwd?: string) {
 async function touch(filePath: string, when: Date): Promise<void> {
   await utimes(filePath, when, when);
 }
+
+describe("formatPlanListHeader", () => {
+  it("signals truncation when count equals limit", () => {
+    expect(formatPlanListHeader(5, 5)).toBe("Most recent 5 plans (there may be more):\n\n");
+    expect(formatPlanListHeader(1, 1)).toBe("Most recent 1 plan (there may be more):\n\n");
+  });
+
+  it("reports a complete inventory when under the limit", () => {
+    expect(formatPlanListHeader(2, 5)).toBe("All 2 plans:\n\n");
+    expect(formatPlanListHeader(1, 5)).toBe("All 1 plan:\n\n");
+  });
+
+  it("reports empty plans/", () => {
+    expect(formatPlanListHeader(0, 5)).toBe("No plans.\n");
+  });
+});
 
 describe("commands/plan/list", () => {
   let cleanup: (() => Promise<void>) | undefined;
@@ -50,10 +70,10 @@ describe("commands/plan/list", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toBe(`1. document 1\n  ${newer}\n\n2. older\n  ${older}\n`);
+    expect(out).toBe(`All 2 plans:\n\n1. document 1\n  ${newer}\n\n2. older\n  ${older}\n`);
   });
 
-  it("prints nothing and exits 0 when plans are empty", async () => {
+  it("prints No plans. and exits 0 when plans are empty", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
@@ -66,10 +86,10 @@ describe("commands/plan/list", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toBe("");
+    expect(out).toBe("No plans.\n");
   });
 
-  it("respects --limit", async () => {
+  it("respects --limit and signals possible truncation", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
@@ -93,10 +113,10 @@ describe("commands/plan/list", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toBe(`1. c\n  ${c}\n`);
+    expect(out).toBe(`Most recent 1 plan (there may be more):\n\n1. c\n  ${c}\n`);
   });
 
-  it("cli prints numbered title + path blocks and honors --limit", async () => {
+  it("cli prints count header + numbered blocks and honors --limit", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -114,7 +134,7 @@ describe("commands/plan/list", () => {
     const result = runCli(["plan", "list", "--limit", "1"], withGroundedHome(env.home), env.repo);
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toBe(`1. newer\n  ${newer}\n`);
+    expect(result.stdout).toBe(`Most recent 1 plan (there may be more):\n\n1. newer\n  ${newer}\n`);
   });
 
   it("returns usage error for invalid --limit", async () => {
@@ -150,6 +170,6 @@ describe("commands/plan/list", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toBe(`1. phase-1\n  ${planPath}\n`);
+    expect(out).toBe(`All 1 plan:\n\n1. phase-1\n  ${planPath}\n`);
   });
 });
