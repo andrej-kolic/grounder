@@ -12,7 +12,7 @@ Otherwise, from the linked project folder or any subdirectory beneath it:
 
 2. If empty: tell the user there are no handoffs yet, then read repo `AGENTS.md` only and proceed.
 
-3. Otherwise, read that file. If the user names a specific session instead, run `{{GROUNDER_CLI}} handoff list --limit 5` (count header + numbered title/path) and read the indented path for that name or index from *this* listing (positional, not a stable id).
+3. Otherwise, read that file. If the user names a specific session instead: `{{GROUNDER_CLI}} handoff list --limit 5` → match name/index to the indented path in *this* listing (positional, not a stable id). Miss → once with `--limit 50` (*that* listing only). Still miss → tell the user and stop — no guessed hydrate.
 
 4. Read repo `AGENTS.md` (project conventions and constraints).
 

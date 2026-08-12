@@ -21,8 +21,9 @@ describe("templates/grounder-task", () => {
       expect(body).toContain("stop — no hydrate");
       expect(body).toContain("Relay the CLI stdout as-is");
       expect(body).toContain("handoff list --limit 5");
-      expect(body).toContain("count header + numbered title/path");
-      expect(body).toContain("from *this* listing (positional, not a stable id)");
+      expect(body).toContain("indented path in *this* listing (positional, not a stable id)");
+      expect(body).toContain("once with `--limit 50` (*that* listing only)");
+      expect(body).toContain("no guessed hydrate");
     }
   });
 
