@@ -112,7 +112,7 @@ export async function runPlanListWithOptions(options: PlanListOptions = {}): Pro
         process.stdout.write("\n");
       }
       const stem = path.basename(filePath, ".md");
-      process.stdout.write(`${index + 1}. ${stem}\n  ${filePath}\n`);
+      process.stdout.write(`${index + 1}. ${stem}  \n  ${filePath}\n`);
     });
     return 0;
   });

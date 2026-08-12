@@ -70,7 +70,7 @@ describe("commands/plan/list", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toBe(`All 2 plans:\n\n1. document 1\n  ${newer}\n\n2. older\n  ${older}\n`);
+    expect(out).toBe(`All 2 plans:\n\n1. document 1  \n  ${newer}\n\n2. older  \n  ${older}\n`);
   });
 
   it("prints No plans. and exits 0 when plans are empty", async () => {
@@ -113,7 +113,7 @@ describe("commands/plan/list", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toBe(`Most recent 1 plan (there may be more):\n\n1. c\n  ${c}\n`);
+    expect(out).toBe(`Most recent 1 plan (there may be more):\n\n1. c  \n  ${c}\n`);
   });
 
   it("cli prints count header + numbered blocks and honors --limit", async () => {
@@ -134,7 +134,9 @@ describe("commands/plan/list", () => {
     const result = runCli(["plan", "list", "--limit", "1"], withGroundedHome(env.home), env.repo);
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toBe(`Most recent 1 plan (there may be more):\n\n1. newer\n  ${newer}\n`);
+    expect(result.stdout).toBe(
+      `Most recent 1 plan (there may be more):\n\n1. newer  \n  ${newer}\n`,
+    );
   });
 
   it("returns usage error for invalid --limit", async () => {
@@ -170,6 +172,6 @@ describe("commands/plan/list", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toBe(`All 1 plan:\n\n1. phase-1\n  ${planPath}\n`);
+    expect(out).toBe(`All 1 plan:\n\n1. phase-1  \n  ${planPath}\n`);
   });
 });
