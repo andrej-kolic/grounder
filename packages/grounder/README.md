@@ -137,6 +137,7 @@ Nothing is written into the repo except the small `.grounder.json` marker. Agent
 grounder vault init <path>   Initialize vault + home config (once per machine)
 grounder init                Connect the current folder to your vault
 grounder note <text>         Write a note to the vault
+grounder note list           Print recent notes (count header + numbered title/path, newest first)
 grounder handoff <text>      Write a session handoff to vault logs/
 grounder handoff list        Print recent handoff paths (newest first)
 grounder handoff list --head Print only the newest usable handoff path
@@ -187,6 +188,7 @@ See [Upgrading](#upgrading) for the usual post-package-upgrade flow. Untouched c
 | Flag             | Commands                    | Description                                                                                             |
 | ---------------- | --------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `--title <slug>` | `note`, `handoff`           | Filename slug (default: slugified text / first line)                                                    |
+| `--limit <n>`    | `note list`                 | Max notes to print (default: 5)                                                                         |
 | `--limit <n>`    | `handoff list`              | Max paths to print (default: 5)                                                                         |
 | `--limit <n>`    | `plan list`                 | Max plans to print (default: 5)                                                                         |
 | `--head`         | `handoff list`              | Print only the newest *usable* handoff path — skips empty/unreadable files, same pick as `handoff peek` |
