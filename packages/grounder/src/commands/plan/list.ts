@@ -1,9 +1,9 @@
-import path from "node:path";
 import { withHomeDir } from "../../connector/home.js";
 import { resolvePlansDir } from "../../connector/vault.js";
 import { helpExitCode } from "../../help.js";
 import { parseArgs } from "../../util/parse-args.js";
 import { listPlans } from "../../vault/list-plans.js";
+import { writeVaultItemList } from "../output.js";
 import { requireLinkedProject } from "../require-linked.js";
 
 const DEFAULT_LIMIT = 5;
@@ -64,24 +64,6 @@ export async function runPlanList(argv: string[]): Promise<number> {
   return runPlanListWithOptions({ limit });
 }
 
-function planNoun(count: number): string {
-  return count === 1 ? "plan" : "plans";
-}
-
-/**
- * Lead line for `plan list` stdout: truncation signal when `count === limit`,
- * complete inventory when fewer, or empty-dir notice.
- */
-export function formatPlanListHeader(count: number, limit: number): string {
-  if (count === 0) {
-    return "No plans.\n";
-  }
-  if (count === limit) {
-    return `Most recent ${count} ${planNoun(count)} (there may be more):\n\n`;
-  }
-  return `All ${count} ${planNoun(count)}:\n\n`;
-}
-
 /**
  * Resolves the linked project, lists recent plans under `plans/` (newest first).
  * Prints a count header (blank line after when non-empty), then each plan as a
@@ -106,17 +88,7 @@ export async function runPlanListWithOptions(options: PlanListOptions = {}): Pro
     const limit = options.limit ?? DEFAULT_LIMIT;
     const plansDir = resolvePlansDir(linked.home, linked.repo);
     const paths = await listPlans(plansDir, { limit });
-
-    process.stdout.write(formatPlanListHeader(paths.length, limit));
-
-    paths.forEach((filePath, index) => {
-      if (index > 0) {
-        process.stdout.write("\n");
-      }
-      const stem = path.basename(filePath, ".md");
-      // Two trailing spaces: Markdown hard break when stdout is relayed into chat.
-      process.stdout.write(`${index + 1}. ${stem}  \n  ${filePath}\n`);
-    });
+    writeVaultItemList(paths, limit, { singular: "plan", plural: "plans" });
     return 0;
   });
 }

@@ -1,10 +1,10 @@
-import path from "node:path";
 import { withHomeDir } from "../../connector/home.js";
 import { resolveLogsDir } from "../../connector/vault.js";
 import { helpExitCode } from "../../help.js";
 import { flagBool, parseArgs } from "../../util/parse-args.js";
 import { findUsableHandoff } from "../../vault/find-usable-handoff.js";
 import { listHandoffs } from "../../vault/list-handoffs.js";
+import { writeVaultItemList } from "../output.js";
 import { requireLinkedProject } from "../require-linked.js";
 
 const DEFAULT_LIMIT = 5;
@@ -74,24 +74,6 @@ export async function runHandoffList(argv: string[]): Promise<number> {
   return runHandoffListWithOptions({ limit, head: flagBool(flags, "head") });
 }
 
-function handoffNoun(count: number): string {
-  return count === 1 ? "handoff" : "handoffs";
-}
-
-/**
- * Lead line for `handoff list` stdout: truncation signal when `count === limit`,
- * complete inventory when fewer, or empty-dir notice.
- */
-export function formatHandoffListHeader(count: number, limit: number): string {
-  if (count === 0) {
-    return "No handoffs.\n";
-  }
-  if (count === limit) {
-    return `Most recent ${count} ${handoffNoun(count)} (there may be more):\n\n`;
-  }
-  return `All ${count} ${handoffNoun(count)}:\n\n`;
-}
-
 /**
  * Resolves the linked project, lists recent handoffs under `logs/` (newest first).
  * Default: prints a count header (blank line after when non-empty), then each
@@ -125,17 +107,7 @@ export async function runHandoffListWithOptions(options: HandoffListOptions = {}
     }
 
     const paths = await listHandoffs(logsDir, { limit });
-
-    process.stdout.write(formatHandoffListHeader(paths.length, limit));
-
-    paths.forEach((filePath, index) => {
-      if (index > 0) {
-        process.stdout.write("\n");
-      }
-      const stem = path.basename(filePath, ".md");
-      // Two trailing spaces: Markdown hard break when stdout is relayed into chat.
-      process.stdout.write(`${index + 1}. ${stem}  \n  ${filePath}\n`);
-    });
+    writeVaultItemList(paths, limit, { singular: "handoff", plural: "handoffs" });
     return 0;
   });
 }

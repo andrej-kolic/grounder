@@ -3,11 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  formatHandoffListHeader,
-  runHandoffList,
-  runHandoffListWithOptions,
-} from "../../../src/commands/handoff/list.js";
+import { runHandoffList, runHandoffListWithOptions } from "../../../src/commands/handoff/list.js";
 import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
 import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
 import { captureStdout, createTempEnv, withGroundedHome } from "../../helpers.js";
@@ -18,22 +14,6 @@ const cli = path.join(pkgRoot, "dist", "cli.js");
 function runCli(args: string[], env: NodeJS.ProcessEnv, cwd?: string) {
   return spawnSync(process.execPath, [cli, ...args], { encoding: "utf8", env, cwd });
 }
-
-describe("formatHandoffListHeader", () => {
-  it("signals truncation when count equals limit", () => {
-    expect(formatHandoffListHeader(5, 5)).toBe("Most recent 5 handoffs (there may be more):\n\n");
-    expect(formatHandoffListHeader(1, 1)).toBe("Most recent 1 handoff (there may be more):\n\n");
-  });
-
-  it("reports a complete inventory when under the limit", () => {
-    expect(formatHandoffListHeader(2, 5)).toBe("All 2 handoffs:\n\n");
-    expect(formatHandoffListHeader(1, 5)).toBe("All 1 handoff:\n\n");
-  });
-
-  it("reports empty logs/", () => {
-    expect(formatHandoffListHeader(0, 5)).toBe("No handoffs.\n");
-  });
-});
 
 describe("commands/handoff/list", () => {
   let cleanup: (() => Promise<void>) | undefined;
