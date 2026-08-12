@@ -2,7 +2,9 @@ Hydrate this session from the latest vault handoff and repo truth.
 
 Read-only — do not write to the vault. Do not invent vault paths.
 
-From the linked project folder or any subdirectory beneath it:
+**Special case: the instruction asks to view existing handoffs, not hydrate** (`list`, `list 3 oldest`, `show handoffs`, etc.) → run `{{GROUNDER_CLI}} handoff list --limit <N>` (N = count named, else 5; ignore order words like "oldest" — output is always newest-first, never resort or relabel it) and stop — no hydrate, no `AGENTS.md`, no “start work.” Relay the CLI stdout as-is (it already includes the count header).
+
+Otherwise, from the linked project folder or any subdirectory beneath it:
 
 1. Get the current handoff (skips empty/unreadable files, same pick as the session-start teaser):
 
