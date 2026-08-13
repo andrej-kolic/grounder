@@ -18,6 +18,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/grounder
 
+  packages/demo-casts: {}
+
   packages/grounder:
     devDependencies:
       '@types/node':

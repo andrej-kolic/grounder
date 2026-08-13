@@ -1,0 +1,16 @@
+{
+  "name": "@grounder/demo-casts",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Hand-authored terminal demo scenes compiled to asciicast + GIF for README and docs",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/cast.mjs",
+    "cast": "pnpm run build",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

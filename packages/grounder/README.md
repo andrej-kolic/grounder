@@ -22,7 +22,18 @@ Grounder is **not** an auto-capture or RAG tool, nor does it attempt to record e
 
 ### Demo
 
-*Recording pending — asciinema/GIF of the session loop:* `/grounder-task` *→ work →* `/grounder-task-handoff` *→ new session →* `/grounder-task`*, showing the checkpoint file in the vault along the way.*
+![A session loop: peek teaser, /grounder-task resume, /grounder-plan list, continuing a plan, /grounder-note, /grounder-task-handoff — each with the real grounder CLI call it runs and the vault path it touches](../demo-casts/out/readme.gif)
+
+A full session loop, one step at a time:
+
+- **Peek hook** resumes a prior handoff automatically at session start
+- **`/grounder-task`** picks up the next step from that handoff
+- **`/grounder-plan list`** shows the real plans already sitting in the vault
+- Continuing a plan by name — plain chat works too, not just slash commands
+- **`/grounder-note`** captures a quick mid-session insight
+- **`/grounder-task-handoff`** checkpoints the session on close
+
+Dim lines are the actual `grounder` CLI call each slash command runs under the hood. Regenerated with `pnpm demo:cast` from [`@grounder/demo-casts`](../demo-casts/).
 
 **Requirements:** Node.js 18+ and an Obsidian vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
 
