@@ -47,7 +47,7 @@ export default {
 | `cast`  | Alias for `build`                                                |
 | `test`  | Unit-test the compiler (`node:test`, no deps)                    |
 
-From the monorepo root (once wired): `pnpm demo:cast`.
+From the monorepo root: `pnpm demo:cast` (not part of `pnpm check`).
 
 ## Prerequisites
 
