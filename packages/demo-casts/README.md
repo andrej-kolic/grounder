@@ -8,7 +8,7 @@ Private workspace package that compiles hand-authored terminal scene scripts int
 
 ```text
 scenes/     # hand-authored step scripts (*.mjs)
-scripts/    # compile.mjs (pure) + cast.mjs (CLI); agg render comes later
+scripts/    # compile.mjs (pure) + cast.mjs (CLI → .cast + agg → .gif)
 out/        # committed artifacts (.cast + .gif) — see out/README.md
 test/       # node:test unit tests (zero deps)
 ```
@@ -37,21 +37,29 @@ export default {
 | `output` | `text` (ANSI allowed)          | Instant canned terminal output                |
 | `wait`   | `seconds`                      | Advance timeline; no bytes emitted            |
 
-`build` compiles each scene to deterministic asciicast v2 JSONL at `out/<name>.cast`.
+`build` compiles each scene to deterministic asciicast v2 JSONL at `out/<name>.cast`, then shells out to `agg` to render `out/<name>.gif`. Both artifacts are written for every scene; the build fails if `agg` is missing or rendering fails.
 
 ## Scripts
 
-| Script  | Purpose                                             |
-| ------- | --------------------------------------------------- |
-| `build` | Compile `scenes/*.mjs` → `out/<name>.cast`          |
-| `cast`  | Alias for `build`                                   |
-| `test`  | Unit-test the compiler (`node:test`, no deps)       |
+| Script  | Purpose                                                          |
+| ------- | ---------------------------------------------------------------- |
+| `build` | Compile `scenes/*.mjs` → `out/<name>.cast` + `out/<name>.gif`    |
+| `cast`  | Alias for `build`                                                |
+| `test`  | Unit-test the compiler (`node:test`, no deps)                    |
 
 From the monorepo root (once wired): `pnpm demo:cast`.
 
 ## Prerequisites
 
-GIF rendering (later) requires [`agg`](https://github.com/asciinema/agg) on `PATH` (e.g. `brew install agg`). The `.cast` files are the canonical source.
+[`agg`](https://github.com/asciinema/agg) must be on `PATH` (one-time contributor setup):
+
+```bash
+brew install agg
+# or: cargo install --git https://github.com/asciinema/agg
+# or: download a release binary from the repo and put it on PATH
+```
+
+`agg` is an external binary — not an npm dependency. The `.cast` files remain the canonical source; GIFs are derived for README/docs embeds.
 
 ## Consumers
 
