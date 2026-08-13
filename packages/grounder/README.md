@@ -22,7 +22,9 @@ Grounder is **not** an auto-capture or RAG tool, nor does it attempt to record e
 
 ### Demo
 
-*Recording pending — asciinema/GIF of the session loop:* `/grounder-task` *→ work →* `/grounder-task-handoff` *→ new session →* `/grounder-task`*, showing the checkpoint file in the vault along the way.*
+![grounder note — typed command and vault-relative Wrote path](../demo-casts/out/readme.gif)
+
+Happy path: `grounder note` saves an ad-hoc note and prints a vault-relative path under `10-Projects/…/notes/`. Regenerated with `pnpm demo:cast` from [`@grounder/demo-casts`](../demo-casts/).
 
 **Requirements:** Node.js 18+ and an Obsidian vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
 
