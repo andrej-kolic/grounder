@@ -8,9 +8,9 @@ Private workspace package that compiles hand-authored terminal scene scripts int
 
 ```text
 scenes/     # hand-authored step scripts (*.mjs)
-scripts/    # compile.mjs (pure) + cast.mjs (CLI → .cast + agg → .gif)
+scripts/    # compile.mjs (pure) + scene.mjs + cast.mjs (CLI → .cast + agg → .gif)
 out/        # committed artifacts (.cast + .gif) — see out/README.md
-test/       # node:test unit tests (zero deps)
+test/       # node:test (compiler + cast freshness vs scenes/; no agg)
 ```
 
 ## Scene scripts
@@ -45,7 +45,7 @@ export default {
 | ------- | ---------------------------------------------------------------- |
 | `build` | Compile `scenes/*.mjs` → `out/<name>.cast` + `out/<name>.gif`    |
 | `cast`  | Alias for `build`                                                |
-| `test`  | Unit-test the compiler (`node:test`, no deps)                    |
+| `test`  | Compiler unit tests + assert `out/*.cast` matches `scenes/`       |
 
 From the monorepo root: `pnpm demo:cast` (not part of `pnpm check`).
 
