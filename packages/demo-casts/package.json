@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/cast.mjs",
-    "cast": "pnpm run build"
+    "cast": "pnpm run build",
+    "test": "node --test test/*.test.mjs"
   },
   "engines": {
     "node": ">=18"
