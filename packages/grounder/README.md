@@ -41,15 +41,21 @@ Dim lines are the actual `grounder` CLI call each slash command runs under the h
 
 ## Install
 
+### npm
+
 ```bash
 npm install -g grounder
 ```
 
-Or run without installing:
+Or run without installing: `npx grounder --help`. A global install lets `vault init` symlink `~/.grounder/runtime` so it tracks upgrades; bare `npx` copies it instead, so you need `grounder migrate` after every upgrade.
+
+### Agent skill (install + setup in one shot)
 
 ```bash
-npx grounder --help
+npx skills add andrej-kolic/grounder --skill grounder-setup -g
 ```
+
+Adding the skill only loads instructions — it does **nothing** until you ask your agent to run it (e.g. "set up grounder").
 
 `grounder -h` prints a short synopsis; `grounder --help` (or `grounder help`) prints the full reference; `grounder -v` prints the installed version.
 

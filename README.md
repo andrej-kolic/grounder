@@ -38,13 +38,23 @@ Dim lines are the actual `grounder` CLI call each slash command runs under the h
 
 ## Get started
 
+### npm
+
 ```bash
 npm install -g grounder
 ```
 
-Or: `npx grounder --help`.
+Then follow the **[package README](packages/grounder/README.md)** for quickstart, commands, configuration, and troubleshooting.
 
-Then follow the **[package README](packages/grounder/README.md)** — quickstart, commands, configuration, troubleshooting.
+### Agent skill (install + setup in one shot)
+
+```bash
+npx skills add andrej-kolic/grounder --skill grounder-setup -g
+```
+
+Adding the skill only loads instructions — it does **nothing** until you ask your agent to run it (e.g. "set up grounder").
+
+Or skip the global install: `npx grounder --help`.
 
 This repo is the monorepo that publishes that package.
 
@@ -55,6 +65,8 @@ grounder/
 ├── packages/
 │   ├── grounder/          # publishable npm package (`grounder`)
 │   └── demo-casts/        # generate GIF for READMEs (`pnpm demo:cast`)
+├── skills/
+│   └── grounder-setup/    # skills.sh listing (`npx skills add …`; not in the npm tarball)
 ├── fixtures/
 │   ├── minimal-git-repo/  # stable test fixture
 │   └── dev/               # local CLI sandbox (`pnpm fixture:setup`)

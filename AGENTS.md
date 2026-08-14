@@ -5,6 +5,7 @@ Grounder is a Node CLI (`packages/grounder`) that wires project folders to perso
 ## Layout
 
 - `packages/grounder/` — publishable package; all implementation lives here
+- `skills/grounder-setup/` — skills.sh meta-skill (CLI driver; not in the npm tarball)
 - `fixtures/minimal-git-repo/` — stable test fixture (automated tests)
 - `fixtures/dev/` — local CLI sandbox (`pnpm fixture:setup`)
 
