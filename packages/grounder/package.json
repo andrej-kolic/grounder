@@ -27,7 +27,12 @@
     "handoff",
     "developer-tools",
     "ai",
-    "cli"
+    "cli",
+    "agent-memory",
+    "local-first",
+    "vault",
+    "session-handoff",
+    "context-management"
   ],
   "license": "MIT",
   "repository": {
