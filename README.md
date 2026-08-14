@@ -5,18 +5,52 @@
 
 > **Markdown-native memory shared across AI agents, sessions, and machines.**
 
-Monorepo for the [Grounder](https://www.npmjs.com/package/grounder) CLI — connect project folders to a personal Obsidian vault so AI agents get persistent memory without committing personal docs to the repo.
+AI agents forget everything between sessions and can't share context with each other. **Grounder** fixes this by externalizing agent memory into local files you control (Obsidian-compatible, but never required). Context survives session ends, agent switches, and machine migrations.
+
+### What it is
+
+AI-first CLI and agent command set that:
+
+- **Connects any project** — git repositories or standard folders — to your local vault (multi-project support).
+- **Captures state deliberately** — converts a discussion into a living plan, checkpoints a session for handoff, or saves arbitrary notes.
+- **Hydrates on demand** — allows you or any agent to resume exactly where a prior session left off without re-deriving context.
+- **Works natively today** with Cursor, Claude Code, and standard CLI workflows.
+
+### What it is not
+
+Grounder is **not** an auto-capture or RAG tool, nor does it attempt to record every interaction. There is no vector database, no background indexing, and zero context injection unless explicitly requested. One small, deliberate checkpoint replaces an agent re-deriving context from scratch — using a fraction of the tokens in a file you can diff, edit, or delete.
+
+### Demo
 
 ![A session loop: peek teaser, /grounder-task resume, /grounder-plan list, continuing a plan, /grounder-note, /grounder-task-handoff — each with the real grounder CLI call it runs and the vault path it touches](packages/demo-casts/out/readme.gif)
 
+A full session loop, one step at a time:
+
+- **Peek hook** resumes a prior handoff automatically at session start
+- **`/grounder-task`** picks up the next step from that handoff
+- **`/grounder-plan list`** shows the real plans already sitting in the vault
+- Continuing a plan by name — plain chat works too, not just slash commands
+- **`/grounder-note`** captures a quick mid-session insight
+- **`/grounder-task-handoff`** checkpoints the session on close
+
+Dim lines are the actual `grounder` CLI call each slash command runs under the hood.
+
 **Install and use:** see [packages/grounder/README.md](packages/grounder/README.md) for the full walkthrough — quickstart, commands, configuration, and troubleshooting.
+
+This repo is the monorepo that publishes that package.
 
 ## Monorepo layout
 
 ```text
 grounder/
-├── packages/grounder/     # publishable npm package (`grounder`)
-└── fixtures/              # test git repos (not published)
+├── packages/
+│   ├── grounder/          # publishable npm package (`grounder`)
+│   └── demo-casts/        # generate GIF for READMEs (`pnpm demo:cast`)
+├── fixtures/
+│   ├── minimal-git-repo/  # stable test fixture
+│   └── dev/               # local CLI sandbox (`pnpm fixture:setup`)
+├── docs/architecture/     # contributor design notes
+└── AGENTS.md              # repo map for agents / contributors
 ```
 
 ## Development
