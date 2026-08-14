@@ -1,0 +1,18 @@
+---
+description: Always escalate Shell for gh / GitHub API (macOS keyring)
+alwaysApply: true
+---
+
+# GitHub CLI shell permissions
+
+`gh` reads tokens from the macOS Keychain. A sandboxed Shell run fails with "token invalid" / GraphQL Forbidden even when auth is fine.
+
+## Required
+
+- Any `gh` invocation (`issue`, `pr`, `api`, `auth`, `release`, `run`, …): first attempt with Shell `required_permissions: ["all"]`.
+- Do **not** probe sandboxed first and retry — escalate immediately.
+- Same for other commands that need Keychain or full host network for GitHub (e.g. `git push` / `git fetch` when they fail under the sandbox).
+
+## Already covered elsewhere
+
+Grounder vault CLI / slash commands already require `["all"]` because the vault lives outside the workspace — keep that pattern.
