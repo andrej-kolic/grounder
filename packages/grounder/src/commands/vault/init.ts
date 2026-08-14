@@ -20,6 +20,7 @@ export interface VaultInitOptions {
   force?: boolean;
   /** Also install session-start teaser hooks for adapters that support them. */
   hooks?: boolean;
+  dryRun?: boolean;
   homeDir?: string;
   /** Agent ids to install for. Defaults to auto-detecting installed agents. */
   agents?: string[];
@@ -36,6 +37,7 @@ export async function runVaultInit(argv: string[]): Promise<number> {
   const yes = flagBool(flags, "yes", "y");
   const force = flagBool(flags, "force", "f");
   const hooks = flagBool(flags, "hooks");
+  const dryRun = flagBool(flags, "dry-run");
   const agents = flagStrings(repeated, "agent");
 
   if (!vaultPathArg) {
@@ -48,6 +50,7 @@ export async function runVaultInit(argv: string[]): Promise<number> {
     yes,
     force,
     hooks,
+    dryRun,
     agents: agents.length > 0 ? agents : undefined,
   });
 }
@@ -58,6 +61,7 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
     const yes = options.yes ?? false;
     const force = options.force ?? false;
     const hooks = options.hooks ?? false;
+    const dryRun = options.dryRun ?? false;
     const homeDir = options.homeDir;
 
     const existingHome = await readHomeConfig();
@@ -72,6 +76,9 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
     }
 
     process.stdout.write(`Vault root: ${vaultRoot}\n`);
+    if (dryRun) {
+      process.stdout.write("Dry run — no files will be written.\n");
+    }
     process.stdout.write("Will write:\n");
     process.stdout.write(`  home   ${homeConfigPath(homeDir)}\n`);
     process.stdout.write("  vault  10-Projects/ (if missing)\n");
@@ -93,6 +100,10 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
       process.stdout.write("  (no supported agents detected — skipping agent artifacts)\n");
     }
     process.stdout.write("\n");
+
+    if (dryRun) {
+      return 0;
+    }
 
     if (!yes) {
       const proceed = await confirm("Proceed?");

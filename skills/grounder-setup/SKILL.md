@@ -19,7 +19,7 @@ Adding this skill only loads these instructions. Running it is what installs the
 - Delegate writes to the CLI. Do not copy command files, edit `~/.grounder/config.json` by hand, or invent repair steps.
 - Do not pass `--agent` unless the user asks to **limit** the install. Auto-detect should install every detected host (Cursor and Claude Code).
 - Never `--force` on first setup. Never `--force` a vault-root change (home config pointing at a different vault is a conflict to surface, not overwrite).
-- Always preview writes in chat and get approval, then apply `vault init` / `init` with `--yes`. Never rely on the interactive `confirm()` prompt — it treats empty stdin as yes, so a non-TTY agent shell would apply unaudited. `migrate` has no confirm prompt; preview with `--dry-run` first.
+- Always preview writes in chat and get approval. For `vault init` / `init` / `migrate`, run `--dry-run` first and show that stdout — do not reconstruct the write list. Then apply (`--yes` on the inits; `migrate` has no confirm). Never rely on the interactive `confirm()` prompt — it treats empty stdin as yes, so a non-TTY agent shell would apply unaudited.
 - Do not write a test note or handoff unless asked.
 - Skill present ≠ Grounder ready.
 
@@ -69,33 +69,19 @@ If the resolved path is missing: **warn** that `vault init` will create that dir
 
 ## 4. Preview in chat, then apply
 
-Show the writes in chat and wait for approval. Then apply with `--yes`. Include `--hooks` on first-time setup unless the user declines. No `--agent`, no `--force`.
+For each command from step 2's table: run with `--dry-run` and show that stdout in chat as-is — it's the real write list, do not restate or reconstruct it yourself. Wait for approval, then rerun the identical command with `--yes`. Add `--hooks` on a first-time `vault init` unless declined. Never `--agent`, never `--force`.
 
-First-time machine setup:
-
-```bash
-$GROUNDER vault init <path> --hooks --yes
-```
-
-Omit `--hooks` if they declined. Then, if the project is still unlinked:
+`init` reads `~/.grounder/config.json`, which `vault init` creates — so `vault init` must be fully applied (not just previewed) before you preview or apply `init`:
 
 ```bash
-$GROUNDER init --yes
+$GROUNDER vault init <path> --hooks --dry-run
+# → approve → $GROUNDER vault init <path> --hooks --yes
+
+$GROUNDER init --dry-run          # only if the project is still unlinked
+# → approve → $GROUNDER init --yes
 ```
 
-`vault init` writes:
-
-- `~/.grounder/config.json` (`vaultRoot`)
-- `<vault>/10-Projects/` if missing
-- `~/.grounder/runtime` when any agent is detected
-- slash commands (and `--hooks` teasers) for each **detected** agent
-
-`init` writes:
-
-- `.grounder.json` in the current project folder (`projectId` — safe to commit)
-- `<vault>/10-Projects/<projectId>/{notes,logs,plans}/`
-
-If no supported agent is detected, still run `vault init` (home config + `10-Projects/` are useful without glue).
+To preview `init` before `vault init` is applied, add `--vault <path>` to `init --dry-run` — it resolves the vault path without needing the home config yet. If no supported agent is detected, still run `vault init`: the home config and `10-Projects/` are useful without CLI/editor glue.
 
 ## 5. When doctor fails
 

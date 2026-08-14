@@ -39,7 +39,7 @@ export const COMMANDS: readonly CommandMeta[] = [
     group: "Setup",
     summary: "Vault setup commands",
     listUsage: "vault init <path>",
-    usage: "grounder vault init <path> [--yes] [--force] [--agent <id>] [--hooks]",
+    usage: "grounder vault init <path> [--yes] [--force] [--agent <id>] [--hooks] [--dry-run]",
     list: false,
     flags: `Subcommands:
   vault init   Initialize vault + home config (once per machine)`,
@@ -49,25 +49,27 @@ export const COMMANDS: readonly CommandMeta[] = [
     group: "Setup",
     summary: "Initialize vault + home config (once per machine)",
     listUsage: "vault init <path>",
-    usage: "grounder vault init <path> [--yes] [--force] [--agent <id>] [--hooks]",
+    usage: "grounder vault init <path> [--yes] [--force] [--agent <id>] [--hooks] [--dry-run]",
     flags: `Flags:
   --yes          Skip confirmation prompts
   --force        Overwrite existing home config / generated files
   --agent <id>   Install for a specific agent (repeatable; default: auto-detect)
                  Supported: cursor, claude
-  --hooks        Also install session-start teaser hooks`,
+  --hooks        Also install session-start teaser hooks
+  --dry-run      Preview without writing`,
   },
   {
     id: "init",
     group: "Setup",
     summary: "Connect the current repo to your vault",
     listUsage: "init",
-    usage: "grounder init [--yes] [--force] [--id <id>] [--vault <path>]",
+    usage: "grounder init [--yes] [--force] [--id <id>] [--vault <path>] [--dry-run]",
     flags: `Flags:
   --yes          Skip confirmation prompts
   --force        Overwrite an existing link marker
   --id <id>      Override detected project id
-  --vault <path> Override home vault root for this run`,
+  --vault <path> Override home vault root for this run
+  --dry-run      Preview without writing`,
   },
   {
     id: "note",

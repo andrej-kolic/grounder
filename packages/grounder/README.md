@@ -83,7 +83,7 @@ cd your-project
 grounder init
 ```
 
-Both commands preview what they'll write and ask to confirm; add `--yes` to skip the prompt (e.g. in scripts).
+Both commands preview what they'll write and ask to confirm; add `--yes` to skip the prompt (e.g. in scripts), or `--dry-run` to print the same preview without writing.
 
 **2. Daily use — from your agent's chat:**
 
@@ -177,6 +177,7 @@ grounder migrate             Refresh agent install after upgrading grounder
 | Flag             | Commands                        | Description                                                                                       |
 | ---------------- | ------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `--yes`          | `vault init`, `init`            | Skip confirmation prompts                                                                         |
+| `--dry-run`      | `vault init`, `init`, `migrate` | Preview without writing                                                                           |
 | `--force`        | `vault init`, `init`, `migrate` | Overwrite existing generated / locally-modified files                                             |
 | `--id <id>`      | `init`                          | Override detected project id                                                                      |
 | `--vault <path>` | `init`                          | Override home vault root for this run                                                             |

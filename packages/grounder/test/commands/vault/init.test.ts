@@ -14,7 +14,7 @@ import {
   grounderPlanCommandPath,
   grounderTaskHandoffCommandPath,
 } from "../../../src/agents/cursor.js";
-import { runtimeInvocation } from "../../../src/agents/hook-runtime.js";
+import { runtimeCliPath, runtimeInvocation } from "../../../src/agents/hook-runtime.js";
 import { runVaultInit, runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
 import { homeConfigPath } from "../../../src/connector/home.js";
 import { readGrounderState, statePath } from "../../../src/connector/state.js";
@@ -123,6 +123,55 @@ describe("commands/vault/init", () => {
     expect(code).toBe(0);
     expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toBe(noteBefore);
     expect(await readFile(grounderTaskHandoffCommandPath(env.home), "utf8")).toBe(handoffBefore);
+  });
+
+  it("dry-run previews writes without creating home config, vault scaffold, or agent artifacts", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    const { code, out } = await captureStdout(() =>
+      runVaultInitWithOptions({
+        vaultPath: env.vault,
+        dryRun: true,
+        hooks: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("Dry run");
+    expect(out).toContain("Will write:");
+    expect(out).toContain(`home   ${homeConfigPath(env.home)}`);
+    expect(out).toContain("vault  10-Projects/ (if missing)");
+    expect(out).toContain(`grounder runtime ${runtimeCliPath(env.home)}`);
+    expect(out).toContain(`cursor   ${grounderNoteCommandPath(env.home)}`);
+    expect(out).toContain(`hook ${cursorHooksJsonPath(env.home)}`);
+    expect(out).not.toContain("✓ Wrote home config");
+
+    expect(await fileExists(homeConfigPath(env.home))).toBe(false);
+    expect(await fileExists(path.join(env.vault, "10-Projects"))).toBe(false);
+    expect(await fileExists(grounderNoteCommandPath(env.home))).toBe(false);
+    expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(false);
+    expect(await fileExists(runtimeCliPath(env.home))).toBe(false);
+    expect(await fileExists(statePath(env.home))).toBe(false);
+  });
+
+  it("parses --dry-run from argv", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    previousGrounderHome = process.env.GROUNDER_HOME;
+    process.env.GROUNDER_HOME = env.home;
+    restoredGrounderHome = true;
+
+    const { code, out } = await captureStdout(() =>
+      runVaultInit([env.vault, "--dry-run", "--hooks", "--agent", "cursor"]),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("Dry run");
+    expect(await fileExists(homeConfigPath(env.home))).toBe(false);
+    expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(false);
   });
 
   it("returns error before prompting when vault already configured to a different path", async () => {

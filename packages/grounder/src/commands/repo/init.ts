@@ -19,6 +19,7 @@ export interface RepoInitOptions {
   cwd?: string;
   yes?: boolean;
   force?: boolean;
+  dryRun?: boolean;
   id?: string;
   vault?: string;
   homeDir?: string;
@@ -34,6 +35,7 @@ export async function runRepoInit(argv: string[]): Promise<number> {
   return runRepoInitWithOptions({
     yes: flagBool(flags, "yes", "y"),
     force: flagBool(flags, "force", "f"),
+    dryRun: flagBool(flags, "dry-run"),
     id: flagString(flags, "id"),
     vault: flagString(flags, "vault"),
   });
@@ -44,6 +46,7 @@ export async function runRepoInitWithOptions(options: RepoInitOptions = {}): Pro
     const cwd = path.resolve(options.cwd ?? process.cwd());
     const yes = options.yes ?? false;
     const force = options.force ?? false;
+    const dryRun = options.dryRun ?? false;
     const gitRoot = await findGitRoot(cwd);
 
     let home = await readHomeConfig();
@@ -75,11 +78,24 @@ export async function runRepoInitWithOptions(options: RepoInitOptions = {}): Pro
     const logsDirRelative = path.relative(vaultRoot, logsDir);
     const plansDirRelative = path.relative(vaultRoot, plansDir);
 
+    if (dryRun) {
+      process.stdout.write("Dry run — no files will be written.\n");
+    }
     process.stdout.write("Will create:\n");
     process.stdout.write(`  link   ${repoConfigPath(cwd)}\n`);
     process.stdout.write(`  vault  ${notesDirRelative}/\n`);
     process.stdout.write(`  vault  ${logsDirRelative}/\n`);
     process.stdout.write(`  vault  ${plansDirRelative}/\n`);
+
+    if (dryRun) {
+      if (existingRepo && !force && existingRepo.projectId !== detected.id) {
+        process.stderr.write(
+          `Folder already linked as ${existingRepo.projectId}. Use --force to overwrite.\n`,
+        );
+        return 1;
+      }
+      return 0;
+    }
 
     if (!yes) {
       const proceed = await confirm("Proceed?");

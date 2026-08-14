@@ -87,6 +87,14 @@ describe("skills/grounder-setup", () => {
     expect(keys).not.toContain("context");
   });
 
+  it("previews vault init and init via --dry-run instead of listing writes", async () => {
+    const content = await readFile(skillPath, "utf8");
+    expect(content).toContain("vault init <path> --hooks --dry-run");
+    expect(content).toContain("init --dry-run");
+    expect(content).not.toContain("`vault init` writes:");
+    expect(content).not.toContain("`init` writes:");
+  });
+
   it("is not shipped in the npm tarball", async () => {
     const pkg = JSON.parse(await readFile(packageJsonPath, "utf8")) as { files?: string[] };
     expect(pkg.files).toEqual(["dist", "templates"]);
