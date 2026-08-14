@@ -83,7 +83,8 @@ export default {
         `2. ${green("auth-middleware-cleanup")}\r\n` +
         `  ${dim("~/vault/10-Projects/your-project/plans/auth-middleware-cleanup.md")}\r\n\r\n`,
     },
-    { type: "wait", seconds: 1.8 },
+    // Longest mid-scene hold — densest block; let viewers read paths before scroll.
+    { type: "wait", seconds: 4.0 },
 
     // Load the plan that matches current work — plain chat, not just slash commands.
     prompt(),
@@ -117,7 +118,9 @@ export default {
     },
     { type: "wait", seconds: 1.4 },
 
+    // Hold on the final prompt so README GIF viewers can finish reading
+    // before the loop restarts (also keeps the embed from feeling frantic).
     prompt(),
-    { type: "wait", seconds: 1.2 },
+    { type: "wait", seconds: 6 },
   ],
 };

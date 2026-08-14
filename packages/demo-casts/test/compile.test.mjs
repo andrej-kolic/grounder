@@ -92,4 +92,23 @@ describe("compileCast", () => {
     assert.equal(events[0][2], "late");
     assert.ok(events[0][0] >= 2);
   });
+
+  it("preserves trailing wait in cast duration via a no-op event", () => {
+    const jsonl = compileCast(
+      [
+        { type: "output", text: "done" },
+        { type: "wait", seconds: 6 },
+      ],
+      { timestamp: 0 },
+    );
+    const events = jsonl
+      .trimEnd()
+      .split("\n")
+      .slice(1)
+      .map((l) => JSON.parse(l));
+    assert.equal(events.length, 2);
+    assert.equal(events[0][2], "done");
+    assert.equal(events[1][2], "");
+    assert.ok(events[1][0] >= events[0][0] + 6);
+  });
 });

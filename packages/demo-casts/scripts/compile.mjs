@@ -89,12 +89,20 @@ export function compileCast(steps, options = {}) {
   };
 
   let t = 0;
+  let lastEmittedT = 0;
   const lines = [JSON.stringify(header)];
 
   for (const ev of expandSteps(steps, cps)) {
     t += ev.dt;
     if (ev.data === "") continue;
+    lastEmittedT = t;
     lines.push(JSON.stringify([Number(t.toFixed(3)), "o", ev.data]));
+  }
+
+  // Trailing waits advance `t` but emit no bytes — record a no-op event so
+  // cast duration (and players/agg that key off the last timestamp) include them.
+  if (t > lastEmittedT) {
+    lines.push(JSON.stringify([Number(t.toFixed(3)), "o", ""]));
   }
 
   return `${lines.join("\n")}\n`;

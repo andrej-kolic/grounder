@@ -42,7 +42,13 @@ function requireAgg() {
  */
 function renderGif(castPath, gifPath) {
   try {
-    execFileSync("agg", [castPath, gifPath], { stdio: "ignore" });
+    // End hold must be --last-frame-duration: agg ignores trailing empty
+    // cast events (and no-op ANSI), so scene `wait` alone never lengthens the GIF.
+    execFileSync(
+      "agg",
+      ["--last-frame-duration", "6", "--idle-time-limit", "10", castPath, gifPath],
+      { stdio: "ignore" },
+    );
   } catch (err) {
     if (isEnoent(err)) {
       throw new Error(AGG_MISSING);

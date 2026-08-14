@@ -1,8 +1,15 @@
 # Grounder
 
+[![npm version](https://img.shields.io/npm/v/grounder.svg)](https://www.npmjs.com/package/grounder)
+[![license](https://img.shields.io/npm/l/grounder.svg)](LICENSE)
+
+> **Markdown-native memory shared across AI agents, sessions, and machines.**
+
 Monorepo for the [Grounder](https://www.npmjs.com/package/grounder) CLI — connect project folders to a personal Obsidian vault so AI agents get persistent memory without committing personal docs to the repo.
 
-**Install and use:** see [packages/grounder/README.md](packages/grounder/README.md).
+![A session loop: peek teaser, /grounder-task resume, /grounder-plan list, continuing a plan, /grounder-note, /grounder-task-handoff — each with the real grounder CLI call it runs and the vault path it touches](packages/demo-casts/out/readme.gif)
+
+**Install and use:** see [packages/grounder/README.md](packages/grounder/README.md) for the full walkthrough — quickstart, commands, configuration, and troubleshooting.
 
 ## Monorepo layout
 
