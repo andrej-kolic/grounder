@@ -1,6 +1,7 @@
 # Grounder
 
 [![npm version](https://img.shields.io/npm/v/grounder.svg)](https://www.npmjs.com/package/grounder)
+[![CI](https://github.com/andrej-kolic/grounder/actions/workflows/ci.yml/badge.svg)](https://github.com/andrej-kolic/grounder/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/grounder.svg)](LICENSE)
 
 > **Markdown-native memory shared across AI agents, sessions, and machines.**
@@ -35,7 +36,15 @@ A full session loop, one step at a time:
 
 Dim lines are the actual `grounder` CLI call each slash command runs under the hood.
 
-**Install and use:** see [packages/grounder/README.md](packages/grounder/README.md) for the full walkthrough — quickstart, commands, configuration, and troubleshooting.
+## Get started
+
+```bash
+npm install -g grounder
+```
+
+Or: `npx grounder --help`.
+
+Then follow the **[package README](packages/grounder/README.md)** — quickstart, commands, configuration, troubleshooting.
 
 This repo is the monorepo that publishes that package.
 
@@ -57,8 +66,7 @@ grounder/
 
 ```bash
 pnpm install
-pnpm build
-pnpm test
+pnpm check                 # build + typecheck + lint + test
 pnpm grounder --version    # run local CLI (build first)
 ```
 
@@ -68,21 +76,15 @@ Use `fixtures/dev/` as a workspace sandbox (not the test fixture):
 
 ```bash
 pnpm fixture:setup
-pnpm grounder vault init <path-to-your-vault> --yes --hooks   # once per machine; --hooks = session-start teaser
+pnpm grounder vault init <path-to-your-vault> --yes --hooks   # once per machine
 cd fixtures/dev
 pnpm grounder init --yes
 pnpm grounder note "hello from dev fixture"
-pnpm grounder handoff "# Handoff"$'\n\n'"## Next"$'\n'"1. Try /grounder-task next session"
-pnpm grounder handoff list
-pnpm grounder handoff peek   # one-line teaser (same as the session hook)
-pnpm grounder path logs
-pnpm grounder status
-pnpm grounder doctor
 ```
 
 Session loop in the agent: (optional teaser on session start) → `/grounder-task` → work → `/grounder-task-handoff`.
 
-See [fixtures/dev/README.md](fixtures/dev/README.md).
+More commands and dogfooding tips: [fixtures/dev/README.md](fixtures/dev/README.md).
 
 ## Publish
 
