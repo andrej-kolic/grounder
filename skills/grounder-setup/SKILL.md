@@ -38,22 +38,29 @@ Call the resolved binary `GROUNDER` below (`grounder` or `npx grounder`). Do not
 
 ## 2. State check
 
-Run `$GROUNDER status`.
+This skill always targets `pwd` — state that folder in chat before running anything (e.g. "Setting up Grounder for `/path/you/are/in`") so it's clear which folder will get `.grounder.json`, especially in a repo that already links a parent/sibling folder elsewhere.
 
-- Home exists but project unlinked: also run `$GROUNDER doctor --global` (repair the machine first if it fails).
-- Project already linked (`Linked: yes`): run `$GROUNDER doctor`.
-- No home config yet: skip `doctor --global` — `status` already gives the fix (`Config: missing → grounder vault init`).
+Run `$GROUNDER status`. `status`/`doctor` walk up from `pwd` to the nearest `.grounder.json` (stopping at the git root), so a subdirectory of an already-linked repo can report `Linked: yes` for an *ancestor* folder, not `pwd` itself. Before trusting `Linked:`, check:
+
+- `Folder:` equals `pwd` exactly, **and**
+- there is no `Note: linked ancestor …` line (status) / no `— ancestor of … this folder itself is unlinked` suffix on `repo-config` (doctor).
+
+If either signal shows an ancestor link, treat `pwd` as **unlinked**, no matter what `Linked:` says — do not run doctor's hinted fix command in the ancestor folder; you were asked to set up `pwd`, not its parent.
+
+- Home exists but project unlinked (including "linked via an ancestor only"): also run `$GROUNDER doctor --global` (repair the machine first if it fails).
+- Project linked to *this exact folder* (`Linked: yes` and `Folder:` == `pwd`): run `$GROUNDER doctor`.
+- No usable home config yet (`Config: missing` **or** `Config: invalid` → grounder vault init): skip `doctor --global` — `status` already gives the fix. `vault init` recreates a missing *or* corrupt `~/.grounder/config.json` on its own (no manual delete, no `--force`) — treat `invalid` exactly like `missing` and proceed straight to first-time `vault init`.
 
 Then branch — do not always run both inits:
 
 | State | Action |
 |---|---|
-| No home config (`Config: missing → grounder vault init`) | Resolve vault path → first-time `vault init` → `init` if the project is unlinked |
-| Home exists, project unlinked | `init` only (repair the machine first if `doctor --global` failed) |
-| Linked and `doctor` exits 0 | Report notes/logs/plans paths and stop |
-| Already set up, but `doctor` exits 1 | Run the command after `→` in the failing check (section 5) |
+| No usable home config (`Config: missing` or `invalid` → `grounder vault init`) | Resolve vault path → first-time `vault init` → `init` if the project is unlinked |
+| Home exists, project unlinked (or only linked via an ancestor folder) | `init` only (repair the machine first if `doctor --global` failed) |
+| Linked to this exact folder and `doctor` exits 0 | Report notes/logs/plans paths and stop |
+| Linked to this exact folder, but `doctor` exits 1 | Run the command after `→` in the failing check (section 5) |
 
-`doctor` exit 1 means a `fail` check. `warn` (including missing hooks) is not a failure.
+`doctor` exit 1 means a `fail` check. `warn` (including missing hooks) is not a failure. An ancestor-link note is never itself something to fix — it means run `init` in `pwd`.
 
 ## 3. Vault path (first-time `vault init` only)
 
@@ -85,6 +92,8 @@ To preview `init` before `vault init` is applied, add `--vault <path>` to `init 
 
 ## 5. When doctor fails
 
+First confirm doctor's `repo-config` check applies to `pwd` and not an ancestor folder (section 2) — never follow a fix hint that belongs to a folder other than `pwd`.
+
 Do not invent a repair. Doctor already prints the fix after `→` on each `fail` line. Preview that command, get approval, then run it. Typical hints:
 
 - `grounder migrate`
@@ -94,6 +103,8 @@ Do not invent a repair. Doctor already prints the fix after `→` on each `fail`
 - `upgrade grounder`
 
 These hints always print the literal word `grounder` — even if you're bootstrapping via `npx grounder`. Replace that prefix with your resolved `$GROUNDER` before running. Do not invent extra flags.
+
+A corrupt `~/.grounder/state.json` (unlike a corrupt `config.json`, section 2) is not self-healing: doctor's `install-state` hint reads `fix or remove ~/.grounder/state.json, then grounder migrate --force`. That file-removal instruction is doctor-sanctioned, not an invented repair — get approval, `rm` exactly that path (never `config.json`, never anything doctor didn't name), then run the `grounder migrate --force` half of the hint.
 
 `migrate` writes immediately (no confirm). Preview first:
 

@@ -43,15 +43,32 @@ export async function withHomeDir<T>(
   }
 }
 
+/**
+ * Read `~/.grounder/config.json`. Missing file → `null`. Corrupt/invalid
+ * contents throw with the file path and an actionable fix baked in: unlike
+ * `state.json`, a broken home config carries no data worth preserving, so
+ * `grounder vault init <path>` can safely recreate it (see `runVaultInit`,
+ * which treats this error as "no existing home").
+ */
 export async function readHomeConfig(): Promise<HomeConfig | null> {
   const configPath = homeConfigPath();
   if (!(await fileExists(configPath))) {
     return null;
   }
 
-  const raw = JSON.parse(await readFile(configPath, "utf8")) as Partial<HomeConfig>;
+  let raw: Partial<HomeConfig>;
+  try {
+    raw = JSON.parse(await readFile(configPath, "utf8")) as Partial<HomeConfig>;
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Invalid home config at ${configPath}: ${detail}. Run: grounder vault init <path> to repair (recreates this file).`,
+    );
+  }
   if (typeof raw.vaultRoot !== "string" || raw.vaultRoot.length === 0) {
-    throw new Error(`Invalid home config at ${configPath}: missing vaultRoot`);
+    throw new Error(
+      `Invalid home config at ${configPath}: missing vaultRoot. Run: grounder vault init <path> to repair (recreates this file).`,
+    );
   }
 
   return { vaultRoot: raw.vaultRoot };

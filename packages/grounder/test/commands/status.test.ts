@@ -80,6 +80,34 @@ describe("commands/status", () => {
     expect(out).toContain("  State:      missing → grounder migrate --force");
   });
 
+  it("flags an ancestor link when cwd is an unlinked subdirectory of a linked repo", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const subdir = path.join(env.repo, "fixtures", "dev");
+    await mkdir(subdir, { recursive: true });
+
+    const { code, out } = await captureStdout(() =>
+      runStatusWithOptions({ cwd: subdir, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("  Linked:     yes");
+    expect(out).toContain(`  Folder:     ${env.repo}`);
+    expect(out).toContain(
+      `  Note:       linked ancestor — ${subdir} itself is unlinked; grounder init here would create a separate project`,
+    );
+    expect(out).toContain("  Id:         my-app");
+  });
+
   it("reports package lag when grounderVersion is behind the running package", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;

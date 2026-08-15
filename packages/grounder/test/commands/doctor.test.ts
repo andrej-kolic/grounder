@@ -108,6 +108,34 @@ describe("commands/doctor", () => {
     expect(out).toMatch(/^\d+ passed, 0 failed, 0 warned$/m);
   });
 
+  it("flags an ancestor link when cwd is an unlinked subdirectory of a linked repo", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const subdir = path.join(env.repo, "fixtures", "dev");
+    await mkdir(subdir, { recursive: true });
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: subdir, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("ok    repo-config");
+    expect(out).toContain(
+      `ancestor of ${subdir}; this folder itself is unlinked (grounder init here would create a separate project)`,
+    );
+    expect(out).toContain("ok    notes-dir");
+  });
+
   it("fails when home config is missing", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;

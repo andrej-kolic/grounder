@@ -1,6 +1,6 @@
-import { access, readFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   claude,
   claudePeekHookCommand,
@@ -172,6 +172,88 @@ describe("commands/vault/init", () => {
     expect(out).toContain("Dry run");
     expect(await fileExists(homeConfigPath(env.home))).toBe(false);
     expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(false);
+  });
+
+  it("self-heals a corrupt home config instead of crashing on dry-run", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await mkdir(path.dirname(homeConfigPath(env.home)), { recursive: true });
+    await writeFile(homeConfigPath(env.home), "{not-json", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runVaultInitWithOptions({
+        vaultPath: env.vault,
+        dryRun: true,
+        homeDir: env.home,
+        agents: [],
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("Note: existing home config was invalid and will be replaced.");
+    expect(out).toContain(`Invalid home config at ${homeConfigPath(env.home)}`);
+    expect(out).toContain(`Vault root: ${env.vault}`);
+    expect(out).toContain("Will write:");
+  });
+
+  it("self-heals a corrupt home config on apply, without needing --force", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await mkdir(path.dirname(homeConfigPath(env.home)), { recursive: true });
+    await writeFile(homeConfigPath(env.home), "{not-json", "utf8");
+
+    const code = await runVaultInitWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: [],
+    });
+
+    expect(code).toBe(0);
+    expect(JSON.parse(await readFile(homeConfigPath(env.home), "utf8"))).toEqual({
+      vaultRoot: env.vault,
+    });
+  });
+
+  it("reports partial success when state.json is corrupt during first-time vault init", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await mkdir(path.dirname(statePath(env.home)), { recursive: true });
+    await writeFile(statePath(env.home), "{not-json", "utf8");
+
+    const stderrChunks: string[] = [];
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderrChunks.push(String(chunk));
+      return true;
+    });
+
+    try {
+      const { code, out } = await captureStdout(() =>
+        runVaultInitWithOptions({
+          vaultPath: env.vault,
+          yes: true,
+          homeDir: env.home,
+          agents: ["cursor"],
+        }),
+      );
+
+      expect(code).toBe(1);
+      expect(out).toContain("✓ Wrote home config");
+      expect(out).toContain("✓ Vault scaffold:");
+      const stderrOut = stderrChunks.join("");
+      expect(stderrOut).toContain(
+        "Home config and vault scaffold were written, but agent command files/hooks were not installed",
+      );
+      expect(stderrOut).toContain("grounder migrate --force");
+      expect(JSON.parse(await readFile(homeConfigPath(env.home), "utf8"))).toEqual({
+        vaultRoot: env.vault,
+      });
+    } finally {
+      stderrSpy.mockRestore();
+    }
   });
 
   it("returns error before prompting when vault already configured to a different path", async () => {

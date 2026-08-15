@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { runtimeCliPath } from "../../agents/hook-runtime.js";
 import { resolveAgents } from "../../agents/index.js";
 import {
+  type HomeConfig,
   homeConfigPath,
   readHomeConfig,
   withHomeDir,
@@ -24,6 +25,26 @@ export interface VaultInitOptions {
   homeDir?: string;
   /** Agent ids to install for. Defaults to auto-detecting installed agents. */
   agents?: string[];
+}
+
+/**
+ * Read the existing home config for the "already exists with a different
+ * vault" conflict check. A corrupt/invalid file has no value worth
+ * conflict-checking (unlike `state.json`, which can encode forward-compat
+ * schema info) — treat it as absent so `vault init` can recreate it without
+ * requiring the user to manually delete it first, or doctor's plain
+ * `grounder vault init <path>` hint would dead-end on the same parse error.
+ */
+async function readExistingHomeForInit(): Promise<{
+  home: HomeConfig | null;
+  invalidDetail: string | null;
+}> {
+  try {
+    return { home: await readHomeConfig(), invalidDetail: null };
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { home: null, invalidDetail: detail };
+  }
 }
 
 export async function runVaultInit(argv: string[]): Promise<number> {
@@ -64,7 +85,7 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
     const dryRun = options.dryRun ?? false;
     const homeDir = options.homeDir;
 
-    const existingHome = await readHomeConfig();
+    const { home: existingHome, invalidDetail } = await readExistingHomeForInit();
     const projectsDir = projectsParent(vaultRoot);
     const agents = await resolveAgents(options.agents);
 
@@ -75,6 +96,10 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
       return 1;
     }
 
+    if (invalidDetail) {
+      process.stdout.write(`Note: existing home config was invalid and will be replaced.\n`);
+      process.stdout.write(`  ${invalidDetail}\n`);
+    }
     process.stdout.write(`Vault root: ${vaultRoot}\n`);
     if (dryRun) {
       process.stdout.write("Dry run — no files will be written.\n");
@@ -119,12 +144,20 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
     process.stdout.write("✓ Wrote home config\n");
     process.stdout.write(`✓ Vault scaffold: ${projectsDir}\n`);
 
-    await applyAgentInstalls({
-      agents,
-      force,
-      hooks,
-      homeDir,
-    });
+    try {
+      await applyAgentInstalls({
+        agents,
+        force,
+        hooks,
+        homeDir,
+      });
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : String(error);
+      process.stderr.write(
+        `\nHome config and vault scaffold were written, but agent command files/hooks were not installed:\n  ${detail}\n`,
+      );
+      return 1;
+    }
 
     return 0;
   });
