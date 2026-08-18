@@ -103,14 +103,21 @@ describe("skills/grounder-setup", () => {
     expect(content).not.toContain("notes folder");
   });
 
-  it("narrates connect/link/refresh purpose lines verbatim before dry-run", async () => {
+  it("narrates a four-step board then connect/link/refresh lines before dry-run", async () => {
     const content = await readFile(skillPath, "utf8");
-    expect(content).toContain("say the matching purpose line verbatim");
-    expect(content).toContain("**Connect** to a markdown vault (once per machine).");
+    expect(content).toContain("Setup has four steps:");
+    expect(content).toContain("1. Environment — Node 18+");
+    expect(content).toContain("2. Grounder — CLI on this machine");
+    expect(content).toContain("3. Connect — markdown vault (once per machine)");
+    expect(content).toContain("4. Link — this project (once per project)");
+    expect(content).toContain("Do not dump `status`/`doctor` prose");
+    expect(content).not.toContain("Setup has two steps:");
+    expect(content).toContain("say the matching line verbatim");
+    expect(content).toContain("Step 3 of 4 — **Connect** to a markdown vault (once per machine).");
     expect(content).toContain(
-      "**Link this project** inside the markdown vault (once per project).",
+      "Step 4 of 4 — **Link this project** inside the markdown vault (once per project).",
     );
-    expect(content).toContain("**Refresh Grounder after an upgrade.**");
+    expect(content).toContain("Repair — **Refresh Grounder after an upgrade.**");
   });
 
   it("is not shipped in the npm tarball", async () => {

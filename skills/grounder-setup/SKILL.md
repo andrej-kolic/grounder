@@ -19,26 +19,26 @@ Adding this skill only loads these instructions. Running it is what installs the
 - Delegate writes to the CLI. Do not copy command files, edit `~/.grounder/config.json` by hand, or invent repair steps.
 - Do not pass `--agent` unless the user asks to **limit** the install. Auto-detect should install every detected host (Cursor and Claude Code).
 - Never `--force` on first setup. Never `--force` a vault-root change (home config pointing at a different vault is a conflict to surface, not overwrite).
-- Always preview writes in chat and get approval. For `vault init` / `init` / `migrate`, say the purpose line (section 4), run `--dry-run`, and show that stdout as-is — do not reconstruct the write list. Then apply (`--yes` on the inits; `migrate` has no confirm). Never rely on the interactive `confirm()` prompt — it treats empty stdin as yes, so a non-TTY agent shell would apply unaudited. No extra confirmation gates.
+- Always preview writes in chat and get approval. For `vault init` / `init` / `migrate`, say the `Step N of 4` line (section 4), run `--dry-run`, and show that stdout as-is — do not reconstruct the write list. Then apply (`--yes` on the inits; `migrate` has no confirm). Never rely on the interactive `confirm()` prompt — it treats empty stdin as yes, so a non-TTY agent shell would apply unaudited. No extra confirmation gates.
 - Do not write a test note or handoff unless asked.
 - Skill present ≠ Grounder ready.
 
 The vault and `~/.grounder` live outside the project. Grant the shell whatever unrestricted / `all` permissions the host requires so those paths are reachable.
 
-## 1. CLI on PATH
+## 1. Environment and Grounder CLI
 
-Prefer a real global CLI so `vault init` can symlink `~/.grounder/runtime` (tracks upgrades). Bare `npx grounder vault init` copies the runtime and needs `migrate` after every upgrade.
+Steps 1–2 of the board. Prefer a real global CLI so `vault init` can symlink `~/.grounder/runtime` (tracks upgrades). Bare `npx grounder vault init` copies the runtime and needs `migrate` after every upgrade.
 
-1. Check Node 18+ (`node -v`). If Node is missing or too old, stop — do not install Node.
+1. Check Node 18+ (`node -v`). If missing or too old: print the board with step 1 needed and stop — do not install Node.
 2. If `grounder --version` (or `command -v grounder`) works, use `grounder` for every later command.
-3. If missing: **ask** before `npm install -g grounder`. Never silently install a global package. Default `npm`; offer `pnpm add -g grounder` only when that is clearly the user's toolchain.
-4. If they decline: use `npx grounder` as bootstrap, and tell them the runtime will be a copy until they install globally.
+3. If missing: print the board with step 2 needed and **ask** before `npm install -g grounder`. Never silently install a global package. Default `npm`; offer `pnpm add -g grounder` only when that is clearly the user's toolchain.
+4. If they decline: use `npx grounder` as bootstrap, mark step 2 `using npx`, and tell them the runtime will be a copy until they install globally.
 
 Call the resolved binary `GROUNDER` below (`grounder` or `npx grounder`). Do not hard-code one or the other.
 
 ## 2. State check
 
-This skill always targets `pwd` — state that folder in chat before running anything (e.g. "Setting up Grounder for `/path/you/are/in`") so it's clear which folder will get `.grounder.json`, especially in a repo that already links a parent/sibling folder elsewhere.
+This skill always targets `pwd` (the folder that will get `.grounder.json`). Run checks first; the first user-visible message is the progress board (below), not a diagnostic paragraph.
 
 Run `$GROUNDER status`. `status`/`doctor` walk up from `pwd` to the nearest `.grounder.json` (stopping at the git root), so a subdirectory of an already-linked repo can report `Linked: yes` for an *ancestor* folder, not `pwd` itself. Before trusting `Linked:`, check:
 
@@ -62,17 +62,45 @@ Then branch — do not always run both inits:
 
 `doctor` exit 1 means a `fail` check. `warn` (including missing hooks) is not a failure. An ancestor-link note is never itself something to fix — it means run `init` in `pwd`.
 
-## 3. Vault path (first-time `vault init` only)
+Map `doctor --global` failures onto step 3 (Connect) — e.g. missing `10-Projects/` is Connect needed, not a separate story.
 
-`vault init <path>` is once per machine. After `~/.grounder/config.json` exists, skip it (unless a later doctor hint says otherwise). `GROUNDER_VAULT` is a session override, not a setup input. `init` needs no path. Do not require `.obsidian`.
+## Progress board
 
-Before first-time `vault init`, say this once (even if the path is already known):
+After sections 1–2, print this board once (every path, including already-done and repair). Fill `{…}` from checks you already ran. Do not dump `status`/`doctor` prose (`Home config already…`, `This folder is not linked.`, `doctor --global failed…`). Do not say `Dry-run of grounder …`.
 
 ```text
-Setup has two steps:
-1. Connect to a markdown vault (once; Obsidian not required). That's the vault root — Grounder creates `10-Projects/` inside it; notes, logs, and plans live under each project.
-2. Link this project inside that vault (once per project)
+Setting up Grounder for `/pwd`.
+
+Setup has four steps:
+1. Environment — Node 18+ — {done (vX) | needed (install Node 18+ and re-run)}
+2. Grounder — CLI on this machine — {done (vX) | needed | using npx}
+3. Connect — markdown vault (once per machine) — {done (path) | needed | needed (`10-Projects/` missing)}
+4. Link — this project (once per project) — {done | needed}
 ```
+
+Then only the remaining steps, in order, using the `Step N of 4` lines in section 4. After applying a step, say `Step N done.` and continue.
+
+If 1–4 are all done, print the board, report notes/logs/plans paths, and stop.
+
+Example (home exists, vault scaffold missing, project unlinked) — this is the whole first message, then wait:
+
+```text
+Setting up Grounder for `/path/to/project`.
+
+Setup has four steps:
+1. Environment — Node 18+ — done (v24.9.0)
+2. Grounder — CLI on this machine — done (0.4.2)
+3. Connect — markdown vault (once per machine) — needed (`10-Projects/` missing)
+4. Link — this project (once per project) — needed
+
+Step 3 of 4 — Connect to a markdown vault (once per machine). Preview:
+```
+
+Then paste `--dry-run` stdout as-is. Then: `Approve this and I’ll apply it. After that: step 4 (link this project).`
+
+## 3. Vault path (first-time `vault init` only)
+
+`vault init <path>` is once per machine. After `~/.grounder/config.json` exists, skip it (unless a later doctor hint says otherwise). `GROUNDER_VAULT` is a session override, not a setup input. `init` needs no path. Do not require `.obsidian`. The board already explained Connect vs Link — do not print a second intro.
 
 Resolution order:
 
@@ -84,13 +112,15 @@ If the resolved path is missing: **warn** that `vault init` will create that dir
 
 ## 4. Preview in chat, then apply
 
-Before each `--dry-run`, say the matching purpose line verbatim, then show that stdout in chat as-is — it's the real write list, do not restate or reconstruct it yourself. Wait for approval, then rerun the identical command with `--yes`. Add `--hooks` on a first-time `vault init` unless declined. Never `--agent`, never `--force`. No extra confirmation gates beyond that approval.
+Before each `--dry-run`, say the matching line verbatim, then show that stdout in chat as-is — it's the real write list, do not restate or reconstruct it yourself. Wait for approval, then rerun the identical command with `--yes`. Add `--hooks` on a first-time `vault init` unless declined. Never `--agent`, never `--force`. No extra confirmation gates beyond that approval. Do not mention `--yes` or `--dry-run` in chat.
 
 | Command | Say (then paste stdout) |
 |---|---|
-| `vault init` | **Connect** to a markdown vault (once per machine). Records the path, creates `10-Projects/`, installs slash commands. Preview: |
-| `init` | **Link this project** inside the markdown vault (once per project). Writes `.grounder.json` and creates `10-Projects/{projectId}/notes`, `logs`, and `plans`. Preview: |
-| `migrate` | **Refresh Grounder after an upgrade.** Updates slash commands/hooks; does not change the vault path. Preview: |
+| `vault init` | Step 3 of 4 — **Connect** to a markdown vault (once per machine). Preview: |
+| `init` | Step 4 of 4 — **Link this project** inside the markdown vault (once per project). Preview: |
+| `migrate` | Repair — **Refresh Grounder after an upgrade.** Preview: |
+
+If another setup step remains after this apply: `Approve this and I’ll apply it. After that: step 4 (link this project).` If this is the last remaining setup write: `Approve this and I’ll apply it.`
 
 `init` reads `~/.grounder/config.json`, which `vault init` creates — so `vault init` must be fully applied (not just previewed) before you preview or apply `init`:
 

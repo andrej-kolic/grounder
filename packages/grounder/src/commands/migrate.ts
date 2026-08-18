@@ -95,10 +95,7 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
     process.stdout.write(
       "Refresh Grounder after an upgrade (slash commands/hooks; vault path unchanged).\n",
     );
-    if (dryRun) {
-      process.stdout.write("Dry run — no files will be written.\n");
-    }
-    process.stdout.write("Will refresh:\n");
+    process.stdout.write(dryRun ? "Would refresh:\n" : "Will refresh:\n");
     if (agents.length === 0) {
       process.stdout.write("  (no agents recorded or detected)\n");
     } else {

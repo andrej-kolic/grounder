@@ -141,10 +141,11 @@ describe("commands/vault/init", () => {
 
     expect(code).toBe(0);
     expect(out).toContain("Connect to a markdown vault (once per machine).");
-    expect(out).toContain("Dry run");
-    expect(out).toContain("Will write:");
+    expect(out).toContain("Would write:");
+    expect(out).not.toContain("Dry run");
+    expect(out).not.toContain("Will write:");
     expect(out.indexOf("Connect to a markdown vault (once per machine).")).toBeLessThan(
-      out.indexOf("Will write:"),
+      out.indexOf("Would write:"),
     );
     expect(out).toContain(`home   ${homeConfigPath(env.home)}`);
     expect(out).toContain("vault  10-Projects/ (if missing)");
@@ -173,7 +174,8 @@ describe("commands/vault/init", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain("Dry run");
+    expect(out).toContain("Would write:");
+    expect(out).not.toContain("Dry run");
     expect(await fileExists(homeConfigPath(env.home))).toBe(false);
     expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(false);
   });
@@ -198,7 +200,7 @@ describe("commands/vault/init", () => {
     expect(out).toContain("Note: existing home config was invalid and will be replaced.");
     expect(out).toContain(`Invalid home config at ${homeConfigPath(env.home)}`);
     expect(out).toContain(`Vault root: ${env.vault}`);
-    expect(out).toContain("Will write:");
+    expect(out).toContain("Would write:");
   });
 
   it("self-heals a corrupt home config on apply, without needing --force", async () => {

@@ -102,10 +102,7 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
     }
     process.stdout.write(`Vault root: ${vaultRoot}\n`);
     process.stdout.write("Connect to a markdown vault (once per machine).\n");
-    if (dryRun) {
-      process.stdout.write("Dry run — no files will be written.\n");
-    }
-    process.stdout.write("Will write:\n");
+    process.stdout.write(dryRun ? "Would write:\n" : "Will write:\n");
     process.stdout.write(`  home   ${homeConfigPath(homeDir)}\n`);
     process.stdout.write("  vault  10-Projects/ (if missing)\n");
     if (agents.length > 0) {
