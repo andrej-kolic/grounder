@@ -19,7 +19,7 @@ Adding this skill only loads these instructions. Running it is what installs the
 - Delegate writes to the CLI. Do not copy command files, edit `~/.grounder/config.json` by hand, or invent repair steps.
 - Do not pass `--agent` unless the user asks to **limit** the install. Auto-detect should install every detected host (Cursor and Claude Code).
 - Never `--force` on first setup. Never `--force` a vault-root change (home config pointing at a different vault is a conflict to surface, not overwrite).
-- Always preview writes in chat and get approval. For `vault init` / `init` / `migrate`, run `--dry-run` first and show that stdout — do not reconstruct the write list. Then apply (`--yes` on the inits; `migrate` has no confirm). Never rely on the interactive `confirm()` prompt — it treats empty stdin as yes, so a non-TTY agent shell would apply unaudited.
+- Always preview writes in chat and get approval. For `vault init` / `init` / `migrate`, say the purpose line (section 4), run `--dry-run`, and show that stdout as-is — do not reconstruct the write list. Then apply (`--yes` on the inits; `migrate` has no confirm). Never rely on the interactive `confirm()` prompt — it treats empty stdin as yes, so a non-TTY agent shell would apply unaudited. No extra confirmation gates.
 - Do not write a test note or handoff unless asked.
 - Skill present ≠ Grounder ready.
 
@@ -64,19 +64,33 @@ Then branch — do not always run both inits:
 
 ## 3. Vault path (first-time `vault init` only)
 
-`vault init <path>` is once per machine. After `~/.grounder/config.json` exists, skip it (unless a later doctor hint says otherwise). `GROUNDER_VAULT` is a session override, not a setup input. `init` needs no path.
+`vault init <path>` is once per machine. After `~/.grounder/config.json` exists, skip it (unless a later doctor hint says otherwise). `GROUNDER_VAULT` is a session override, not a setup input. `init` needs no path. Do not require `.obsidian`.
+
+Before first-time `vault init`, say this once (even if the path is already known):
+
+```text
+Setup has two steps:
+1. Connect this machine to a markdown vault (once; Obsidian not required). That's the vault root — Grounder creates `10-Projects/` inside it; notes, logs, and plans live under each project.
+2. Link this project inside that vault (once per project)
+```
 
 Resolution order:
 
 1. Path in the triggering message (e.g. “set up Grounder with ~/Documents/obsidian/dev”). Do not depend on host `$ARGUMENTS` being real.
-2. Ask once: "What's the path to your Obsidian vault?" Wait. Do not proceed.
+2. Otherwise ask once, then wait. Do not proceed: "What's the path to your markdown vault?"
 3. **Never guess** `~/Documents/Obsidian`, `~/obsidian`, or the current repo. A wrong `vaultRoot` is sticky machine state.
 
-If the resolved path is missing: **warn** that `vault init` will create that directory (`mkdir` of `10-Projects/` is recursive) and **ask how to proceed** — continue (create it), pick a different path, or abort. Do not require `.obsidian`; Grounder is Obsidian-compatible, not Obsidian-only.
+If the resolved path is missing: **warn** that `vault init` will create that directory (`mkdir` of `10-Projects/` is recursive) and **ask how to proceed** — continue (create it), pick a different path, or abort.
 
 ## 4. Preview in chat, then apply
 
-For each command from step 2's table: run with `--dry-run` and show that stdout in chat as-is — it's the real write list, do not restate or reconstruct it yourself. Wait for approval, then rerun the identical command with `--yes`. Add `--hooks` on a first-time `vault init` unless declined. Never `--agent`, never `--force`.
+Before each `--dry-run`, say the matching purpose line verbatim, then show that stdout in chat as-is — it's the real write list, do not restate or reconstruct it yourself. Wait for approval, then rerun the identical command with `--yes`. Add `--hooks` on a first-time `vault init` unless declined. Never `--agent`, never `--force`. No extra confirmation gates beyond that approval.
+
+| Command | Say (then paste stdout) |
+|---|---|
+| `vault init` | **Connect this machine** to a markdown vault (once per machine). Records the path, creates `10-Projects/`, installs slash commands. Preview: |
+| `init` | **Link this project** inside the markdown vault (once per project). Writes `.grounder.json` and creates `10-Projects/{projectId}/notes`, `logs`, and `plans`. Preview: |
+| `migrate` | **Refresh Grounder after an upgrade.** Updates slash commands/hooks; does not change the vault path. Preview: |
 
 `init` reads `~/.grounder/config.json`, which `vault init` creates — so `vault init` must be fully applied (not just previewed) before you preview or apply `init`:
 
@@ -106,7 +120,7 @@ These hints always print the literal word `grounder` — even if you're bootstra
 
 A corrupt `~/.grounder/state.json` (unlike a corrupt `config.json`, section 2) is not self-healing: doctor's `install-state` hint reads `fix or remove ~/.grounder/state.json, then grounder migrate --force`. That file-removal instruction is doctor-sanctioned, not an invented repair — get approval, `rm` exactly that path (never `config.json`, never anything doctor didn't name), then run the `grounder migrate --force` half of the hint.
 
-`migrate` writes immediately (no confirm). Preview first:
+`migrate` writes immediately (no confirm). Say the purpose line, then preview first:
 
 ```bash
 $GROUNDER migrate --dry-run
