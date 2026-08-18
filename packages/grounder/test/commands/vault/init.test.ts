@@ -140,6 +140,7 @@ describe("commands/vault/init", () => {
     );
 
     expect(code).toBe(0);
+    expect(out).toContain("Connect this machine to a markdown vault (once per machine).");
     expect(out).toContain("Dry run");
     expect(out).toContain("Will write:");
     expect(out).toContain(`home   ${homeConfigPath(env.home)}`);

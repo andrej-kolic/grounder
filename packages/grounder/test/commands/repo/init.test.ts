@@ -38,6 +38,7 @@ describe("commands/repo/init", () => {
     );
 
     expect(code).toBe(0);
+    expect(out).toContain("Link this project inside the markdown vault (once per project).");
     expect(out).toContain("Dry run");
     expect(out).toContain("Will create:");
     expect(out).toContain(`link   ${repoConfigPath(env.repo)}`);

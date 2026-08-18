@@ -78,6 +78,7 @@ export async function runRepoInitWithOptions(options: RepoInitOptions = {}): Pro
     const logsDirRelative = path.relative(vaultRoot, logsDir);
     const plansDirRelative = path.relative(vaultRoot, plansDir);
 
+    process.stdout.write("Link this project inside the markdown vault (once per project).\n");
     if (dryRun) {
       process.stdout.write("Dry run — no files will be written.\n");
     }

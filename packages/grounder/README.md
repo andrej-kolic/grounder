@@ -74,7 +74,7 @@ Run `grounder doctor` if you’re unsure — it hints when plain `migrate` is en
 **1. One-time setup:**
 
 ```bash
-# Once per machine — set vault location + install agent slash commands
+# Once per machine — connect this machine to a markdown vault + install agent slash commands
 # --hooks adds an optional one-line session-start reminder (see Session-start hooks)
 grounder vault init <path-to-your-vault> --hooks
 

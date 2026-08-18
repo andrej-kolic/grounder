@@ -178,6 +178,9 @@ describe("commands/migrate", () => {
     );
 
     expect(code).toBe(0);
+    expect(out).toContain(
+      "Refresh Grounder after an upgrade (slash commands/hooks; vault path unchanged).",
+    );
     expect(out).toContain("Dry run");
     expect(out).toContain("would update:");
     expect(out).toContain(`Install state would update: ${statePath(env.home)}`);

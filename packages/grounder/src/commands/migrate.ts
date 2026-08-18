@@ -92,6 +92,9 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
     }
 
     process.stdout.write(`Vault root: ${home.vaultRoot}\n`);
+    process.stdout.write(
+      "Refresh Grounder after an upgrade (slash commands/hooks; vault path unchanged).\n",
+    );
     if (dryRun) {
       process.stdout.write("Dry run — no files will be written.\n");
     }
