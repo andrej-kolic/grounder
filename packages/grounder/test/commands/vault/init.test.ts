@@ -143,6 +143,9 @@ describe("commands/vault/init", () => {
     expect(out).toContain("Connect to a markdown vault (once per machine).");
     expect(out).toContain("Dry run");
     expect(out).toContain("Will write:");
+    expect(out.indexOf("Connect to a markdown vault (once per machine).")).toBeLessThan(
+      out.indexOf("Will write:"),
+    );
     expect(out).toContain(`home   ${homeConfigPath(env.home)}`);
     expect(out).toContain("vault  10-Projects/ (if missing)");
     expect(out).toContain(`grounder runtime ${runtimeCliPath(env.home)}`);

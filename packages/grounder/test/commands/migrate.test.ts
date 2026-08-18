@@ -183,6 +183,11 @@ describe("commands/migrate", () => {
     );
     expect(out).toContain("Dry run");
     expect(out).toContain("would update:");
+    expect(
+      out.indexOf(
+        "Refresh Grounder after an upgrade (slash commands/hooks; vault path unchanged).",
+      ),
+    ).toBeLessThan(out.indexOf("Will refresh:"));
     expect(out).toContain(`Install state would update: ${statePath(env.home)}`);
     expect(out).not.toContain("grounder migrate --force");
     expect(await readFile(noteDest, "utf8")).toBe(before);

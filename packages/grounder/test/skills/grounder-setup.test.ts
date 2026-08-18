@@ -95,6 +95,24 @@ describe("skills/grounder-setup", () => {
     expect(content).not.toContain("`init` writes:");
   });
 
+  it("asks for a markdown vault path, not an Obsidian vault or notes folder", async () => {
+    const content = await readFile(skillPath, "utf8");
+    expect(content).toContain(`"What's the path to your markdown vault?"`);
+    expect(content).not.toContain("What's the path to your Obsidian vault?");
+    expect(content).not.toContain("Obsidian vault");
+    expect(content).not.toContain("notes folder");
+  });
+
+  it("narrates connect/link/refresh purpose lines verbatim before dry-run", async () => {
+    const content = await readFile(skillPath, "utf8");
+    expect(content).toContain("say the matching purpose line verbatim");
+    expect(content).toContain("**Connect** to a markdown vault (once per machine).");
+    expect(content).toContain(
+      "**Link this project** inside the markdown vault (once per project).",
+    );
+    expect(content).toContain("**Refresh Grounder after an upgrade.**");
+  });
+
   it("is not shipped in the npm tarball", async () => {
     const pkg = JSON.parse(await readFile(packageJsonPath, "utf8")) as { files?: string[] };
     expect(pkg.files).toEqual(["dist", "templates"]);
