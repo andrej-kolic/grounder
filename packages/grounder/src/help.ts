@@ -355,9 +355,11 @@ function formatFullCommandDetails(): string {
   return blocks.join("\n\n");
 }
 
+const BANNER = "grounder — markdown-native memory for AI agents";
+
 /** Bare `grounder` / `-h` — short grouped synopsis (no flag encyclopedia). */
 export function printSynopsis(): void {
-  process.stdout.write(`grounder — connect git projects to markdown vaults for AI agents
+  process.stdout.write(`${BANNER}
 
 ${formatGroupedLists()}
 
@@ -375,7 +377,7 @@ ${QUICKSTART}
 
 /** `--help` / `grounder help` with no args — one-shot reference for humans/agents. */
 export function printFullHelp(): void {
-  process.stdout.write(`grounder — connect git projects to markdown vaults for AI agents
+  process.stdout.write(`${BANNER}
 
 ${formatGroupedLists()}
 

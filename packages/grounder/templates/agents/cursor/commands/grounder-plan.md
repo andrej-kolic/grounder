@@ -1,4 +1,4 @@
-Write a named, updatable plan document to the Obsidian vault for this project.
+Write a named, updatable plan document to the markdown vault for this project.
 
 Distill the instruction after `/grounder-plan` into a structured plan — not a chat transcript.
 Do not dump tool traces, full conversation, or false starts.

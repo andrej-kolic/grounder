@@ -1,4 +1,4 @@
-Write a session handoff checkpoint to the Obsidian vault for this project.
+Write a session handoff checkpoint to the markdown vault for this project.
 
 Summarize the session into a structured handoff — not a chat transcript.
 Do not dump tool traces, full conversation, or false starts.

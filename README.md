@@ -12,7 +12,7 @@ AI agents forget everything between sessions and can't share context with each o
 
 AI-first CLI and agent command set that:
 
-- **Connects any project** — git repositories or standard folders — to your local vault (multi-project support).
+- **Links any project** — git repositories or standard folders — to your local vault (multi-project support).
 - **Captures state deliberately** — converts a discussion into a living plan, checkpoints a session for handoff, or saves arbitrary notes.
 - **Hydrates on demand** — allows you or any agent to resume exactly where a prior session left off without re-deriving context.
 - **Works natively today** with Cursor, Claude Code, and standard CLI workflows.

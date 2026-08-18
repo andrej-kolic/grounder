@@ -1,6 +1,6 @@
 # AGENTS.md — Grounder repo
 
-Grounder is a Node CLI (`packages/grounder`) that wires project folders to personal Obsidian dev vaults for AI agent memory.
+Grounder is a Node CLI (`packages/grounder`) that links project folders to personal markdown vaults for AI agent memory.
 
 ## Layout
 
