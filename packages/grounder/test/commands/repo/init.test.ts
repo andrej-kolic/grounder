@@ -96,10 +96,55 @@ describe("commands/repo/init", () => {
     cleanup = env.cleanup;
 
     await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
-    const code = await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const { code, out } = await captureStdout(() =>
+      runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home }),
+    );
 
     expect(code).toBe(0);
+    expect(out).toContain("✓ Already linked (skipped)");
+    expect(out).not.toContain("Will create:");
+    expect(out).not.toContain("✓ Wrote .grounder.json");
     expect(await readRepoConfig(env.repo)).toEqual({ version: 1, projectId: "my-app" });
+  });
+
+  it("dry-run reports already linked instead of would-create", async () => {
+    const env = await setupLinkedEnv();
+    cleanup = env.cleanup;
+
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const { code, out } = await captureStdout(() =>
+      runRepoInitWithOptions({
+        cwd: env.repo,
+        dryRun: true,
+        homeDir: env.home,
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("Already linked (would skip).");
+    expect(out).not.toContain("Would create:");
+    expect(out).not.toContain("Link this project inside the markdown vault (once per project).");
+    expect(out).not.toContain(`link   ${repoConfigPath(env.repo)}`);
+  });
+
+  it("dry-run with --force still previews overwrite when already linked", async () => {
+    const env = await setupLinkedEnv();
+    cleanup = env.cleanup;
+
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const { code, out } = await captureStdout(() =>
+      runRepoInitWithOptions({
+        cwd: env.repo,
+        dryRun: true,
+        force: true,
+        homeDir: env.home,
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("Would create:");
+    expect(out).toContain(`link   ${repoConfigPath(env.repo)}`);
+    expect(out).not.toContain("Already linked (would skip).");
   });
 
   it("overwrites marker with --force", async () => {

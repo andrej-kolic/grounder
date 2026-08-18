@@ -47,8 +47,10 @@ Run `$GROUNDER status`. `status`/`doctor` walk up from `pwd` to the nearest `.gr
 
 If either signal shows an ancestor link, treat `pwd` as **unlinked**, no matter what `Linked:` says — do not run doctor's hinted fix command in the ancestor folder; you were asked to set up `pwd`, not its parent.
 
+This exact folder is **linked** (step 4 `done`) when `Linked: yes` and `Folder:` == `pwd`. `Linked: no`, or an ancestor-only link, is **unlinked** (step 4 `needed`). Missing Connect does not change that.
+
 - Home exists but project unlinked (including "linked via an ancestor only"): also run `$GROUNDER doctor --global` (repair the machine first if it fails).
-- Project linked to *this exact folder* (`Linked: yes` and `Folder:` == `pwd`): run `$GROUNDER doctor`.
+- Project linked to *this exact folder* (`Linked: yes` and `Folder:` == `pwd`): run `$GROUNDER doctor` when home exists; if home is missing/invalid, skip doctor and go to first-time `vault init` (Link stays `done`).
 - No usable home config yet (`Config: missing` **or** `Config: invalid` → grounder vault init): skip `doctor --global` — `status` already gives the fix. `vault init` recreates a missing *or* corrupt `~/.grounder/config.json` on its own (no manual delete, no `--force`) — treat `invalid` exactly like `missing` and proceed straight to first-time `vault init`.
 
 Then branch — do not always run both inits:
@@ -60,7 +62,7 @@ Then branch — do not always run both inits:
 | Linked to this exact folder and `doctor` exits 0 | Report notes/logs/plans paths and stop |
 | Linked to this exact folder, but `doctor` exits 1 | Run the command after `→` in the failing check (section 5) |
 
-`doctor` exit 1 means a `fail` check. `warn` (including missing hooks) is not a failure. An ancestor-link note is never itself something to fix — it means run `init` in `pwd`.
+`doctor` exit 1 means a `fail` check. `warn` (including missing hooks **and** missing `notes/` / `logs/` / `plans/`) is not a failure. Those three layout dirs `mkdir` on first note/handoff/plan write — do not preview `init` for them. An ancestor-link note is never itself something to fix — it means run `init` in `pwd`.
 
 Map `doctor --global` failures onto step 3 (Connect) — e.g. missing `10-Projects/` is Connect needed, not a separate story.
 
@@ -78,7 +80,9 @@ Setup has four steps:
 4. Link — this project (once per project) — {done | needed}
 ```
 
-Then only the remaining steps, in order, using the `Step N of 4` lines in section 4. After applying a step, say `Step N done.` and continue.
+Then only the remaining steps, in order, using the `Step N of 4` lines in section 4.
+
+After applying a step, say `Step N done.` Then re-run `$GROUNDER status` (and `$GROUNDER doctor` if this exact folder is now linked). Remaining writes come from **current** state — do not preview `init` just because the original board listed step 4, and do not follow doctor **warn** hints. If Link is `done`, skip `init` and go to section 6.
 
 If 1–4 are all done, print the board, report notes/logs/plans paths, and stop.
 
@@ -132,6 +136,8 @@ $GROUNDER init --dry-run          # only if the project is still unlinked
 # → approve → $GROUNDER init --yes
 ```
 
+After Connect is applied, re-check before this preview. If the project is already linked, skip `init`. If `init --dry-run` prints `Already linked (would skip).`, treat step 4 as done — do not apply, do not wait for approval.
+
 To preview `init` before `vault init` is applied, add `--vault <path>` to `init --dry-run` — it resolves the vault path without needing the home config yet. If no supported agent is detected, still run `vault init`: the home config and `10-Projects/` are useful without CLI/editor glue.
 
 ## 5. When doctor fails
@@ -162,7 +168,7 @@ Never `--force` a vault-root change.
 
 ## 6. Verify
 
-After `init` / repair, run `$GROUNDER doctor` (full, not `--global`). Report the notes/logs/plans paths (`status` or `$GROUNDER path notes` / `path logs` / `path plans`).
+After `init` / repair, run `$GROUNDER doctor` (full, not `--global`). Report the notes/logs/plans paths (`status` or `$GROUNDER path notes` / `path logs` / `path plans`). Doctor exit 0 with warns (including missing notes/logs/plans) is done — report those paths and stop. Do not treat `→ grounder init` on a **warn** as remaining setup.
 
 - If the repo is shared, mention that `.grounder.json` should be committed.
 - Do not write a test note or handoff unless asked.

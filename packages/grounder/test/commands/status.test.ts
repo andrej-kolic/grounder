@@ -215,7 +215,7 @@ describe("commands/status", () => {
     expect(out).not.toContain("incomplete");
   });
 
-  it("reports incomplete when project config exists but vault does not", async () => {
+  it("reports linked when project config exists but vault does not", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -227,10 +227,11 @@ describe("commands/status", () => {
 
     expect(code).toBe(0);
     expect(out).toContain("  Config:     missing → grounder vault init <path>");
-    expect(out).toContain("  Linked:     incomplete → grounder vault init <path>");
+    expect(out).toContain("  Linked:     yes");
     expect(out).toContain(`  Folder:     ${env.repo}`);
     expect(out).toContain(`  Config:     ${path.join(env.repo, ".grounder.json")}`);
     expect(out).toContain("  Id:         my-app");
+    expect(out).not.toContain("incomplete");
     expect(out).not.toContain("Notes:");
     expect(out).not.toContain("Logs:");
     expect(out).not.toContain("Plans:");
@@ -273,9 +274,10 @@ describe("commands/status", () => {
     expect(out).toContain("  Config:     invalid → grounder vault init <path>");
     expect(out).not.toContain("Vault:");
     expect(out).not.toContain("State:");
-    expect(out).toContain("  Linked:     incomplete → grounder vault init <path>");
+    expect(out).toContain("  Linked:     yes");
     expect(out).toContain(`  Folder:     ${env.repo}`);
     expect(out).toContain("  Id:         my-app");
+    expect(out).not.toContain("incomplete");
   });
 
   it("reports invalid repo config without aborting", async () => {

@@ -181,24 +181,16 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
       return 0;
     }
 
-    if (!home) {
-      process.stdout.write(statusLine("Linked:", `incomplete → ${VAULT_INIT}`));
-      process.stdout.write(statusLine("Folder:", linkedRoot));
-      writeAncestorNoteIfAny(cwd, linkedRoot);
-      process.stdout.write(statusLine("Config:", repoConfigPath(linkedRoot)));
-      process.stdout.write(statusLine("Id:", repo.projectId));
-      await writeGitLine(gitRoot);
-      return 0;
-    }
-
     process.stdout.write(statusLine("Linked:", "yes"));
     process.stdout.write(statusLine("Folder:", linkedRoot));
     writeAncestorNoteIfAny(cwd, linkedRoot);
     process.stdout.write(statusLine("Config:", repoConfigPath(linkedRoot)));
     process.stdout.write(statusLine("Id:", repo.projectId));
-    process.stdout.write(statusLine("Notes:", resolveNotesDir(home, repo)));
-    process.stdout.write(statusLine("Logs:", resolveLogsDir(home, repo)));
-    process.stdout.write(statusLine("Plans:", resolvePlansDir(home, repo)));
+    if (home) {
+      process.stdout.write(statusLine("Notes:", resolveNotesDir(home, repo)));
+      process.stdout.write(statusLine("Logs:", resolveLogsDir(home, repo)));
+      process.stdout.write(statusLine("Plans:", resolvePlansDir(home, repo)));
+    }
     await writeGitLine(gitRoot);
 
     return 0;

@@ -103,6 +103,15 @@ describe("skills/grounder-setup", () => {
     expect(content).not.toContain("notes folder");
   });
 
+  it("does not treat an already-linked project as step 4 after Connect", async () => {
+    const content = await readFile(skillPath, "utf8");
+    expect(content).toContain("Already linked (would skip).");
+    expect(content).toContain("Remaining writes come from **current** state");
+    expect(content).toContain("do not preview `init` for them");
+    expect(content).toContain("Missing Connect does not change that");
+    expect(content).toContain("If Link is `done`, skip `init`");
+  });
+
   it("narrates a four-step board then connect/link/refresh lines before dry-run", async () => {
     const content = await readFile(skillPath, "utf8");
     expect(content).toContain("Setup has four steps:");

@@ -78,6 +78,25 @@ export async function runRepoInitWithOptions(options: RepoInitOptions = {}): Pro
     const logsDirRelative = path.relative(vaultRoot, logsDir);
     const plansDirRelative = path.relative(vaultRoot, plansDir);
 
+    if (existingRepo && !force) {
+      if (existingRepo.projectId === detected.id) {
+        process.stdout.write(
+          dryRun ? "Already linked (would skip).\n" : "✓ Already linked (skipped)\n",
+        );
+        if (!dryRun) {
+          await mkdir(notesDir, { recursive: true });
+          await mkdir(logsDir, { recursive: true });
+          await mkdir(plansDir, { recursive: true });
+        }
+        return 0;
+      }
+
+      process.stderr.write(
+        `Folder already linked as ${existingRepo.projectId}. Use --force to overwrite.\n`,
+      );
+      return 1;
+    }
+
     process.stdout.write("Link this project inside the markdown vault (once per project).\n");
     process.stdout.write(dryRun ? "Would create:\n" : "Will create:\n");
     process.stdout.write(`  link   ${repoConfigPath(cwd)}\n`);
@@ -86,12 +105,6 @@ export async function runRepoInitWithOptions(options: RepoInitOptions = {}): Pro
     process.stdout.write(`  vault  ${plansDirRelative}/\n`);
 
     if (dryRun) {
-      if (existingRepo && !force && existingRepo.projectId !== detected.id) {
-        process.stderr.write(
-          `Folder already linked as ${existingRepo.projectId}. Use --force to overwrite.\n`,
-        );
-        return 1;
-      }
       return 0;
     }
 
@@ -101,21 +114,6 @@ export async function runRepoInitWithOptions(options: RepoInitOptions = {}): Pro
         process.stdout.write("Aborted.\n");
         return 0;
       }
-    }
-
-    if (existingRepo && !force) {
-      if (existingRepo.projectId === detected.id) {
-        process.stdout.write("✓ Already linked (skipped)\n");
-        await mkdir(notesDir, { recursive: true });
-        await mkdir(logsDir, { recursive: true });
-        await mkdir(plansDir, { recursive: true });
-        return 0;
-      }
-
-      process.stderr.write(
-        `Folder already linked as ${existingRepo.projectId}. Use --force to overwrite.\n`,
-      );
-      return 1;
     }
 
     await writeRepoConfig(cwd, { version: 1, projectId: detected.id });
