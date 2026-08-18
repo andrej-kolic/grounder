@@ -11,7 +11,7 @@ AI agents forget everything between sessions and can't share context with each o
 
 AI-first CLI and agent command set that:
 
-- **Connects any project** — git repositories or standard folders — to your local vault (multi-project support).
+- **Links any project** — git repositories or standard folders — to your local vault (multi-project support).
 - **Captures state deliberately** — converts a discussion into a living plan, checkpoints a session for handoff, or saves arbitrary notes.
 - **Hydrates on demand** — allows you or any agent to resume exactly where a prior session left off without re-deriving context.
 - **Works natively today** with Cursor, Claude Code, and standard CLI workflows.
@@ -35,7 +35,7 @@ A full session loop, one step at a time:
 
 Dim lines are the actual `grounder` CLI call each slash command runs under the hood. Regenerated with `pnpm demo:cast` from [`@grounder/demo-casts`](../demo-casts/).
 
-**Requirements:** Node.js 18+ and an Obsidian vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
+**Requirements:** Node.js 18+ and a markdown vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
 
 **Contents:** [Install](#install) · [Upgrading](#upgrading) · [Quickstart](#quickstart) · [Setup overview](#setup-overview) · [Commands](#commands) · [Configuration](#configuration) · [Agents](#agents) · [Session-start hooks](#session-start-hooks) · [Troubleshooting](#troubleshooting) · [Roadmap](#roadmap)
 
@@ -74,7 +74,7 @@ Run `grounder doctor` if you’re unsure — it hints when plain `migrate` is en
 **1. One-time setup:**
 
 ```bash
-# Once per machine — connect this machine to a markdown vault + install agent slash commands
+# Once per machine — connect to a markdown vault + install agent slash commands
 # --hooks adds an optional one-line session-start reminder (see Session-start hooks)
 grounder vault init <path-to-your-vault> --hooks
 
@@ -151,8 +151,8 @@ Nothing is written into the repo except the small `.grounder.json` marker. Agent
 ## Commands
 
 ```text
-grounder vault init <path>   Initialize vault + home config (once per machine)
-grounder init                Connect the current folder to your vault
+grounder vault init <path>   Connect to a markdown vault (once per machine)
+grounder init                Link this project inside the markdown vault (once per project)
 grounder note <text>         Write a note to the vault
 grounder note list           Print recent notes (count header + numbered title/path, newest first)
 grounder handoff <text>      Write a session handoff to vault logs/

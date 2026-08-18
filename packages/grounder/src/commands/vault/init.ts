@@ -101,7 +101,7 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
       process.stdout.write(`  ${invalidDetail}\n`);
     }
     process.stdout.write(`Vault root: ${vaultRoot}\n`);
-    process.stdout.write("Connect this machine to a markdown vault (once per machine).\n");
+    process.stdout.write("Connect to a markdown vault (once per machine).\n");
     if (dryRun) {
       process.stdout.write("Dry run — no files will be written.\n");
     }

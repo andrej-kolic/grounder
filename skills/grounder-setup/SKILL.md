@@ -70,7 +70,7 @@ Before first-time `vault init`, say this once (even if the path is already known
 
 ```text
 Setup has two steps:
-1. Connect this machine to a markdown vault (once; Obsidian not required). That's the vault root — Grounder creates `10-Projects/` inside it; notes, logs, and plans live under each project.
+1. Connect to a markdown vault (once; Obsidian not required). That's the vault root — Grounder creates `10-Projects/` inside it; notes, logs, and plans live under each project.
 2. Link this project inside that vault (once per project)
 ```
 
@@ -88,7 +88,7 @@ Before each `--dry-run`, say the matching purpose line verbatim, then show that 
 
 | Command | Say (then paste stdout) |
 |---|---|
-| `vault init` | **Connect this machine** to a markdown vault (once per machine). Records the path, creates `10-Projects/`, installs slash commands. Preview: |
+| `vault init` | **Connect** to a markdown vault (once per machine). Records the path, creates `10-Projects/`, installs slash commands. Preview: |
 | `init` | **Link this project** inside the markdown vault (once per project). Writes `.grounder.json` and creates `10-Projects/{projectId}/notes`, `logs`, and `plans`. Preview: |
 | `migrate` | **Refresh Grounder after an upgrade.** Updates slash commands/hooks; does not change the vault path. Preview: |
 

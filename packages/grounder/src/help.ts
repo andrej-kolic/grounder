@@ -42,12 +42,12 @@ export const COMMANDS: readonly CommandMeta[] = [
     usage: "grounder vault init <path> [--yes] [--force] [--agent <id>] [--hooks] [--dry-run]",
     list: false,
     flags: `Subcommands:
-  vault init   Initialize vault + home config (once per machine)`,
+  vault init   Connect to a markdown vault (once per machine)`,
   },
   {
     id: "vault init",
     group: "Setup",
-    summary: "Initialize vault + home config (once per machine)",
+    summary: "Connect to a markdown vault (once per machine)",
     listUsage: "vault init <path>",
     usage: "grounder vault init <path> [--yes] [--force] [--agent <id>] [--hooks] [--dry-run]",
     flags: `Flags:
@@ -61,7 +61,7 @@ export const COMMANDS: readonly CommandMeta[] = [
   {
     id: "init",
     group: "Setup",
-    summary: "Connect the current repo to your vault",
+    summary: "Link this project inside the markdown vault (once per project)",
     listUsage: "init",
     usage: "grounder init [--yes] [--force] [--id <id>] [--vault <path>] [--dry-run]",
     flags: `Flags:
@@ -357,7 +357,7 @@ function formatFullCommandDetails(): string {
 
 /** Bare `grounder` / `-h` — short grouped synopsis (no flag encyclopedia). */
 export function printSynopsis(): void {
-  process.stdout.write(`grounder — connect git projects to Obsidian dev vaults for AI agents
+  process.stdout.write(`grounder — connect git projects to markdown vaults for AI agents
 
 ${formatGroupedLists()}
 
@@ -375,7 +375,7 @@ ${QUICKSTART}
 
 /** `--help` / `grounder help` with no args — one-shot reference for humans/agents. */
 export function printFullHelp(): void {
-  process.stdout.write(`grounder — connect git projects to Obsidian dev vaults for AI agents
+  process.stdout.write(`grounder — connect git projects to markdown vaults for AI agents
 
 ${formatGroupedLists()}
 
