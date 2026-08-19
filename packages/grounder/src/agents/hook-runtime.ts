@@ -16,7 +16,7 @@
  * [npm/cli#9244](https://github.com/npm/cli/issues/9244).
  *
  * ## Design
- * On `vault init`, materialize this package's `dist/` at
+ * On `setup`, materialize this package's `dist/` at
  * `~/.grounder/runtime/dist/` and point both host hook configs *and* the
  * commands copied into `~/.cursor/commands/` / `~/.claude/commands/` at:
  *   `process.execPath` + `~/.grounder/runtime/dist/cli.js` + `<subcommand> …`
@@ -29,11 +29,11 @@
  * - **Durable source** (monorepo checkout, global install, linked devDependency) →
  *   **symlink** `dist/` straight to the source. `pnpm build` / upgrading the
  *   global install overwrites that same path in place, so hooks and commands
- *   pick up new code immediately — no re-run of `vault init` ever needed.
+ *   pick up new code immediately — no re-run of `setup` ever needed.
  * - **Ephemeral source** (bare `npx grounder …`, no install — each invocation
  *   resolves to an immutable, version-keyed npx cache dir that can be evicted
  *   or swapped out from under a symlink) → **copy** `dist/`. Re-run
- *   `grounder vault init <vault>` after upgrading to refresh; this is an
+ *   `grounder setup <vault>` after upgrading to refresh; this is an
  *   inherent limitation of using npx with no install for something that must
  *   persist, not something we can engineer around.
  *
@@ -397,7 +397,7 @@ export async function installHookRuntime(options: {
 
   if (!(await fileExists(path.join(sourceDistDir, "cli.js")))) {
     throw new Error(
-      `Grounder dist missing at ${sourceDistDir}. Run \`pnpm build\` (or install a published package) before vault init.`,
+      `Grounder dist missing at ${sourceDistDir}. Run \`pnpm build\` (or install a published package) before setup.`,
     );
   }
 

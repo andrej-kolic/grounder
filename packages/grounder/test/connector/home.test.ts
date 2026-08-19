@@ -42,7 +42,7 @@ describe("connector/home", () => {
     await writeFile(homeConfigPath(), "{not-json", "utf8");
 
     await expect(readHomeConfig()).rejects.toThrow(
-      /Invalid home config at .*config\.json:.*grounder vault init <path> to repair/,
+      /Invalid home config at .*config\.json:.*grounder setup <path> to repair/,
     );
 
     process.env.GROUNDER_HOME = previousHome;
@@ -58,7 +58,7 @@ describe("connector/home", () => {
     await mkdir(path.dirname(homeConfigPath()), { recursive: true });
     await writeFile(homeConfigPath(), "{}", "utf8");
 
-    await expect(readHomeConfig()).rejects.toThrow(/missing vaultRoot.*grounder vault init <path>/);
+    await expect(readHomeConfig()).rejects.toThrow(/missing vaultRoot.*grounder setup <path>/);
 
     process.env.GROUNDER_HOME = previousHome;
   });

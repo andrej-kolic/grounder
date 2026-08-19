@@ -2,8 +2,8 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { runLinkWithOptions } from "../../../src/commands/link.js";
 import { runPathLogsWithOptions } from "../../../src/commands/path/logs.js";
-import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
 import { writeHomeConfig } from "../../../src/connector/home.js";
 import { captureStdout, createTempEnv, withGroundedHome } from "../../helpers.js";
 
@@ -30,7 +30,7 @@ describe("commands/path/logs", () => {
     process.env.GROUNDER_HOME = env.home;
 
     await writeHomeConfig({ vaultRoot: env.vault });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const { code, out } = await captureStdout(() =>
       runPathLogsWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -45,7 +45,7 @@ describe("commands/path/logs", () => {
 
     process.env.GROUNDER_HOME = env.home;
     await writeHomeConfig({ vaultRoot: env.vault });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const result = runCli(["path", "logs"], withGroundedHome(env.home), env.repo);
 

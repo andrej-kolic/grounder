@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runRepoInitWithOptions } from "../../src/commands/repo/init.js";
+import { runLinkWithOptions } from "../../src/commands/link.js";
+import { runSetupWithOptions } from "../../src/commands/setup.js";
 import { runStatusWithOptions } from "../../src/commands/status.js";
-import { runVaultInitWithOptions } from "../../src/commands/vault/init.js";
 import { homeConfigPath, writeHomeConfig } from "../../src/connector/home.js";
 import { writeRepoConfig } from "../../src/connector/repo.js";
 import { statePath, writeGrounderState } from "../../src/connector/state.js";
@@ -24,13 +24,13 @@ describe("commands/status", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const { code, out } = await captureStdout(() =>
       runStatusWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -62,7 +62,7 @@ describe("commands/status", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -84,13 +84,13 @@ describe("commands/status", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const subdir = path.join(env.repo, "fixtures", "dev");
     await mkdir(subdir, { recursive: true });
@@ -103,7 +103,7 @@ describe("commands/status", () => {
     expect(out).toContain("  Linked:     yes");
     expect(out).toContain(`  Folder:     ${env.repo}`);
     expect(out).toContain(
-      `  Note:       linked ancestor — ${subdir} itself is unlinked; grounder init here would create a separate project`,
+      `  Note:       linked ancestor — ${subdir} itself is unlinked; grounder link here would create a separate project`,
     );
     expect(out).toContain("  Id:         my-app");
   });
@@ -112,7 +112,7 @@ describe("commands/status", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -143,7 +143,7 @@ describe("commands/status", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -171,7 +171,7 @@ describe("commands/status", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -207,7 +207,7 @@ describe("commands/status", () => {
 
     expect(code).toBe(0);
     expect(out).toContain("Machine\n");
-    expect(out).toContain("  Config:     missing → grounder vault init <path>");
+    expect(out).toContain("  Config:     missing → grounder setup <path>");
     expect(out).not.toContain("Vault:");
     expect(out).not.toContain("State:");
     expect(out).toContain("Project\n");
@@ -226,7 +226,7 @@ describe("commands/status", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain("  Config:     missing → grounder vault init <path>");
+    expect(out).toContain("  Config:     missing → grounder setup <path>");
     expect(out).toContain("  Linked:     yes");
     expect(out).toContain(`  Folder:     ${env.repo}`);
     expect(out).toContain(`  Config:     ${path.join(env.repo, ".grounder.json")}`);
@@ -255,7 +255,7 @@ describe("commands/status", () => {
     expect(out).toContain("  State:      missing → grounder migrate --force");
     expect(out).toContain("Project\n");
     expect(out).toContain("  Linked:     no");
-    expect(out).toContain("  Config:     missing → grounder init");
+    expect(out).toContain("  Config:     missing → grounder link");
   });
 
   it("reports invalid home config without aborting", async () => {
@@ -271,7 +271,7 @@ describe("commands/status", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain("  Config:     invalid → grounder vault init <path>");
+    expect(out).toContain("  Config:     invalid → grounder setup <path>");
     expect(out).not.toContain("Vault:");
     expect(out).not.toContain("State:");
     expect(out).toContain("  Linked:     yes");
@@ -284,7 +284,7 @@ describe("commands/status", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
     await writeFile(path.join(env.repo, ".grounder.json"), '{"version":1}\n', "utf8");
 
     const { code, out } = await captureStdout(() =>
@@ -294,9 +294,9 @@ describe("commands/status", () => {
     expect(code).toBe(0);
     expect(out).toContain(`  Config:     ${homeConfigPath(env.home)}`);
     expect(out).toContain(`  Vault:      ${env.vault}`);
-    expect(out).toContain("  Linked:     incomplete → grounder init --force");
+    expect(out).toContain("  Linked:     incomplete → grounder link --force");
     expect(out).toContain(`  Folder:     ${env.repo}`);
-    expect(out).toContain("  Config:     invalid → grounder init --force");
+    expect(out).toContain("  Config:     invalid → grounder link --force");
     expect(out).not.toContain("Notes:");
     expect(out).not.toContain("Plans:");
     expect(out).not.toContain("Id:");
@@ -306,7 +306,7 @@ describe("commands/status", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
     await writeFile(
       path.join(env.repo, ".grounder.json"),
       `${JSON.stringify({ version: 2, projectId: "my-app" }, null, 2)}\n`,
@@ -320,7 +320,7 @@ describe("commands/status", () => {
     expect(code).toBe(0);
     expect(out).toContain("  Linked:     unsupported → upgrade grounder");
     expect(out).toContain("  Config:     unsupported → upgrade grounder");
-    expect(out).not.toContain("grounder init --force");
+    expect(out).not.toContain("grounder link --force");
     expect(out).not.toContain("Notes:");
   });
 });

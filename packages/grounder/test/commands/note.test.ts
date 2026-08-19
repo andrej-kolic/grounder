@@ -3,9 +3,9 @@ import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { runLinkWithOptions } from "../../src/commands/link.js";
 import { runNoteWithOptions } from "../../src/commands/note.js";
-import { runRepoInitWithOptions } from "../../src/commands/repo/init.js";
-import { runVaultInitWithOptions } from "../../src/commands/vault/init.js";
+import { runSetupWithOptions } from "../../src/commands/setup.js";
 import { writeHomeConfig } from "../../src/connector/home.js";
 import { createTempEnv, withGroundedHome } from "../helpers.js";
 
@@ -31,8 +31,8 @@ describe("commands/note", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const fixedTime = new Date("2026-06-26T14:30:00");
     const code = await runNoteWithOptions({
@@ -57,8 +57,8 @@ describe("commands/note", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const result = runCli(["note", "hello world"], withGroundedHome(env.home), env.repo);
     expect(result.status).toBe(0);
@@ -72,7 +72,7 @@ describe("commands/note", () => {
 
     process.env.GROUNDER_HOME = env.home;
     await writeHomeConfig({ vaultRoot: env.vault });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const result = runCli(["path", "notes"], withGroundedHome(env.home), env.repo);
 
@@ -85,8 +85,8 @@ describe("commands/note", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const nested = path.join(env.repo, "src", "nested");
     await mkdir(nested, { recursive: true });

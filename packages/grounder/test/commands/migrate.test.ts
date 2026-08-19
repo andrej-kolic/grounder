@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cursorHooksJsonPath, grounderNoteCommandPath } from "../../src/agents/cursor.js";
 import { runMigrateWithOptions } from "../../src/commands/migrate.js";
-import { runVaultInitWithOptions } from "../../src/commands/vault/init.js";
+import { runSetupWithOptions } from "../../src/commands/setup.js";
 import { readGrounderState, statePath, writeGrounderState } from "../../src/connector/state.js";
 import { fileExists } from "../../src/util/fs.js";
 import { captureStdout, createTempEnv } from "../helpers.js";
@@ -29,7 +29,7 @@ describe("commands/migrate", () => {
     try {
       const code = await runMigrateWithOptions({ homeDir: env.home });
       expect(code).toBe(1);
-      expect(chunks.join("")).toContain("grounder vault init <path>");
+      expect(chunks.join("")).toContain("grounder setup <path>");
     } finally {
       spy.mockRestore();
     }
@@ -39,7 +39,7 @@ describe("commands/migrate", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -60,7 +60,7 @@ describe("commands/migrate", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -87,7 +87,7 @@ describe("commands/migrate", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -126,7 +126,7 @@ describe("commands/migrate", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
@@ -145,7 +145,7 @@ describe("commands/migrate", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -163,7 +163,7 @@ describe("commands/migrate", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -199,7 +199,7 @@ describe("commands/migrate", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -221,7 +221,7 @@ describe("commands/migrate", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -229,7 +229,7 @@ describe("commands/migrate", () => {
     });
     const state = await readGrounderState(env.home);
     if (!state) {
-      throw new Error("expected install state after vault init");
+      throw new Error("expected install state after setup");
     }
     await writeGrounderState(
       {
@@ -270,7 +270,7 @@ describe("commands/migrate", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -286,7 +286,7 @@ describe("commands/migrate", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -325,7 +325,7 @@ describe("commands/migrate", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,

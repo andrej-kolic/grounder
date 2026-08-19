@@ -10,9 +10,9 @@ From the monorepo root:
 
 ```bash
 pnpm fixture:setup
-pnpm grounder vault init <path-to-your-vault> --yes --hooks   # once per machine
+pnpm grounder setup <path-to-your-vault> --yes --hooks   # once per machine
 cd fixtures/dev
-pnpm grounder init --yes
+pnpm grounder link --yes
 pnpm grounder note "hello from dev fixture"
 ```
 
@@ -24,11 +24,11 @@ Project id comes from `package.json` → **`grounder-dev`**. Paths:
 <vault>/10-Projects/grounder-dev/plans/
 ```
 
-Run `init` from this folder — it writes `.grounder.json` here (not at the monorepo root). Run `note` / `handoff` / `plan` from here or any subfolder; the CLI walks up to find the marker. The `grounder` CLI is a workspace dependency (`workspace:*`).
+Run `link` from this folder — it writes `.grounder.json` here (not at the monorepo root). Run `note` / `handoff` / `plan` from here or any subfolder; the CLI walks up to find the marker. The `grounder` CLI is a workspace dependency (`workspace:*`).
 
 After editing `packages/grounder/src`, run `pnpm build` from the repo root — the bin runs `dist/cli.js`.
 
-Both slash commands and (with `--hooks`) session-start hooks run through `~/.grounder/runtime/dist/cli.js`, never `npx`. Because `pnpm grounder` here runs straight from this checkout (`node packages/grounder/dist/cli.js`), `vault init` **symlinks** `~/.grounder/runtime/dist` to this checkout's `dist/` — after that one-time run, `pnpm build` alone keeps slash commands *and* hooks current. No need to re-run `vault init` after every change, and no risk of them silently running a different (published) version — see the [Session-start hooks](../../packages/grounder/README.md#session-start-hooks) section of `packages/grounder/README.md` for the symlink/copy mechanism.
+Both slash commands and (with `--hooks`) session-start hooks run through `~/.grounder/runtime/dist/cli.js`, never `npx`. Because `pnpm grounder` here runs straight from this checkout (`node packages/grounder/dist/cli.js`), `setup` **symlinks** `~/.grounder/runtime/dist` to this checkout's `dist/` — after that one-time run, `pnpm build` alone keeps slash commands *and* hooks current. No need to re-run `setup` after every change, and no risk of them silently running a different (published) version — see the [Session-start hooks](../../packages/grounder/README.md#session-start-hooks) section of `packages/grounder/README.md` for the symlink/copy mechanism.
 
 ## Session handoff loop
 
@@ -100,6 +100,6 @@ The teaser never auto-loads the full handoff and never blocks a session — run 
 All four slash commands run through the symlinked runtime described above, so they always exercise this checkout's build — `pnpm build` after editing `src/` is enough; no re-run of `vault init` needed to pick up code changes. Re-run only after editing **templates** (`templates/agents/*/commands/*.md`), since template content is copied at install time:
 
 ```bash
-pnpm grounder vault init <path-to-your-vault> --force --yes --hooks
+pnpm grounder setup <path-to-your-vault> --force --yes --hooks
 # or pin agents: --agent=cursor --agent=claude
 ```

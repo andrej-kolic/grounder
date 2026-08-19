@@ -9,8 +9,8 @@ import {
 } from "../../src/agents/cursor.js";
 import { grounderRuntimeDir, runtimeCliPath, shellQuote } from "../../src/agents/hook-runtime.js";
 import { runDoctorWithOptions } from "../../src/commands/doctor.js";
-import { runRepoInitWithOptions } from "../../src/commands/repo/init.js";
-import { runVaultInitWithOptions } from "../../src/commands/vault/init.js";
+import { runLinkWithOptions } from "../../src/commands/link.js";
+import { runSetupWithOptions } from "../../src/commands/setup.js";
 import { writeRepoConfig } from "../../src/connector/repo.js";
 import { readGrounderState, statePath, writeGrounderState } from "../../src/connector/state.js";
 import { VERSION } from "../../src/index.js";
@@ -76,14 +76,14 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const { code, out } = await captureStdout(() =>
       runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -112,14 +112,14 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const subdir = path.join(env.repo, "fixtures", "dev");
     await mkdir(subdir, { recursive: true });
@@ -131,7 +131,7 @@ describe("commands/doctor", () => {
     expect(code).toBe(0);
     expect(out).toContain("ok    repo-config");
     expect(out).toContain(
-      `ancestor of ${subdir}; this folder itself is unlinked (grounder init here would create a separate project)`,
+      `ancestor of ${subdir}; this folder itself is unlinked (grounder link here would create a separate project)`,
     );
     expect(out).toContain("ok    notes-dir");
   });
@@ -146,13 +146,13 @@ describe("commands/doctor", () => {
 
     expect(code).toBe(1);
     expect(out).toContain("fail  home-config");
-    expect(out).toContain("grounder vault init <path>");
+    expect(out).toContain("grounder setup <path>");
     expect(out).toContain("fail  vault");
     expect(out).toContain("Project\n");
     expect(out).toContain("fail  repo-config");
   });
 
-  it("hints vault init for notes/logs/plans when home is missing but repo config exists", async () => {
+  it("hints setup for notes/logs/plans when home is missing but repo config exists", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -165,16 +165,16 @@ describe("commands/doctor", () => {
     expect(code).toBe(1);
     expect(out).toContain("ok    repo-config");
     expect(out).toContain("fail  notes-dir");
-    expect(out).toContain("cannot resolve notes/ (no home config) → grounder vault init <path>");
-    expect(out).toContain("cannot resolve logs/ (no home config) → grounder vault init <path>");
-    expect(out).toContain("cannot resolve plans/ (no home config) → grounder vault init <path>");
+    expect(out).toContain("cannot resolve notes/ (no home config) → grounder setup <path>");
+    expect(out).toContain("cannot resolve logs/ (no home config) → grounder setup <path>");
+    expect(out).toContain("cannot resolve plans/ (no home config) → grounder setup <path>");
   });
 
   it("fails when repo config is missing", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -188,7 +188,7 @@ describe("commands/doctor", () => {
     expect(code).toBe(1);
     expect(out).toContain("ok    home-config");
     expect(out).toContain("fail  repo-config");
-    expect(out).toContain("no .grounder.json uptree → grounder init");
+    expect(out).toContain("no .grounder.json uptree → grounder link");
     expect(out).toContain("fail  notes-dir");
     expect(out).toContain("fail  logs-dir");
     expect(out).toContain("fail  plans-dir");
@@ -198,7 +198,7 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -218,7 +218,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("logs/ missing");
     expect(out).toContain("warn  plans-dir");
     expect(out).toContain("plans/ missing");
-    expect(out).toContain("→ grounder init");
+    expect(out).toContain("→ grounder link");
     expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
   });
 
@@ -226,14 +226,14 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     await rm(grounderTaskCommandPath(env.home));
 
     const { code, out } = await captureStdout(() =>
@@ -252,14 +252,14 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     // Pre-ledger installs have command files but no ~/.grounder/state.json →
     // treat as schema 0 (same migrate hint as the old npx content sniff).
     await rm(statePath(env.home));
@@ -283,16 +283,16 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     const state = await readGrounderState(env.home);
     if (!state?.agents.cursor) {
-      throw new Error("expected cursor install state after vault init");
+      throw new Error("expected cursor install state after setup");
     }
     await writeGrounderState(
       {
@@ -321,17 +321,17 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     const state = await readGrounderState(env.home);
     if (!state) {
-      throw new Error("expected install state after vault init");
+      throw new Error("expected install state after setup");
     }
     await writeGrounderState({ ...state, grounderVersion: "0.1.0" }, env.home);
 
@@ -355,17 +355,17 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     const state = await readGrounderState(env.home);
     if (!state) {
-      throw new Error("expected install state after vault init");
+      throw new Error("expected install state after setup");
     }
     await writeGrounderState({ ...state, grounderVersion: "99.0.0" }, env.home);
 
@@ -383,14 +383,14 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     await rewriteCursorHookCommandStale(env.home);
 
     const { code, out } = await captureStdout(() =>
@@ -409,14 +409,14 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     const notePath = grounderNoteCommandPath(env.home);
     await writeFile(notePath, `${await readFile(notePath, "utf8")}\n<!-- local edit -->\n`);
 
@@ -436,17 +436,17 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     const state = await readGrounderState(env.home);
     if (!state?.agents.cursor) {
-      throw new Error("expected cursor install state after vault init");
+      throw new Error("expected cursor install state after setup");
     }
     await writeGrounderState(
       {
@@ -477,17 +477,17 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     const state = await readGrounderState(env.home);
     if (!state?.agents.cursor) {
-      throw new Error("expected cursor install state after vault init");
+      throw new Error("expected cursor install state after setup");
     }
     await writeGrounderState(
       {
@@ -518,14 +518,14 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const install = vi.spyOn(cursor, "install").mockRejectedValue(new Error("boom"));
     try {
@@ -548,14 +548,14 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const install = vi.spyOn(cursor, "install").mockResolvedValue({
       artifacts: {
@@ -583,14 +583,14 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const installHooks = vi
       .spyOn(cursor, "installHooks")
@@ -615,13 +615,13 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     await writeFile(statePath(env.home), '{"agents":{}}\n', "utf8");
 
     const { code, out } = await captureStdout(() =>
@@ -644,17 +644,17 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     const state = await readGrounderState(env.home);
     if (!state?.agents.cursor) {
-      throw new Error("expected cursor install state after vault init");
+      throw new Error("expected cursor install state after setup");
     }
     await writeGrounderState(
       {
@@ -689,7 +689,7 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -710,20 +710,20 @@ describe("commands/doctor", () => {
     expect(out).toContain("Upgrade grounder");
     expect(out).toContain("→ upgrade grounder");
     expect(out).toContain("unsupported repo config version");
-    expect(out).not.toContain("grounder init --force");
+    expect(out).not.toContain("grounder link --force");
   });
 
   it("warns when a detected agent has no command files", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
     });
     await mkdir(path.join(env.home, ".cursor"), { recursive: true });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const { code, out } = await captureStdout(() =>
       runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -742,13 +742,13 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const { code, out } = await captureStdout(() =>
       runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -768,14 +768,14 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     await rm(grounderRuntimeDir(env.home), { recursive: true, force: true });
 
     const { code, out } = await captureStdout(() =>
@@ -798,14 +798,14 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const missingNode = path.join(env.home, "no-such-node");
     await rewriteCursorHookNodePath(env.home, missingNode);
@@ -827,14 +827,14 @@ describe("commands/doctor", () => {
       const env = await createTempEnv({ packageName: "my-app" });
       cleanup = env.cleanup;
 
-      await runVaultInitWithOptions({
+      await runSetupWithOptions({
         vaultPath: env.vault,
         yes: true,
         hooks: true,
         homeDir: env.home,
         agents: ["cursor"],
       });
-      await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+      await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
       const nonExecNode = await writeNonExecutableNodeStub(env.home);
       await rewriteCursorHookNodePath(env.home, nonExecNode);
@@ -855,14 +855,14 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     // Any absolute executable is fine — doctor must not require process.execPath.
     expect(process.execPath).not.toBe("/bin/sh");
@@ -883,14 +883,14 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const hooksPath = cursorHooksJsonPath(env.home);
     const parsed = JSON.parse(await readFile(hooksPath, "utf8")) as {
@@ -915,13 +915,13 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const missingNode = path.join(env.home, "no-such-node");
     await rewriteCommandFileNodePaths(grounderNoteCommandPath(env.home), missingNode);
@@ -943,13 +943,13 @@ describe("commands/doctor", () => {
       const env = await createTempEnv({ packageName: "my-app" });
       cleanup = env.cleanup;
 
-      await runVaultInitWithOptions({
+      await runSetupWithOptions({
         vaultPath: env.vault,
         yes: true,
         homeDir: env.home,
         agents: ["cursor"],
       });
-      await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+      await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
       const nonExecNode = await writeNonExecutableNodeStub(env.home);
       await rewriteCommandFileNodePaths(grounderNoteCommandPath(env.home), nonExecNode);
@@ -970,13 +970,13 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     expect(process.execPath).not.toBe("/bin/sh");
     await rewriteCommandFileNodePaths(grounderNoteCommandPath(env.home), "/bin/sh");
@@ -996,7 +996,7 @@ describe("commands/doctor", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       hooks: true,

@@ -7,6 +7,7 @@ import { runDoctor } from "./commands/doctor.js";
 import { runHandoffList } from "./commands/handoff/list.js";
 import { runHandoffPeek } from "./commands/handoff/peek.js";
 import { runHandoff } from "./commands/handoff.js";
+import { runLink } from "./commands/link.js";
 import { runMigrate } from "./commands/migrate.js";
 import { runNoteList } from "./commands/note/list.js";
 import { runNote } from "./commands/note.js";
@@ -15,10 +16,9 @@ import { runPathNotes } from "./commands/path/notes.js";
 import { runPathPlans } from "./commands/path/plans.js";
 import { runPlanList } from "./commands/plan/list.js";
 import { runPlan } from "./commands/plan.js";
-import { runRepoInit } from "./commands/repo/init.js";
+import { runSetup } from "./commands/setup.js";
 import { runStatus } from "./commands/status.js";
 import { notifyUpgradeIfNeeded } from "./commands/upgrade-banner.js";
-import { runVaultInit } from "./commands/vault/init.js";
 import { printCommandHelpById, printFullHelp, printSynopsis, runHelp, wantsHelp } from "./help.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -71,20 +71,17 @@ async function main(): Promise<void> {
     wantsHelp(args) ||
     (command === "handoff" && rest[0] === "peek") ||
     command === "migrate" ||
-    (command === "vault" && rest[0] === "init");
+    command === "setup";
   if (!skipUpgradeBanner) {
     await notifyUpgradeIfNeeded();
   }
 
-  if (command === "vault") {
-    if (rest[0] === "init") {
-      process.exit(await runVaultInit(rest.slice(1)));
-    }
-    exitParentTopic("vault", wantsHelp(rest) || rest.length === 0);
+  if (command === "setup") {
+    process.exit(await runSetup(rest));
   }
 
-  if (command === "init") {
-    process.exit(await runRepoInit(rest));
+  if (command === "link") {
+    process.exit(await runLink(rest));
   }
 
   if (command === "note" && rest[0] === "list") {

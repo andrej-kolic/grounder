@@ -8,7 +8,7 @@ User-facing steps (`grounder migrate`, doctor hints, `--force`) live in [package
 
 Upgrading the `grounder` npm package does not automatically refresh files already written on the machine (slash commands, hook fragments, `~/.grounder/runtime`). Those artifacts can drift from what the new binary expects.
 
-Early versions relied on ad-hoc detection (e.g. regex sniffing for `npx` in command files) and told users to re-run `vault init --force`. That conflated first-time setup with routine upgrades, clobbered hand-edited commands unless the user opted in carefully, and had no clean answer for “this machine was touched by a *newer* grounder than the binary currently running.”
+Early versions relied on ad-hoc detection (e.g. regex sniffing for `npx` in command files) and told users to re-run `setup --force`. That conflated first-time setup with routine upgrades, clobbered hand-edited commands unless the user opted in carefully, and had no clean answer for “this machine was touched by a *newer* grounder than the binary currently running.”
 
 ## What is versioned
 
@@ -21,7 +21,7 @@ Grounder writes several persistent artifacts. They need **different** upgrade ru
 | Runtime materialization | Grounder-owned | `~/.grounder/runtime/` | No | Always refresh |
 | Home config | Grounder-owned | `~/.grounder/config.json` | Path may be hand-edited | Not schema-migrated here |
 | Repo marker | Grounder-owned, often committed | `.grounder.json` (`version` + `projectId`) | Rarely | Forward-compat hard stop if `version` too new |
-| Install ledger | Grounder-owned | `~/.grounder/state.json` | No | Written by vault init / migrate |
+| Install ledger | Grounder-owned | `~/.grounder/state.json` | No | Written by setup / migrate |
 
 The important split is **owned JSON / runtime** vs **user-editable markdown**. The rest of the design follows from that.
 
@@ -41,7 +41,7 @@ We do **not** pin a per-project Grounder version (Corepack-style). Install state
 
 ### Two migration strategies
 
-1. **Owned fragments** (hooks entry, runtime, ledger): always refresh on `vault init` / `migrate`. No `--force` required.
+1. **Owned fragments** (hooks entry, runtime, ledger): always refresh on `setup` / `migrate`. No `--force` required.
 2. **Command markdown**: chezmoi-style drift detection.
    - On write, record per file: `hash` (exact rendered bytes Grounder wrote — not the raw template).
    - Later: on-disk hash == recorded hash → file untouched → safe auto-update without `--force`.
@@ -98,19 +98,19 @@ Invariants:
 - Agent schema **greater than** this binary’s adapter → **forward-compat hard stop** (`UnsupportedSchemaError`: upgrade grounder). Same idea for `.grounder.json`’s `version` vs `SUPPORTED_REPO_VERSION` in [`connector/repo.ts`](../../packages/grounder/src/connector/repo.ts).
 - Ledger agent ids this binary does not know → skip with a stderr warning on `migrate` (still refresh known agents); explicit `--agent=<unknown>` still errors.
 - Corrupt ledger → fail with a clear “fix or remove, then migrate” message (distinct from “newer than me”).
-- `migrate` / vault init **must not** advance `commandsSchema` when every command artifact was left as `modified` (legacy or local edits). Runtime/`grounderVersion` (and hooks, when refreshed) may still update; doctor keeps the schema-stale / `--force` hint until a real command write lands.
-### `grounder migrate` (not only `vault init --force`)
+- `migrate` / setup **must not** advance `commandsSchema` when every command artifact was left as `modified` (legacy or local edits). Runtime/`grounderVersion` (and hooks, when refreshed) may still update; doctor keeps the schema-stale / `--force` hint until a real command write lands.
+### `grounder migrate` (not only `setup --force`)
 
-`vault init` is “point this machine at a vault and install.” Reusing it as the routine post-upgrade action forces retyping a path and mixes first-time setup with keep-current.
+`setup` is “point this machine at a vault and install.” Reusing it as the routine post-upgrade action forces retyping a path and mixes first-time setup with keep-current.
 
 `grounder migrate`:
 
-- No vault path — reads home config (points at `vault init` if missing).
+- No vault path — reads home config (points at `setup` if missing).
 - Agents: explicit `--agent`, else keys already in the ledger, else auto-detect (legacy).
-- Shares install implementation with `vault init` via [`apply-agent-installs.ts`](../../packages/grounder/src/commands/apply-agent-installs.ts).
+- Shares install implementation with `setup` via [`apply-agent-installs.ts`](../../packages/grounder/src/commands/apply-agent-installs.ts).
 - `--dry-run`, `--force`, `--hooks` as documented in the package README.
 
-`vault init --force` remains supported for existing scripts; it calls the same path.
+`setup --force` remains supported for existing scripts; it calls the same path.
 
 ### How users learn they need to migrate
 
@@ -120,7 +120,7 @@ Three channels, no new product surface:
 | --- | --- |
 | **`grounder doctor` / `status`** | Checks install state. Schema stale → warn + migrate. Schema too new → fail (upgrade grounder). Also shows package mismatch when present. Missing/non-executable Node in hooks or commands → fail + migrate ([details](./runtime-invocation.md)). |
 | **Session hook / `handoff peek`** | Checks **schemas only**. One-line teaser: `Install outdated — run: grounder migrate`. No auto-migrate. |
-| **CLI upgrade banner** | Checks **`grounderVersion` only**. Package newer → migrate. Package older → install a newer Grounder. Skipped for peek, migrate, and vault init. |
+| **CLI upgrade banner** | Checks **`grounderVersion` only**. Package newer → migrate. Package older → install a newer Grounder. Skipped for peek, migrate, and setup. |
 
 #### Schemas vs package version (keep separate)
 
@@ -169,7 +169,7 @@ flowchart TD
 
 ## Rejected alternatives
 
-- **Only `vault init --force` for upgrades** — wrong verb; requires vault path; trains users to force-clobber.
+- **Only `setup --force` for upgrades** — wrong verb; requires vault path; trains users to force-clobber.
 - **Auto-migrate from the session hook** — hooks must stay fast and side-effect-free.
 - **Make peek also check `grounderVersion`** — peek can only say “run migrate,” but package mismatch sometimes means “upgrade grounder.” Keep schema and package checks separate (see above).
 - **Name the command `upgrade`** — confuses with upgrading the npm package itself.

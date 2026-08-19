@@ -3,9 +3,9 @@ import { mkdir, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { runLinkWithOptions } from "../../../src/commands/link.js";
 import { runPlanList, runPlanListWithOptions } from "../../../src/commands/plan/list.js";
-import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
-import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
+import { runSetupWithOptions } from "../../../src/commands/setup.js";
 import { captureStdout, createTempEnv, withGroundedHome } from "../../helpers.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -34,8 +34,8 @@ describe("commands/plan/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
     const older = path.join(plansDir, "older.md");
@@ -58,8 +58,8 @@ describe("commands/plan/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const { code, out } = await captureStdout(() =>
       runPlanListWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -74,8 +74,8 @@ describe("commands/plan/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
     const a = path.join(plansDir, "a.md");
@@ -100,8 +100,8 @@ describe("commands/plan/list", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
     const older = path.join(plansDir, "older.md");
@@ -137,8 +137,8 @@ describe("commands/plan/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
     const planPath = path.join(plansDir, "phase-1.md");

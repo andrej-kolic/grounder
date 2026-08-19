@@ -25,7 +25,7 @@ export interface AgentState {
 }
 
 export interface GrounderState {
-  /** Package version that last wrote install artifacts (via vault init / migrate). */
+  /** Package version that last wrote install artifacts (via setup / migrate). */
   grounderVersion: string;
   agents: Record<string, AgentState>;
 }

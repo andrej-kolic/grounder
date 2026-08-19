@@ -3,7 +3,7 @@
 export type HelpGroup = "Setup" | "Write" | "Paths" | "Maintain" | "Advanced";
 
 export interface CommandMeta {
-  /** Canonical id (`note`, `handoff list`, `vault init`, …). */
+  /** Canonical id (`note`, `handoff list`, `setup`, …). */
   id: string;
   group: HelpGroup;
   /** One-line summary for synopsis / full command lists. */
@@ -21,8 +21,8 @@ export interface CommandMeta {
 const GROUP_ORDER: HelpGroup[] = ["Setup", "Write", "Paths", "Maintain", "Advanced"];
 
 const QUICKSTART = `Quickstart:
-  grounder vault init <path-to-your-vault>
-  grounder init
+  grounder setup <path-to-your-vault>
+  grounder link
   grounder note "my first note"
   grounder handoff $'# Handoff\\n\\n## Next\\n1. …'
   grounder handoff list
@@ -35,21 +35,11 @@ const QUICKSTART = `Quickstart:
  */
 export const COMMANDS: readonly CommandMeta[] = [
   {
-    id: "vault",
-    group: "Setup",
-    summary: "Vault setup commands",
-    listUsage: "vault init <path>",
-    usage: "grounder vault init <path> [--yes] [--force] [--agent <id>] [--hooks] [--dry-run]",
-    list: false,
-    flags: `Subcommands:
-  vault init   Connect to a markdown vault (once per machine)`,
-  },
-  {
-    id: "vault init",
+    id: "setup",
     group: "Setup",
     summary: "Connect to a markdown vault (once per machine)",
-    listUsage: "vault init <path>",
-    usage: "grounder vault init <path> [--yes] [--force] [--agent <id>] [--hooks] [--dry-run]",
+    listUsage: "setup <path>",
+    usage: "grounder setup <path> [--yes] [--force] [--agent <id>] [--hooks] [--dry-run]",
     flags: `Flags:
   --yes          Skip confirmation prompts
   --force        Overwrite existing home config / generated files
@@ -59,11 +49,11 @@ export const COMMANDS: readonly CommandMeta[] = [
   --dry-run      Preview without writing`,
   },
   {
-    id: "init",
+    id: "link",
     group: "Setup",
     summary: "Link this project inside the markdown vault (once per project)",
-    listUsage: "init",
-    usage: "grounder init [--yes] [--force] [--id <id>] [--vault <path>] [--dry-run]",
+    listUsage: "link",
+    usage: "grounder link [--yes] [--force] [--id <id>] [--vault <path>] [--dry-run]",
     flags: `Flags:
   --yes          Skip confirmation prompts
   --force        Overwrite an existing link marker
@@ -227,7 +217,7 @@ Examples:
   grounder help
   grounder help note
   grounder help handoff list
-  grounder help vault init`,
+  grounder help setup`,
   },
 ];
 
@@ -236,9 +226,8 @@ Examples:
  * `cli.ts` / `helpExitCode(...)` call sites — the invariant test locks this.
  */
 export const DISPATCHED_COMMAND_IDS = [
-  "vault",
-  "vault init",
-  "init",
+  "setup",
+  "link",
   "note",
   "note list",
   "handoff",

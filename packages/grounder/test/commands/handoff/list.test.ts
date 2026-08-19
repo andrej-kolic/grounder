@@ -4,8 +4,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runHandoffList, runHandoffListWithOptions } from "../../../src/commands/handoff/list.js";
-import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
-import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
+import { runLinkWithOptions } from "../../../src/commands/link.js";
+import { runSetupWithOptions } from "../../../src/commands/setup.js";
 import { captureStdout, createTempEnv, withGroundedHome } from "../../helpers.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -30,8 +30,8 @@ describe("commands/handoff/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
     const older = path.join(logsDir, "2026-06-26-1430.md");
@@ -54,8 +54,8 @@ describe("commands/handoff/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const { code, out } = await captureStdout(() =>
       runHandoffListWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -70,8 +70,8 @@ describe("commands/handoff/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
     const a = path.join(logsDir, "2026-06-26-1300.md");
@@ -95,8 +95,8 @@ describe("commands/handoff/list", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
     await writeFile(path.join(logsDir, "2026-06-26-1300.md"), "a", "utf8");
@@ -128,8 +128,8 @@ describe("commands/handoff/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
     await writeFile(path.join(logsDir, "2026-06-26-1400-older.md"), "older", "utf8");
@@ -148,8 +148,8 @@ describe("commands/handoff/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
     await writeFile(path.join(logsDir, "2026-06-26-1400-older.md"), "older", "utf8");
@@ -168,8 +168,8 @@ describe("commands/handoff/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const { code, out } = await captureStdout(() =>
       runHandoffListWithOptions({ cwd: env.repo, homeDir: env.home, head: true }),
@@ -183,8 +183,8 @@ describe("commands/handoff/list", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
     await writeFile(path.join(logsDir, "2026-06-26-1500.md"), "content", "utf8");
@@ -205,8 +205,8 @@ describe("commands/handoff/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
     const handoffPath = path.join(logsDir, "2026-06-26-1500.md");

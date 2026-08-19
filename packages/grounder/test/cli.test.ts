@@ -48,9 +48,9 @@ describe("grounder cli", () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("Setup:");
       expect(result.stdout).toContain("Commands:");
-      expect(result.stdout).toContain("Setup\nvault init");
+      expect(result.stdout).toContain("Setup\nsetup");
       expect(result.stdout).toContain("Write\nnote");
-      expect(result.stdout).toContain("Usage: grounder vault init");
+      expect(result.stdout).toContain("Usage: grounder setup");
       expect(result.stdout).toContain("Usage: grounder note");
       expect(result.stdout).toContain("Usage: grounder plan");
       expect(result.stdout).toContain("Usage: grounder migrate");
@@ -89,10 +89,8 @@ describe("grounder cli", () => {
       [["note", "list", "--help"], "note list"],
       [["help", "note", "list"], "note list"],
       [["handoff", "peek", "--help"], "handoff peek"],
-      [["vault", "init", "--help"], "vault init"],
-      [["help", "vault", "init"], "vault init"],
-      [["help", "vault"], "vault init"],
-      [["vault", "--help"], "vault init"],
+      [["setup", "--help"], "setup"],
+      [["help", "setup"], "setup"],
       [["path", "notes", "--help"], "path notes"],
       [["help", "path", "notes"], "path notes"],
       [["path", "--help"], "path <notes|logs|plans>"],
@@ -104,26 +102,23 @@ describe("grounder cli", () => {
     }
   });
 
-  it("prints parent usage for bare vault/path", () => {
-    const vault = run(["vault"]);
-    expect(vault.status).toBe(0);
-    expect(vault.stdout).toContain("Usage: grounder vault init");
-    expect(vault.stdout).toContain("Subcommands:");
-
+  it("prints parent usage for bare path", () => {
     const pathCmd = run(["path"]);
     expect(pathCmd.status).toBe(0);
     expect(pathCmd.stdout).toContain("Usage: grounder path <notes|logs|plans>");
     expect(pathCmd.stdout).toContain("Subcommands:");
   });
 
-  it("prints parent usage (exit 1) for unknown vault/path subcommands", () => {
-    const vault = run(["vault", "nope"]);
-    expect(vault.status).toBe(1);
-    expect(vault.stdout).toContain("Usage: grounder vault init");
-
+  it("prints parent usage (exit 1) for unknown path subcommands", () => {
     const pathCmd = run(["path", "nope"]);
     expect(pathCmd.status).toBe(1);
     expect(pathCmd.stdout).toContain("Usage: grounder path <notes|logs|plans>");
+  });
+
+  it("exits with unknown command for vault", () => {
+    const vault = run(["vault"]);
+    expect(vault.status).toBe(1);
+    expect(vault.stderr).toContain("Unknown command: vault");
   });
 
   it("short-circuits --help before side effects on argument-less commands", async () => {
@@ -131,21 +126,21 @@ describe("grounder cli", () => {
     try {
       const grounded = withGroundedHome(env.home);
 
-      const initHelp = run(["init", "--help"], grounded);
-      expect(initHelp.status).toBe(0);
-      expect(initHelp.stdout).toContain("Usage: grounder init");
-      expect(initHelp.stdout).not.toContain("Will create:");
-      expect(initHelp.stderr).not.toContain("Proceed?");
+      const linkHelp = run(["link", "--help"], grounded);
+      expect(linkHelp.status).toBe(0);
+      expect(linkHelp.stdout).toContain("Usage: grounder link");
+      expect(linkHelp.stdout).not.toContain("Will create:");
+      expect(linkHelp.stderr).not.toContain("Proceed?");
 
       const migrateHelp = run(["migrate", "-h"], grounded);
       expect(migrateHelp.status).toBe(0);
       expect(migrateHelp.stdout).toContain("Usage: grounder migrate");
       expect(migrateHelp.stdout).not.toContain("No home config");
 
-      const vaultHelp = run(["vault", "init", env.vault, "--help"], grounded);
-      expect(vaultHelp.status).toBe(0);
-      expect(vaultHelp.stdout).toContain("Usage: grounder vault init");
-      expect(vaultHelp.stdout).not.toContain("Will write:");
+      const setupHelp = run(["setup", env.vault, "--help"], grounded);
+      expect(setupHelp.status).toBe(0);
+      expect(setupHelp.stdout).toContain("Usage: grounder setup");
+      expect(setupHelp.stdout).not.toContain("Will write:");
 
       const doctorHelp = run(["doctor", "--help"], grounded);
       expect(doctorHelp.status).toBe(0);

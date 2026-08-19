@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
-import { runtimeCliPath } from "../../agents/hook-runtime.js";
-import { resolveAgents } from "../../agents/index.js";
+import { runtimeCliPath } from "../agents/hook-runtime.js";
+import { resolveAgents } from "../agents/index.js";
 import {
   type HomeConfig,
   homeConfigPath,
@@ -8,16 +8,16 @@ import {
   readHomeConfig,
   withHomeDir,
   writeHomeConfig,
-} from "../../connector/home.js";
-import { assertAgentSchemasSupported, readGrounderState } from "../../connector/state.js";
-import { helpExitCode } from "../../help.js";
-import { flagBool, flagStrings, parseArgs } from "../../util/parse-args.js";
-import { resolveUserPath } from "../../util/path.js";
-import { confirm } from "../../util/prompt.js";
-import { projectsParent } from "../../vault/layout.js";
-import { applyAgentInstalls } from "../apply-agent-installs.js";
+} from "../connector/home.js";
+import { assertAgentSchemasSupported, readGrounderState } from "../connector/state.js";
+import { helpExitCode } from "../help.js";
+import { flagBool, flagStrings, parseArgs } from "../util/parse-args.js";
+import { resolveUserPath } from "../util/path.js";
+import { confirm } from "../util/prompt.js";
+import { projectsParent } from "../vault/layout.js";
+import { applyAgentInstalls } from "./apply-agent-installs.js";
 
-export interface VaultInitOptions {
+export interface SetupOptions {
   vaultPath: string;
   yes?: boolean;
   force?: boolean;
@@ -32,12 +32,10 @@ export interface VaultInitOptions {
 /**
  * Read the existing home config for the "already exists with a different
  * vault" conflict check. A corrupt/invalid file has no value worth
- * conflict-checking (unlike `state.json`, which can encode forward-compat
- * schema info) — treat it as absent so `vault init` can recreate it without
- * requiring the user to manually delete it first, or doctor's plain
- * `grounder vault init <path>` hint would dead-end on the same parse error.
+ * conflict-checking — treat it as absent so `setup` can recreate it without
+ * requiring the user to manually delete it first.
  */
-async function readExistingHomeForInit(): Promise<{
+async function readExistingHomeForSetup(): Promise<{
   home: HomeConfig | null;
   invalidReason: string | null;
 }> {
@@ -54,8 +52,8 @@ async function readExistingHomeForInit(): Promise<{
   }
 }
 
-export async function runVaultInit(argv: string[]): Promise<number> {
-  const helpCode = helpExitCode(argv, "vault init");
+export async function runSetup(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "setup");
   if (helpCode !== null) {
     return helpCode;
   }
@@ -69,11 +67,11 @@ export async function runVaultInit(argv: string[]): Promise<number> {
   const agents = flagStrings(repeated, "agent");
 
   if (!vaultPathArg) {
-    process.stderr.write("Usage: grounder vault init <path>\n");
+    process.stderr.write("Usage: grounder setup <path>\n");
     return 1;
   }
 
-  return runVaultInitWithOptions({
+  return runSetupWithOptions({
     vaultPath: vaultPathArg,
     yes,
     force,
@@ -83,7 +81,7 @@ export async function runVaultInit(argv: string[]): Promise<number> {
   });
 }
 
-export async function runVaultInitWithOptions(options: VaultInitOptions): Promise<number> {
+export async function runSetupWithOptions(options: SetupOptions): Promise<number> {
   return withHomeDir(options.homeDir, async () => {
     const vaultRoot = resolveUserPath(options.vaultPath);
     const yes = options.yes ?? false;
@@ -92,7 +90,7 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
     const dryRun = options.dryRun ?? false;
     const homeDir = options.homeDir;
 
-    const { home: existingHome, invalidReason } = await readExistingHomeForInit();
+    const { home: existingHome, invalidReason } = await readExistingHomeForSetup();
     const projectsDir = projectsParent(vaultRoot);
     const agents = await resolveAgents(options.agents);
 
@@ -116,7 +114,6 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
     process.stdout.write(`  home   ${homeConfigPath(homeDir)}\n`);
     process.stdout.write("  vault  10-Projects/ (if missing)\n");
     if (agents.length > 0) {
-      // Shared across agents (slash commands + optional hooks) — list once.
       process.stdout.write(`  grounder runtime ${runtimeCliPath(homeDir)}\n`);
     }
     for (const agent of agents) {

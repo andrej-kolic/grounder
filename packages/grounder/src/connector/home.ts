@@ -13,7 +13,7 @@ export class InvalidHomeConfigError extends Error {
 
   constructor(configPath: string, reason: string) {
     super(
-      `Invalid home config at ${configPath}: ${reason}. Run: grounder vault init <path> to repair (recreates this file).`,
+      `Invalid home config at ${configPath}: ${reason}. Run: grounder setup <path> to repair (recreates this file).`,
     );
     this.name = "InvalidHomeConfigError";
     this.configPath = configPath;
@@ -61,7 +61,7 @@ export async function withHomeDir<T>(
  * Read `~/.grounder/config.json`. Missing file → `null`. Corrupt/invalid
  * contents throw with the file path and an actionable fix baked in: unlike
  * `state.json`, a broken home config carries no data worth preserving, so
- * `grounder vault init <path>` can safely recreate it (see `runVaultInit`,
+ * `grounder setup <path>` can safely recreate it (see `runSetup`,
  * which treats this error as "no existing home").
  */
 export async function readHomeConfig(): Promise<HomeConfig | null> {
