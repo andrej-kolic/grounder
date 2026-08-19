@@ -85,6 +85,37 @@ describe("vault/write-handoff", () => {
     expect(content).not.toContain("title:");
   });
 
+  it("includes topics in frontmatter when provided", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const logsDir = path.join(env.vault, "logs");
+
+    const writtenPath = await writeHandoff(logsDir, body, {
+      projectId: "my-app",
+      topics: ["auth", "middleware", "jwt"],
+      now: fixedTime,
+    });
+
+    const content = await readFile(writtenPath, "utf8");
+    expect(content).toContain('topics: ["auth", "middleware", "jwt"]\n');
+  });
+
+  it("omits topics when empty or unset", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const logsDir = path.join(env.vault, "logs");
+
+    const p1 = await writeHandoff(logsDir, body, { projectId: "my-app", now: fixedTime });
+    expect(await readFile(p1, "utf8")).not.toContain("topics:");
+
+    const p2 = await writeHandoff(logsDir, body, {
+      projectId: "my-app",
+      topics: [],
+      now: new Date("2026-06-26T14:31:00"),
+    });
+    expect(await readFile(p2, "utf8")).not.toContain("topics:");
+  });
+
   it("creates logs dir when missing", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;

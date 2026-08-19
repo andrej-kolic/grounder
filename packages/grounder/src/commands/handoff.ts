@@ -14,6 +14,8 @@ export interface HandoffOptions {
   text: string;
   /** Optional filename + frontmatter title slug (`--title`). */
   title?: string;
+  /** Topic keywords for search (`--topics "auth,jwt,middleware"`). */
+  topics?: string[];
   /** Override home dir / `GROUNDER_HOME` (tests). */
   homeDir?: string;
   /** Fixed clock for deterministic filenames and `created` (tests). */
@@ -38,9 +40,18 @@ export async function runHandoff(argv: string[]): Promise<number> {
     return 1;
   }
 
+  const topicsRaw = flagString(flags, "topics");
+  const topics = topicsRaw
+    ? topicsRaw
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : undefined;
+
   return runHandoffWithOptions({
     text,
     title: flagString(flags, "title"),
+    topics,
   });
 }
 
@@ -63,6 +74,7 @@ export async function runHandoffWithOptions(options: HandoffOptions): Promise<nu
       projectId: repo.projectId,
       title: options.title,
       branch,
+      topics: options.topics,
       now: options.now,
     });
 

@@ -63,4 +63,35 @@ title: "after-close"
     expect(parseHandoffFrontmatter('---\ntitle: "unterminated\n---\n')).toEqual({});
     expect(parseHandoffFrontmatter("---\ncreated:\n---\n")).toEqual({});
   });
+
+  it("parses topics flow sequence with quoted items", () => {
+    const content = '---\ntopics: ["auth", "jwt", "middleware"]\n---\n\n# body\n';
+    expect(parseHandoffFrontmatter(content)).toEqual({
+      topics: ["auth", "jwt", "middleware"],
+    });
+  });
+
+  it("parses topics flow sequence with unquoted items", () => {
+    const content = "---\ntopics: [auth, jwt]\n---\n\n# body\n";
+    expect(parseHandoffFrontmatter(content)).toEqual({
+      topics: ["auth", "jwt"],
+    });
+  });
+
+  it("parses empty topics list", () => {
+    const content = "---\ntopics: []\n---\n\n# body\n";
+    expect(parseHandoffFrontmatter(content)).toEqual({
+      topics: [],
+    });
+  });
+
+  it("parses topics alongside title and created", () => {
+    const content =
+      '---\ncreated: "2026-08-01T00:00:00.000Z"\ntitle: "x"\ntopics: ["a", "b"]\n---\n';
+    expect(parseHandoffFrontmatter(content)).toEqual({
+      created: "2026-08-01T00:00:00.000Z",
+      title: "x",
+      topics: ["a", "b"],
+    });
+  });
 });

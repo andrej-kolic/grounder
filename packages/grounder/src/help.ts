@@ -66,9 +66,10 @@ export const COMMANDS: readonly CommandMeta[] = [
     group: "Write",
     summary: "Write a note to the vault",
     listUsage: "note <text>",
-    usage: "grounder note <text> [--title <slug>]",
+    usage: "grounder note <text> [--title <slug>] [--topics <list>]",
     flags: `Flags:
-  --title <slug> Short slug in filename (default: slugified first line)
+  --title <slug>  Short slug in filename (default: slugified first line)
+  --topics <list> Comma-separated keywords for search (e.g. "auth,jwt,session")
 
 Subcommands:
   note list   Print recent notes (count header + numbered title/path, newest first)`,
@@ -87,9 +88,10 @@ Subcommands:
     group: "Write",
     summary: "Write a session handoff to vault logs/",
     listUsage: "handoff <text>",
-    usage: "grounder handoff <text> [--title <slug>]",
+    usage: "grounder handoff <text> [--title <slug>] [--topics <list>]",
     flags: `Flags:
-  --title <slug> Short slug in filename (default: slugified first line)
+  --title <slug>  Short slug in filename (default: slugified first line)
+  --topics <list> Comma-separated keywords for search (e.g. "auth,jwt,session")
 
 Subcommands:
   handoff list   Print recent handoffs (count header + numbered title/path, newest first)
@@ -111,13 +113,14 @@ Subcommands:
     group: "Write",
     summary: "Write/update a named plan under vault plans/",
     listUsage: "plan <text>",
-    usage: "grounder plan <text> (--title <name> [--force] | --path <file>)",
+    usage: "grounder plan <text> (--title <name> [--force] | --path <file>) [--topics <list>]",
     flags: `Flags:
-  --title <name> Required filename stem when creating/updating by name
-                 (trailing .md ok; sanitized, max 80 chars)
-  --path <file>  Update an existing plan by path (must resolve under this
-                 project's plans/; no title sanitization; always overwrites)
-  --force        With --title: overwrite an existing plan (preserves created)
+  --title <name>  Required filename stem when creating/updating by name
+                  (trailing .md ok; sanitized, max 80 chars)
+  --path <file>   Update an existing plan by path (must resolve under this
+                  project's plans/; no title sanitization; always overwrites)
+  --force         With --title: overwrite an existing plan (preserves created)
+  --topics <list> Comma-separated keywords for search (e.g. "caching,redis,api")
 
 Subcommands:
   plan list   Print recent plans (count header + numbered title/path, newest first)`,

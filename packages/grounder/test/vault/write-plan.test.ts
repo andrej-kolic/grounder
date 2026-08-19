@@ -45,6 +45,46 @@ Ship plan capture.
     );
   });
 
+  it("includes topics in frontmatter when provided", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const plansDir = path.join(env.vault, "plans");
+
+    const result = await writePlan(plansDir, "with-topics", body, {
+      projectId: "my-app",
+      topics: ["caching", "redis"],
+      now: createdAt,
+    });
+
+    expect(result.status).toBe("created");
+    const content = await readFile(result.path, "utf8");
+    expect(content).toContain('topics: ["caching", "redis"]\n');
+  });
+
+  it("preserves topics through force overwrite", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const plansDir = path.join(env.vault, "plans");
+
+    await writePlan(plansDir, "evolving", body, {
+      projectId: "my-app",
+      topics: ["old"],
+      now: createdAt,
+    });
+
+    const result = await writePlan(plansDir, "evolving", "# new\n", {
+      projectId: "my-app",
+      force: true,
+      topics: ["new-topic", "updated"],
+      now: updatedAt,
+    });
+
+    expect(result.status).toBe("overwritten");
+    const content = await readFile(result.path, "utf8");
+    expect(content).toContain('topics: ["new-topic", "updated"]\n');
+    expect(content).not.toContain('"old"');
+  });
+
   it("creates plans dir when missing", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;

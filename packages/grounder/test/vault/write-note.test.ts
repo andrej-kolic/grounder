@@ -52,6 +52,34 @@ describe("vault/write-note", () => {
     expect(await readFile(writtenPath, "utf8")).toBe(text);
   });
 
+  it("prepends topics frontmatter when provided", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const notesDir = path.join(env.vault, "notes");
+
+    const writtenPath = await writeNote(notesDir, "Auth middleware notes", {
+      topics: ["auth", "middleware"],
+      now: fixedTime,
+    });
+    const content = await readFile(writtenPath, "utf8");
+    expect(content).toBe('---\ntopics: ["auth", "middleware"]\n---\n\nAuth middleware notes');
+  });
+
+  it("omits frontmatter when topics are empty or unset", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const notesDir = path.join(env.vault, "notes");
+
+    const p1 = await writeNote(notesDir, "no topics", { now: fixedTime });
+    expect(await readFile(p1, "utf8")).toBe("no topics");
+
+    const p2 = await writeNote(notesDir, "empty topics", {
+      topics: [],
+      now: new Date("2026-06-26T14:31:00"),
+    });
+    expect(await readFile(p2, "utf8")).toBe("empty topics");
+  });
+
   it("uses _NN suffix on slug collision", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;

@@ -28,6 +28,8 @@ export interface PlanOptions {
   planPath?: string;
   /** When true, overwrite an existing plan (preserving original `created`). */
   force?: boolean;
+  /** Topic keywords for search (`--topics "auth,jwt,middleware"`). */
+  topics?: string[];
   /** Override home dir / `GROUNDER_HOME` (tests). */
   homeDir?: string;
   /** Fixed clock for deterministic `created` / `updated` (tests). */
@@ -52,11 +54,20 @@ export async function runPlan(argv: string[]): Promise<number> {
     return 1;
   }
 
+  const topicsRaw = flagString(flags, "topics");
+  const topics = topicsRaw
+    ? topicsRaw
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : undefined;
+
   return runPlanWithOptions({
     text,
     title: flagString(flags, "title"),
     planPath: flagString(flags, "path"),
     force: flagBool(flags, "force"),
+    topics,
   });
 }
 
@@ -122,6 +133,7 @@ async function writeByTitle(
   const result = await writePlan(plansDir, name, options.text, {
     projectId,
     force: options.force,
+    topics: options.topics,
     now: options.now,
   });
 
@@ -172,6 +184,7 @@ async function updateByPath(
 
   const result = await updatePlanAtPath(filePath, options.text, {
     projectId,
+    topics: options.topics,
     now: options.now,
   });
 

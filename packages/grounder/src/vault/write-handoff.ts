@@ -11,6 +11,8 @@ export interface WriteHandoffOptions {
   title?: string;
   /** Git branch when known; omitted from frontmatter if unset. */
   branch?: string;
+  /** 3-5 topic keywords for search (flat list, omitted when empty/unset). */
+  topics?: string[];
   /** Timestamp for filename prefix and `created` (default: now). */
   now?: Date;
 }
@@ -20,6 +22,7 @@ function buildFrontmatter(options: {
   branch?: string;
   created: string;
   title?: string;
+  topics?: string[];
 }): string {
   const lines = ["---", `project: ${yamlDoubleQuoted(options.projectId)}`];
   if (options.branch) {
@@ -28,6 +31,10 @@ function buildFrontmatter(options: {
   lines.push(`created: ${yamlDoubleQuoted(options.created)}`);
   if (options.title) {
     lines.push(`title: ${yamlDoubleQuoted(options.title)}`);
+  }
+  if (options.topics && options.topics.length > 0) {
+    const items = options.topics.map((t) => yamlDoubleQuoted(t)).join(", ");
+    lines.push(`topics: [${items}]`);
   }
   lines.push("---");
   return `${lines.join("\n")}\n\n`;
@@ -59,6 +66,7 @@ export async function writeHandoff(
       branch: options.branch,
       created: now.toISOString(),
       title: options.title,
+      topics: options.topics,
     }) + body;
 
   return writeUniqueMarkdown(logsDir, basename, content);

@@ -10,6 +10,8 @@ export interface WritePlanOptions {
   projectId: string;
   /** When true, overwrite an existing plan (preserving original `created`). */
   force?: boolean;
+  /** 3-5 topic keywords for search (flat list, omitted when empty/unset). */
+  topics?: string[];
   /** Timestamp for `created` / `updated` (default: now). */
   now?: Date;
 }
@@ -25,6 +27,7 @@ function buildFrontmatter(options: {
   projectId: string;
   created: string;
   updated?: string;
+  topics?: string[];
 }): string {
   const lines = [
     "---",
@@ -33,6 +36,10 @@ function buildFrontmatter(options: {
   ];
   if (options.updated) {
     lines.push(`updated: ${yamlDoubleQuoted(options.updated)}`);
+  }
+  if (options.topics && options.topics.length > 0) {
+    const items = options.topics.map((t) => yamlDoubleQuoted(t)).join(", ");
+    lines.push(`topics: [${items}]`);
   }
   lines.push("---");
   return `${lines.join("\n")}\n\n`;
@@ -59,6 +66,7 @@ export async function updatePlanAtPath(
       projectId: options.projectId,
       created,
       updated,
+      topics: options.topics,
     }) + body;
 
   await writeFile(filePath, content, "utf8");
@@ -88,13 +96,18 @@ export async function writePlan(
   }
 
   if (exists && options.force) {
-    return updatePlanAtPath(filePath, body, { projectId: options.projectId, now });
+    return updatePlanAtPath(filePath, body, {
+      projectId: options.projectId,
+      topics: options.topics,
+      now,
+    });
   }
 
   const content =
     buildFrontmatter({
       projectId: options.projectId,
       created: now.toISOString(),
+      topics: options.topics,
     }) + body;
 
   await writeFile(filePath, content, "utf8");
