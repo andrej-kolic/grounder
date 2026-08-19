@@ -612,8 +612,15 @@ async function runProjectChecks(
     checks.push(failCheck("logs-dir", "cannot resolve logs/ (no repo config)", REPO_INIT));
     checks.push(failCheck("plans-dir", "cannot resolve plans/ (no repo config)", REPO_INIT));
   } else {
+    const ancestorNote =
+      linkedRoot === cwd
+        ? ""
+        : ` — ancestor of ${cwd}; this folder itself is unlinked (grounder init here would create a separate project)`;
     checks.push(
-      okCheck("repo-config", `repo config present (${path.join(linkedRoot, ".grounder.json")})`),
+      okCheck(
+        "repo-config",
+        `repo config present (${path.join(linkedRoot, ".grounder.json")})${ancestorNote}`,
+      ),
     );
 
     let repo: Awaited<ReturnType<typeof readRepoConfig>> = null;

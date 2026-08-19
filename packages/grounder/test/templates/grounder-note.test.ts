@@ -24,6 +24,8 @@ describe("templates/grounder-note", () => {
       expect(body).toContain('{{GROUNDER_CLI}} note "<body>"');
       expect(body).toContain("--title <slug>");
       expect(body).not.toContain("--path");
+      expect(body.startsWith("Save a note to the markdown vault for this project.")).toBe(true);
+      expect(body).not.toContain("Obsidian vault");
     }
   });
 

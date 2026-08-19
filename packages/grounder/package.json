@@ -1,6 +1,6 @@
 {
   "name": "grounder",
-  "version": "0.4.0",
+  "version": "0.4.2",
   "description": "Markdown-native memory for Cursor and Claude Code — session handoffs and plans in a vault you own",
   "type": "module",
   "bin": {

@@ -19,6 +19,7 @@ export interface RepoInitOptions {
   cwd?: string;
   yes?: boolean;
   force?: boolean;
+  dryRun?: boolean;
   id?: string;
   vault?: string;
   homeDir?: string;
@@ -34,6 +35,7 @@ export async function runRepoInit(argv: string[]): Promise<number> {
   return runRepoInitWithOptions({
     yes: flagBool(flags, "yes", "y"),
     force: flagBool(flags, "force", "f"),
+    dryRun: flagBool(flags, "dry-run"),
     id: flagString(flags, "id"),
     vault: flagString(flags, "vault"),
   });
@@ -44,6 +46,7 @@ export async function runRepoInitWithOptions(options: RepoInitOptions = {}): Pro
     const cwd = path.resolve(options.cwd ?? process.cwd());
     const yes = options.yes ?? false;
     const force = options.force ?? false;
+    const dryRun = options.dryRun ?? false;
     const gitRoot = await findGitRoot(cwd);
 
     let home = await readHomeConfig();
@@ -75,26 +78,16 @@ export async function runRepoInitWithOptions(options: RepoInitOptions = {}): Pro
     const logsDirRelative = path.relative(vaultRoot, logsDir);
     const plansDirRelative = path.relative(vaultRoot, plansDir);
 
-    process.stdout.write("Will create:\n");
-    process.stdout.write(`  link   ${repoConfigPath(cwd)}\n`);
-    process.stdout.write(`  vault  ${notesDirRelative}/\n`);
-    process.stdout.write(`  vault  ${logsDirRelative}/\n`);
-    process.stdout.write(`  vault  ${plansDirRelative}/\n`);
-
-    if (!yes) {
-      const proceed = await confirm("Proceed?");
-      if (!proceed) {
-        process.stdout.write("Aborted.\n");
-        return 0;
-      }
-    }
-
     if (existingRepo && !force) {
       if (existingRepo.projectId === detected.id) {
-        process.stdout.write("✓ Already linked (skipped)\n");
-        await mkdir(notesDir, { recursive: true });
-        await mkdir(logsDir, { recursive: true });
-        await mkdir(plansDir, { recursive: true });
+        process.stdout.write(
+          dryRun ? "Already linked (would skip).\n" : "✓ Already linked (skipped)\n",
+        );
+        if (!dryRun) {
+          await mkdir(notesDir, { recursive: true });
+          await mkdir(logsDir, { recursive: true });
+          await mkdir(plansDir, { recursive: true });
+        }
         return 0;
       }
 
@@ -102,6 +95,25 @@ export async function runRepoInitWithOptions(options: RepoInitOptions = {}): Pro
         `Folder already linked as ${existingRepo.projectId}. Use --force to overwrite.\n`,
       );
       return 1;
+    }
+
+    process.stdout.write("Link this project inside the markdown vault (once per project).\n");
+    process.stdout.write(dryRun ? "Would create:\n" : "Will create:\n");
+    process.stdout.write(`  link   ${repoConfigPath(cwd)}\n`);
+    process.stdout.write(`  vault  ${notesDirRelative}/\n`);
+    process.stdout.write(`  vault  ${logsDirRelative}/\n`);
+    process.stdout.write(`  vault  ${plansDirRelative}/\n`);
+
+    if (dryRun) {
+      return 0;
+    }
+
+    if (!yes) {
+      const proceed = await confirm("Proceed?");
+      if (!proceed) {
+        process.stdout.write("Aborted.\n");
+        return 0;
+      }
     }
 
     await writeRepoConfig(cwd, { version: 1, projectId: detected.id });

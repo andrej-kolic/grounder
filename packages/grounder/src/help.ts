@@ -39,35 +39,37 @@ export const COMMANDS: readonly CommandMeta[] = [
     group: "Setup",
     summary: "Vault setup commands",
     listUsage: "vault init <path>",
-    usage: "grounder vault init <path> [--yes] [--force] [--agent <id>] [--hooks]",
+    usage: "grounder vault init <path> [--yes] [--force] [--agent <id>] [--hooks] [--dry-run]",
     list: false,
     flags: `Subcommands:
-  vault init   Initialize vault + home config (once per machine)`,
+  vault init   Connect to a markdown vault (once per machine)`,
   },
   {
     id: "vault init",
     group: "Setup",
-    summary: "Initialize vault + home config (once per machine)",
+    summary: "Connect to a markdown vault (once per machine)",
     listUsage: "vault init <path>",
-    usage: "grounder vault init <path> [--yes] [--force] [--agent <id>] [--hooks]",
+    usage: "grounder vault init <path> [--yes] [--force] [--agent <id>] [--hooks] [--dry-run]",
     flags: `Flags:
   --yes          Skip confirmation prompts
   --force        Overwrite existing home config / generated files
   --agent <id>   Install for a specific agent (repeatable; default: auto-detect)
                  Supported: cursor, claude
-  --hooks        Also install session-start teaser hooks`,
+  --hooks        Also install session-start teaser hooks
+  --dry-run      Preview without writing`,
   },
   {
     id: "init",
     group: "Setup",
-    summary: "Connect the current repo to your vault",
+    summary: "Link this project inside the markdown vault (once per project)",
     listUsage: "init",
-    usage: "grounder init [--yes] [--force] [--id <id>] [--vault <path>]",
+    usage: "grounder init [--yes] [--force] [--id <id>] [--vault <path>] [--dry-run]",
     flags: `Flags:
   --yes          Skip confirmation prompts
   --force        Overwrite an existing link marker
   --id <id>      Override detected project id
-  --vault <path> Override home vault root for this run`,
+  --vault <path> Override home vault root for this run
+  --dry-run      Preview without writing`,
   },
   {
     id: "note",
@@ -353,9 +355,11 @@ function formatFullCommandDetails(): string {
   return blocks.join("\n\n");
 }
 
+const BANNER = "grounder — markdown-native memory for AI agents";
+
 /** Bare `grounder` / `-h` — short grouped synopsis (no flag encyclopedia). */
 export function printSynopsis(): void {
-  process.stdout.write(`grounder — connect git projects to Obsidian dev vaults for AI agents
+  process.stdout.write(`${BANNER}
 
 ${formatGroupedLists()}
 
@@ -373,7 +377,7 @@ ${QUICKSTART}
 
 /** `--help` / `grounder help` with no args — one-shot reference for humans/agents. */
 export function printFullHelp(): void {
-  process.stdout.write(`grounder — connect git projects to Obsidian dev vaults for AI agents
+  process.stdout.write(`${BANNER}
 
 ${formatGroupedLists()}
 

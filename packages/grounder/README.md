@@ -11,7 +11,7 @@ AI agents forget everything between sessions and can't share context with each o
 
 AI-first CLI and agent command set that:
 
-- **Connects any project** — git repositories or standard folders — to your local vault (multi-project support).
+- **Links any project** — git repositories or standard folders — to your local vault (multi-project support).
 - **Captures state deliberately** — converts a discussion into a living plan, checkpoints a session for handoff, or saves arbitrary notes.
 - **Hydrates on demand** — allows you or any agent to resume exactly where a prior session left off without re-deriving context.
 - **Works natively today** with Cursor, Claude Code, and standard CLI workflows.
@@ -35,21 +35,27 @@ A full session loop, one step at a time:
 
 Dim lines are the actual `grounder` CLI call each slash command runs under the hood. Regenerated with `pnpm demo:cast` from [`@grounder/demo-casts`](../demo-casts/).
 
-**Requirements:** Node.js 18+ and an Obsidian vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
+**Requirements:** Node.js 18+ and a markdown vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
 
 **Contents:** [Install](#install) · [Upgrading](#upgrading) · [Quickstart](#quickstart) · [Setup overview](#setup-overview) · [Commands](#commands) · [Configuration](#configuration) · [Agents](#agents) · [Session-start hooks](#session-start-hooks) · [Troubleshooting](#troubleshooting) · [Roadmap](#roadmap)
 
 ## Install
 
+### npm
+
 ```bash
 npm install -g grounder
 ```
 
-Or run without installing:
+Or run without installing: `npx grounder --help`. A global install lets `vault init` symlink `~/.grounder/runtime` so it tracks upgrades; bare `npx` copies it instead, so you need `grounder migrate` after every upgrade.
+
+### Agent skill (install + setup in one shot)
 
 ```bash
-npx grounder --help
+npx skills add andrej-kolic/grounder --skill grounder-setup -g
 ```
+
+Adding the skill only loads instructions — it does **nothing** until you ask your agent to run it (e.g. "set up grounder").
 
 `grounder -h` prints a short synopsis; `grounder --help` (or `grounder help`) prints the full reference; `grounder -v` prints the installed version.
 
@@ -68,7 +74,7 @@ Run `grounder doctor` if you’re unsure — it hints when plain `migrate` is en
 **1. One-time setup:**
 
 ```bash
-# Once per machine — set vault location + install agent slash commands
+# Once per machine — connect to a markdown vault + install agent slash commands
 # --hooks adds an optional one-line session-start reminder (see Session-start hooks)
 grounder vault init <path-to-your-vault> --hooks
 
@@ -77,7 +83,7 @@ cd your-project
 grounder init
 ```
 
-Both commands preview what they'll write and ask to confirm; add `--yes` to skip the prompt (e.g. in scripts).
+Both commands preview what they'll write and ask to confirm; add `--yes` to skip the prompt (e.g. in scripts), or `--dry-run` to print the same preview without writing.
 
 **2. Daily use — from your agent's chat:**
 
@@ -145,8 +151,8 @@ Nothing is written into the repo except the small `.grounder.json` marker. Agent
 ## Commands
 
 ```text
-grounder vault init <path>   Initialize vault + home config (once per machine)
-grounder init                Connect the current folder to your vault
+grounder vault init <path>   Connect to a markdown vault (once per machine)
+grounder init                Link this project inside the markdown vault (once per project)
 grounder note <text>         Write a note to the vault
 grounder note list           Print recent notes (count header + numbered title/path, newest first)
 grounder handoff <text>      Write a session handoff to vault logs/
@@ -171,6 +177,7 @@ grounder migrate             Refresh agent install after upgrading grounder
 | Flag             | Commands                        | Description                                                                                       |
 | ---------------- | ------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `--yes`          | `vault init`, `init`            | Skip confirmation prompts                                                                         |
+| `--dry-run`      | `vault init`, `init`, `migrate` | Preview without writing                                                                           |
 | `--force`        | `vault init`, `init`, `migrate` | Overwrite existing generated / locally-modified files                                             |
 | `--id <id>`      | `init`                          | Override detected project id                                                                      |
 | `--vault <path>` | `init`                          | Override home vault root for this run                                                             |

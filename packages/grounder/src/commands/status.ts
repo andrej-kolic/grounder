@@ -38,6 +38,24 @@ function statusLine(label: string, value: string): string {
   return `  ${label.padEnd(LABEL_WIDTH)}${value}\n`;
 }
 
+/**
+ * `findLinkedRepoRoot` walks up to the nearest `.grounder.json`, so a
+ * subdirectory of a linked repo inherits that link. Surface it explicitly
+ * when `linkedRoot` isn't `cwd` itself, so callers (agents included) don't
+ * mistake an ancestor's link for this exact folder being linked.
+ */
+function writeAncestorNoteIfAny(cwd: string, linkedRoot: string): void {
+  if (linkedRoot === cwd) {
+    return;
+  }
+  process.stdout.write(
+    statusLine(
+      "Note:",
+      `linked ancestor — ${cwd} itself is unlinked; grounder init here would create a separate project`,
+    ),
+  );
+}
+
 function errorDetail(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -148,6 +166,7 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
         statusLine("Linked:", repoUnsupported ? `unsupported → ${fix}` : `incomplete → ${fix}`),
       );
       process.stdout.write(statusLine("Folder:", linkedRoot));
+      writeAncestorNoteIfAny(cwd, linkedRoot);
       process.stdout.write(
         statusLine(
           "Config:",
@@ -162,22 +181,16 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
       return 0;
     }
 
-    if (!home) {
-      process.stdout.write(statusLine("Linked:", `incomplete → ${VAULT_INIT}`));
-      process.stdout.write(statusLine("Folder:", linkedRoot));
-      process.stdout.write(statusLine("Config:", repoConfigPath(linkedRoot)));
-      process.stdout.write(statusLine("Id:", repo.projectId));
-      await writeGitLine(gitRoot);
-      return 0;
-    }
-
     process.stdout.write(statusLine("Linked:", "yes"));
     process.stdout.write(statusLine("Folder:", linkedRoot));
+    writeAncestorNoteIfAny(cwd, linkedRoot);
     process.stdout.write(statusLine("Config:", repoConfigPath(linkedRoot)));
     process.stdout.write(statusLine("Id:", repo.projectId));
-    process.stdout.write(statusLine("Notes:", resolveNotesDir(home, repo)));
-    process.stdout.write(statusLine("Logs:", resolveLogsDir(home, repo)));
-    process.stdout.write(statusLine("Plans:", resolvePlansDir(home, repo)));
+    if (home) {
+      process.stdout.write(statusLine("Notes:", resolveNotesDir(home, repo)));
+      process.stdout.write(statusLine("Logs:", resolveLogsDir(home, repo)));
+      process.stdout.write(statusLine("Plans:", resolvePlansDir(home, repo)));
+    }
     await writeGitLine(gitRoot);
 
     return 0;

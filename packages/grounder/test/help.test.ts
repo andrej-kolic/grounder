@@ -3,6 +3,8 @@ import {
   COMMANDS,
   DISPATCHED_COMMAND_IDS,
   printCommandHelp,
+  printFullHelp,
+  printSynopsis,
   resolveCommandHelp,
   runHelp,
   wantsHelp,
@@ -66,6 +68,30 @@ describe("help", () => {
       expect(runHelp(["vault"])).toBe(0);
       expect(chunks.join("")).toContain("Usage: grounder vault init");
       expect(chunks.join("")).toContain("Subcommands:");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("synopsis and full help share the markdown-native banner", () => {
+    const chunks: string[] = [];
+    const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      chunks.push(String(chunk));
+      return true;
+    });
+    try {
+      printSynopsis();
+      const synopsis = chunks.join("");
+      expect(synopsis).toContain("grounder — markdown-native memory for AI agents");
+      expect(synopsis).not.toContain("connect git projects");
+      expect(synopsis).not.toContain("Obsidian");
+
+      chunks.length = 0;
+      printFullHelp();
+      const full = chunks.join("");
+      expect(full).toContain("grounder — markdown-native memory for AI agents");
+      expect(full).not.toContain("connect git projects");
+      expect(full).not.toContain("Obsidian");
     } finally {
       spy.mockRestore();
     }

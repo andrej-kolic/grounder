@@ -1,4 +1,4 @@
-Save a note to the Obsidian vault for this project.
+Save a note to the markdown vault for this project.
 
 Distill the instruction after `/grounder-note` into a clean note body — not a chat transcript.
 Do not dump tool traces, full conversation, or false starts.

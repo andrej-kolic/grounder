@@ -4,8 +4,9 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
 import { writeHomeConfig } from "../../../src/connector/home.js";
-import { readRepoConfig } from "../../../src/connector/repo.js";
-import { createTempEnv } from "../../helpers.js";
+import { readRepoConfig, repoConfigPath } from "../../../src/connector/repo.js";
+import { fileExists } from "../../../src/util/fs.js";
+import { captureStdout, createTempEnv } from "../../helpers.js";
 
 describe("commands/repo/init", () => {
   let cleanup: (() => Promise<void>) | undefined;
@@ -23,6 +24,54 @@ describe("commands/repo/init", () => {
     await writeHomeConfig({ vaultRoot: env.vault });
     return env;
   }
+
+  it("dry-run previews writes without creating the marker or vault folders", async () => {
+    const env = await setupLinkedEnv();
+    cleanup = env.cleanup;
+
+    const { code, out } = await captureStdout(() =>
+      runRepoInitWithOptions({
+        cwd: env.repo,
+        dryRun: true,
+        homeDir: env.home,
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("Link this project inside the markdown vault (once per project).");
+    expect(out).toContain("Would create:");
+    expect(out).not.toContain("Dry run");
+    expect(out).not.toContain("Will create:");
+    expect(
+      out.indexOf("Link this project inside the markdown vault (once per project)."),
+    ).toBeLessThan(out.indexOf("Would create:"));
+    expect(out).toContain(`link   ${repoConfigPath(env.repo)}`);
+    expect(out).toContain("vault  10-Projects/my-app/notes/");
+    expect(out).toContain("vault  10-Projects/my-app/logs/");
+    expect(out).toContain("vault  10-Projects/my-app/plans/");
+    expect(out).not.toContain("✓ Wrote .grounder.json");
+
+    expect(await readRepoConfig(env.repo)).toBeNull();
+    expect(await fileExists(path.join(env.vault, "10-Projects", "my-app", "notes"))).toBe(false);
+    expect(await fileExists(path.join(env.vault, "10-Projects", "my-app", "logs"))).toBe(false);
+    expect(await fileExists(path.join(env.vault, "10-Projects", "my-app", "plans"))).toBe(false);
+  });
+
+  it("dry-run still errors when the folder is linked as a different project id", async () => {
+    const env = await setupLinkedEnv("old-name");
+    cleanup = env.cleanup;
+
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const code = await runRepoInitWithOptions({
+      cwd: env.repo,
+      dryRun: true,
+      id: "new-id",
+      homeDir: env.home,
+    });
+
+    expect(code).toBe(1);
+    expect(await readRepoConfig(env.repo)).toEqual({ version: 1, projectId: "old-name" });
+  });
 
   it("writes repo marker and creates notes, logs, and plans folders", async () => {
     const env = await setupLinkedEnv();
@@ -47,10 +96,55 @@ describe("commands/repo/init", () => {
     cleanup = env.cleanup;
 
     await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
-    const code = await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const { code, out } = await captureStdout(() =>
+      runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home }),
+    );
 
     expect(code).toBe(0);
+    expect(out).toContain("✓ Already linked (skipped)");
+    expect(out).not.toContain("Will create:");
+    expect(out).not.toContain("✓ Wrote .grounder.json");
     expect(await readRepoConfig(env.repo)).toEqual({ version: 1, projectId: "my-app" });
+  });
+
+  it("dry-run reports already linked instead of would-create", async () => {
+    const env = await setupLinkedEnv();
+    cleanup = env.cleanup;
+
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const { code, out } = await captureStdout(() =>
+      runRepoInitWithOptions({
+        cwd: env.repo,
+        dryRun: true,
+        homeDir: env.home,
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("Already linked (would skip).");
+    expect(out).not.toContain("Would create:");
+    expect(out).not.toContain("Link this project inside the markdown vault (once per project).");
+    expect(out).not.toContain(`link   ${repoConfigPath(env.repo)}`);
+  });
+
+  it("dry-run with --force still previews overwrite when already linked", async () => {
+    const env = await setupLinkedEnv();
+    cleanup = env.cleanup;
+
+    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const { code, out } = await captureStdout(() =>
+      runRepoInitWithOptions({
+        cwd: env.repo,
+        dryRun: true,
+        force: true,
+        homeDir: env.home,
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("Would create:");
+    expect(out).toContain(`link   ${repoConfigPath(env.repo)}`);
+    expect(out).not.toContain("Already linked (would skip).");
   });
 
   it("overwrites marker with --force", async () => {

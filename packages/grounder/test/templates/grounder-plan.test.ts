@@ -29,6 +29,12 @@ describe("templates/grounder-plan", () => {
       expect(body).toContain("--path <path>");
       expect(body).toContain("--title <name>");
       expect(body).toContain("**never** use it to update a plan you meant to target with `--path`");
+      expect(
+        body.startsWith(
+          "Write a named, updatable plan document to the markdown vault for this project.",
+        ),
+      ).toBe(true);
+      expect(body).not.toContain("Obsidian vault");
     }
   });
 
