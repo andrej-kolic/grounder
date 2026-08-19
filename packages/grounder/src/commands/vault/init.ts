@@ -97,8 +97,9 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
     }
 
     if (invalidDetail) {
-      process.stdout.write(`Note: existing home config was invalid and will be replaced.\n`);
-      process.stdout.write(`  ${invalidDetail}\n`);
+      process.stderr.write(
+        `Note: existing home config was invalid and will be replaced (${invalidDetail}).\n`,
+      );
     }
     process.stdout.write(`Vault root: ${vaultRoot}\n`);
     process.stdout.write("Connect to a markdown vault (once per machine).\n");

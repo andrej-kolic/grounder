@@ -187,20 +187,31 @@ describe("commands/vault/init", () => {
     await mkdir(path.dirname(homeConfigPath(env.home)), { recursive: true });
     await writeFile(homeConfigPath(env.home), "{not-json", "utf8");
 
-    const { code, out } = await captureStdout(() =>
-      runVaultInitWithOptions({
-        vaultPath: env.vault,
-        dryRun: true,
-        homeDir: env.home,
-        agents: [],
-      }),
-    );
+    const stderrChunks: string[] = [];
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderrChunks.push(String(chunk));
+      return true;
+    });
 
-    expect(code).toBe(0);
-    expect(out).toContain("Note: existing home config was invalid and will be replaced.");
-    expect(out).toContain(`Invalid home config at ${homeConfigPath(env.home)}`);
-    expect(out).toContain(`Vault root: ${env.vault}`);
-    expect(out).toContain("Would write:");
+    try {
+      const { code, out } = await captureStdout(() =>
+        runVaultInitWithOptions({
+          vaultPath: env.vault,
+          dryRun: true,
+          homeDir: env.home,
+          agents: [],
+        }),
+      );
+
+      expect(code).toBe(0);
+      const stderrOut = stderrChunks.join("");
+      expect(stderrOut).toContain("Note: existing home config was invalid and will be replaced");
+      expect(stderrOut).toContain(`Invalid home config at ${homeConfigPath(env.home)}`);
+      expect(out).toContain(`Vault root: ${env.vault}`);
+      expect(out).toContain("Would write:");
+    } finally {
+      stderrSpy.mockRestore();
+    }
   });
 
   it("self-heals a corrupt home config on apply, without needing --force", async () => {
