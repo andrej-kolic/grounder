@@ -1,7 +1,7 @@
 // Config-aware vault resolution: effective vault root and artifact paths from connector state.
 
 import { resolveUserPath } from "../util/path.js";
-import { logsDir, notesDir, plansDir } from "../vault/layout.js";
+import { logsDir, notesDir, plansDir, projectDir } from "../vault/layout.js";
 import type { HomeConfig } from "./home.js";
 import type { RepoConfig } from "./repo.js";
 
@@ -27,6 +27,16 @@ export function resolveNotesDir(
 ): string {
   const vaultRoot = resolveVaultRoot(home, vaultOverride);
   return notesDir(vaultRoot, repo.projectId);
+}
+
+/** Project vault root directory under the effective vault root. */
+export function resolveProjectVaultRoot(
+  home: HomeConfig,
+  repo: RepoConfig,
+  vaultOverride?: string,
+): string {
+  const vaultRoot = resolveVaultRoot(home, vaultOverride);
+  return projectDir(vaultRoot, repo.projectId);
 }
 
 /** Project logs (handoff) directory under the effective vault root. */

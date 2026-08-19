@@ -14,6 +14,7 @@ import {
   resolveLogsDir,
   resolveNotesDir,
   resolvePlansDir,
+  resolveProjectVaultRoot,
   resolveVaultRoot,
 } from "../connector/vault.js";
 import { helpExitCode } from "../help.js";
@@ -187,6 +188,7 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
     process.stdout.write(statusLine("Config:", repoConfigPath(linkedRoot)));
     process.stdout.write(statusLine("Id:", repo.projectId));
     if (home) {
+      process.stdout.write(statusLine("Project Vault Root:", resolveProjectVaultRoot(home, repo)));
       process.stdout.write(statusLine("Notes:", resolveNotesDir(home, repo)));
       process.stdout.write(statusLine("Logs:", resolveLogsDir(home, repo)));
       process.stdout.write(statusLine("Plans:", resolvePlansDir(home, repo)));

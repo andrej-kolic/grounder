@@ -23,6 +23,7 @@ const templateDir = path.join(pkgRoot, "templates", "agents", "cursor", "command
 
 const COMMANDS = [
   "grounder-note.md",
+  "grounder-search.md",
   "grounder-plan.md",
   "grounder-task-handoff.md",
   "grounder-task.md",
