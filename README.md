@@ -88,9 +88,9 @@ Use `fixtures/dev/` as a workspace sandbox (not the test fixture):
 
 ```bash
 pnpm fixture:setup
-pnpm grounder vault init <path-to-your-vault> --yes --hooks   # once per machine
+pnpm grounder setup <path-to-your-vault> --yes --hooks   # once per machine
 cd fixtures/dev
-pnpm grounder init --yes
+pnpm grounder link --yes
 pnpm grounder note "hello from dev fixture"
 ```
 

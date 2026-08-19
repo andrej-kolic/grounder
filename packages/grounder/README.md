@@ -47,7 +47,7 @@ Dim lines are the actual `grounder` CLI call each slash command runs under the h
 npm install -g grounder
 ```
 
-Or run without installing: `npx grounder --help`. A global install lets `vault init` symlink `~/.grounder/runtime` so it tracks upgrades; bare `npx` copies it instead, so you need `grounder migrate` after every upgrade.
+Or run without installing: `npx grounder --help`. A global install lets `setup` symlink `~/.grounder/runtime` so it tracks upgrades; bare `npx` copies it instead, so you need `grounder migrate` after every upgrade.
 
 ### Agent skill (install + setup in one shot)
 
@@ -76,11 +76,11 @@ Run `grounder doctor` if you’re unsure — it hints when plain `migrate` is en
 ```bash
 # Once per machine — connect to a markdown vault + install agent slash commands
 # --hooks adds an optional one-line session-start reminder (see Session-start hooks)
-grounder vault init <path-to-your-vault> --hooks
+grounder setup <path-to-your-vault> --hooks
 
 # Once per project folder — link project id to vault notes/ + logs/ + plans/
 cd your-project
-grounder init
+grounder link
 ```
 
 Both commands preview what they'll write and ask to confirm; add `--yes` to skip the prompt (e.g. in scripts), or `--dry-run` to print the same preview without writing.
@@ -136,14 +136,14 @@ Inspect or debug setup any time with `grounder status` / `grounder doctor` — s
 | `/grounder-plan`         | `grounder plan`                          | Named living plan under `plans/`                           |
 
 
-The "Equivalent CLI" column is what you'd type by hand — under the hood, slash commands invoke a small runtime `vault init` maintains at `~/.grounder/runtime` (see [Agents](#agents)), not whatever `grounder` binary happens to be on your `PATH`.
+The "Equivalent CLI" column is what you'd type by hand — under the hood, slash commands invoke a small runtime `setup` maintains at `~/.grounder/runtime` (see [Agents](#agents)), not whatever `grounder` binary happens to be on your `PATH`.
 
-With `--hooks` on `vault init`, a new Cursor/Claude session may also print a one-line teaser when a handoff exists — never the full body. See [Session-start hooks](#session-start-hooks).
+With `--hooks` on `setup`, a new Cursor/Claude session may also print a one-line teaser when a handoff exists — never the full body. See [Session-start hooks](#session-start-hooks).
 
 ## Setup overview
 
-- `grounder vault init <path>` (once per machine) writes `~/.grounder/config.json`, creates `<vault>/10-Projects/`, and installs slash commands for detected agents (Cursor → `~/.cursor/commands/`, Claude Code → `~/.claude/commands/`; override with `--agent=<id>`).
-- `grounder init` (once per project folder) writes `.grounder.json` (`projectId` — safe to commit) and creates `<vault>/10-Projects/{projectId}/notes/`, `logs/`, and `plans/`.
+- `grounder setup <path>` (once per machine) writes `~/.grounder/config.json`, creates `<vault>/10-Projects/`, and installs slash commands for detected agents (Cursor → `~/.cursor/commands/`, Claude Code → `~/.claude/commands/`; override with `--agent=<id>`).
+- `grounder link` (once per project folder) writes `.grounder.json` (`projectId` — safe to commit) and creates `<vault>/10-Projects/{projectId}/notes/`, `logs/`, and `plans/`.
 - **Daily use** — notes, handoffs, plans, and recall via CLI or slash commands; no further install.
 
 Nothing is written into the repo except the small `.grounder.json` marker. Agent artifacts stay under the user’s home directory; vault notes stay outside the project tree.
@@ -151,8 +151,8 @@ Nothing is written into the repo except the small `.grounder.json` marker. Agent
 ## Commands
 
 ```text
-grounder vault init <path>   Connect to a markdown vault (once per machine)
-grounder init                Link this project inside the markdown vault (once per project)
+grounder setup <path>        Connect to a markdown vault (once per machine)
+grounder link                Link this project inside the markdown vault (once per project)
 grounder note <text>         Write a note to the vault
 grounder note list           Print recent notes (count header + numbered title/path, newest first)
 grounder handoff <text>      Write a session handoff to vault logs/
@@ -171,18 +171,18 @@ grounder migrate             Refresh agent install after upgrading grounder
 
 
 
-### Init flags
+### Setup / link flags
 
 
 | Flag             | Commands                        | Description                                                                                       |
 | ---------------- | ------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `--yes`          | `vault init`, `init`            | Skip confirmation prompts                                                                         |
-| `--dry-run`      | `vault init`, `init`, `migrate` | Preview without writing                                                                           |
-| `--force`        | `vault init`, `init`, `migrate` | Overwrite existing generated / locally-modified files                                             |
-| `--id <id>`      | `init`                          | Override detected project id                                                                      |
-| `--vault <path>` | `init`                          | Override home vault root for this run                                                             |
-| `--agent <id>`   | `vault init`, `migrate`         | Install for a specific agent (repeatable; default: auto-detect). Supported: `cursor`, `claude`    |
-| `--hooks`        | `vault init`, `migrate`         | Also install session-start teaser hooks (opt-in; see [Session-start hooks](#session-start-hooks)) |
+| `--yes`          | `setup`, `link`                 | Skip confirmation prompts                                                                         |
+| `--dry-run`      | `setup`, `link`, `migrate`      | Preview without writing                                                                           |
+| `--force`        | `setup`, `link`, `migrate`      | Overwrite existing generated / locally-modified files                                             |
+| `--id <id>`      | `link`                          | Override detected project id                                                                      |
+| `--vault <path>` | `link`                          | Override home vault root for this run                                                             |
+| `--agent <id>`   | `setup`, `migrate`              | Install for a specific agent (repeatable; default: auto-detect). Supported: `cursor`, `claude`    |
+| `--hooks`        | `setup`, `migrate`              | Also install session-start teaser hooks (opt-in; see [Session-start hooks](#session-start-hooks)) |
 
 
 
@@ -257,15 +257,15 @@ Both are read-only. `status` exits `0` even when unlinked; `doctor` fails when c
 { "vaultRoot": "/path/to/your/vault" }
 ```
 
-Written by `grounder vault init`. Holds the vault path for this machine only.
+Written by `grounder setup`. Holds the vault path for this machine only.
 
-**Link marker** — `.grounder.json` in the folder where you run `grounder init` (safe to commit):
+**Link marker** — `.grounder.json` in the folder where you run `grounder link` (safe to commit):
 
 ```json
 { "version": 1, "projectId": "your-project" }
 ```
 
-Written by `grounder init` in the **current working directory**. Project id detection (when `--id` is omitted): `package.json` name in that folder → git `origin` remote (if inside a git repo) → folder basename.
+Written by `grounder link` in the **current working directory**. Project id detection (when `--id` is omitted): `package.json` name in that folder → git `origin` remote (if inside a git repo) → folder basename.
 
 `grounder note`, `grounder handoff`, `grounder plan`, and `grounder path *` walk up from the current directory to find the nearest `.grounder.json`, stopping at the git root when one exists (or at the filesystem root otherwise).
 
@@ -282,7 +282,7 @@ Written by `grounder init` in the **current working directory**. Project id dete
 
 ## Agents
 
-The vault layout is agent-agnostic. `grounder vault init` installs thin glue artifacts per detected agent via a pluggable adapter registry (`src/agents/`).
+The vault layout is agent-agnostic. `grounder setup` installs thin glue artifacts per detected agent via a pluggable adapter registry (`src/agents/`).
 
 
 | Agent       | Detection          | Artifacts                                                      |
@@ -294,21 +294,21 @@ The vault layout is agent-agnostic. `grounder vault init` installs thin glue art
 No `--agent` flag: auto-detect installed agents. Explicit install:
 
 ```bash
-grounder vault init <path-to-your-vault> --agent=cursor --agent=claude
+grounder setup <path-to-your-vault> --agent=cursor --agent=claude
 ```
 
 Slash commands invoke `~/.grounder/runtime/dist/cli.js` directly (not `npx`) — see [Session-start hooks](#session-start-hooks) for how that runtime stays current. Command files that still match what Grounder last wrote are refreshed by `grounder migrate` without `--force`. Locally edited files are left alone unless you pass `--force`.
 
-After upgrading the package, see [Upgrading](#upgrading). `vault init --force` still works for scripts that already use it; it shares the same install path as `migrate`.
+After upgrading the package, see [Upgrading](#upgrading). `setup --force` still works for scripts that already use it; it shares the same install path as `migrate`.
 
-Templates live under `templates/agents/{id}/`. Adding another agent means one adapter file + one template directory — `vault init` stays agent-blind.
+Templates live under `templates/agents/{id}/`. Adding another agent means one adapter file + one template directory — `setup` stays agent-blind.
 
 ## Session-start hooks
 
 Opt-in safety net for the session loop: when a Cursor or Claude Code session starts in a linked project that already has a handoff, Grounder prints **one line** reminding you it exists. You (or the agent) still decide whether to run `/grounder-task`.
 
 ```bash
-grounder vault init <path-to-your-vault> --hooks
+grounder setup <path-to-your-vault> --hooks
 ```
 
 Example teaser:
@@ -325,10 +325,10 @@ What hooks do **not** do:
 
 `doctor` reports a `warn` (never a `fail`) when a detected agent has no Grounder hook installed, and when `~/.grounder/runtime` is stale or missing.
 
-Hooks *and* slash commands both run `~/.grounder/runtime/dist/cli.js` directly (never `npx`) — `vault init` materializes it, regardless of whether `--hooks` is passed:
+Hooks *and* slash commands both run `~/.grounder/runtime/dist/cli.js` directly (never `npx`) — `setup` materializes it, regardless of whether `--hooks` is passed:
 
 - **Real install** (`npm i -g grounder`, `pnpm add -g grounder`, or a monorepo checkout) → symlinked. Upgrading overwrites the same path in place, so both stay current with **no re-run needed**.
-- **Bare** `npx grounder vault init …` (nothing installed) → copied, since each `npx` invocation resolves to a disposable, version-pinned cache dir that can't be symlinked durably. Re-run `grounder migrate` (or `vault init`) after upgrading grounder to refresh (no `--force` needed).
+- **Bare** `npx grounder setup …` (nothing installed) → copied, since each `npx` invocation resolves to a disposable, version-pinned cache dir that can't be symlinked durably. Re-run `grounder migrate` (or `setup`) after upgrading grounder to refresh (no `--force` needed).
 
 If you want the runtime to stay current with zero maintenance, install grounder rather than using bare `npx` for this step.
 
@@ -342,8 +342,8 @@ That refresh only touches the shared runtime, not installed command files — se
 | Not sure if this folder is linked                                                      | `grounder status` — check Project `Linked:` and paths                                                                                                |
 | Notes / handoffs / plans fail or slash commands missing                                | `grounder doctor` — follow fix hints                                                                                                                 |
 | Machine setup only (no project yet)                                                    | `grounder doctor --global`                                                                                                                           |
-| Home config / vault missing                                                            | `grounder vault init <path>`                                                                                                                         |
-| No `.grounder.json` / notes / logs / plans dirs                                        | `grounder init`                                                                                                                                      |
+| Home config / vault missing                                                            | `grounder setup <path>`                                                                                                                              |
+| No `.grounder.json` / notes / logs / plans dirs                                        | `grounder link`                                                                                                                                      |
 | Agent slash commands drifted (`doctor` warns)                                          | Follow the hint: plain `grounder migrate` when files would auto-update; `grounder migrate --force` when locally modified (also typical once when upgrading from before 0.3) |
 | Session-start teaser missing (optional)                                                | `grounder migrate --hooks` — `doctor` warns when absent                                                                                              |
 | Shared runtime stale after upgrade (bare npx install)                                  | `grounder migrate` — `doctor` warns when `hook-runtime` is stale                                                                                     |

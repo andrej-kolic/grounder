@@ -3,7 +3,7 @@ name: grounder-setup
 description: >-
   Sets up, verifies, upgrades, or repairs Grounder — the CLI that links a
   project to a local markdown vault for agent memory. Use when the user asks
-  to install Grounder, set up, upgrade, or repair Grounder, run setup,
+  to install Grounder, set up, upgrade, or repair Grounder, run grounder setup,
   link this project to their vault, or when Grounder slash commands,
   handoffs, or session memory are missing.
 ---
@@ -27,7 +27,7 @@ The vault and `~/.grounder` live outside the project. Grant the shell whatever u
 
 ## 1. Environment and Grounder CLI
 
-Steps 1–2 of the board. Prefer a real global CLI so `setup` can symlink `~/.grounder/runtime` (tracks upgrades). Bare `npx grounder setup` copies the runtime and needs `migrate` after every upgrade.
+Steps 1–2 of the board. Prefer a real global CLI so `grounder setup` can symlink `~/.grounder/runtime` (tracks upgrades). Bare `npx grounder setup` copies the runtime and needs `migrate` after every upgrade.
 
 1. Check Node 18+ (`node -v`). If missing or too old: print the board with step 1 needed and stop — do not install Node.
 2. If `grounder --version` (or `command -v grounder`) works, use `grounder` for every later command.

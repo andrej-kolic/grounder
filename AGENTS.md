@@ -31,8 +31,8 @@ vault/                # vault on disk
   find-usable-handoff.ts # newest-first, skipping empty/unreadable (peek + list --head)
 commands/             # mirrors CLI structure
   require-linked.ts   # CLI stderr wrapper around resolveLinkedProject
-  vault/init.ts       # grounder vault init (agent-blind; uses agents registry)
-  repo/init.ts        # grounder init (creates notes/ + logs/ + plans/)
+  setup.ts            # grounder setup (agent-blind; uses agents registry)
+  link.ts             # grounder link (creates notes/ + logs/ + plans/)
   note.ts             # grounder note
   handoff.ts          # grounder handoff
   handoff/list.ts     # grounder handoff list

@@ -12,7 +12,7 @@ A second constraint: editor-spawned subprocesses (Cursor hooks, Claude Code `sh 
 
 ## Design
 
-On `vault init` / `migrate`, Grounder materializes this package's `dist/` at `~/.grounder/runtime/dist/` and points both host hook configs and installed command markdown at:
+On `setup` / `migrate`, Grounder materializes this package's `dist/` at `~/.grounder/runtime/dist/` and points both host hook configs and installed command markdown at:
 
 ```text
 '<absolute process.execPath>' '<~/.grounder/runtime/dist/cli.js>' <subcommand> …
@@ -25,7 +25,7 @@ No registry fetch and no reliance on `PATH` at invocation time. Paths are shell-
 | Source | Mode | Stay current |
 | --- | --- | --- |
 | Durable (monorepo checkout, global install, linked dep) | Symlink `dist/` to source | Upgrade / `pnpm build` overwrites in place — no re-run needed |
-| Ephemeral (bare `npx`, version-keyed cache) | Copy `dist/` | Re-run `grounder migrate` (or `vault init`) after upgrading |
+| Ephemeral (bare `npx`, version-keyed cache) | Copy `dist/` | Re-run `grounder migrate` (or `setup`) after upgrading |
 
 Session hooks stay fast and side-effect-free: they never self-heal the runtime. Refresh is an explicit, idempotent install step.
 
@@ -44,7 +44,7 @@ There is **no** `nodePath` field. The interpreter is baked into each hook/comman
 
 ## Repair loop
 
-`vault init` / `migrate` already recompute invocation strings against the *current* `process.execPath`. If a hook or command file still matches what Grounder last wrote (hash-safe for commands; owned rewrite for hooks), a Node switch + migrate rewrites the baked path. That repair worked before the doctor check existed.
+`setup` / `migrate` already recompute invocation strings against the *current* `process.execPath`. If a hook or command file still matches what Grounder last wrote (hash-safe for commands; owned rewrite for hooks), a Node switch + migrate rewrites the baked path. That repair worked before the doctor check existed.
 
 The remaining gap was detection: after `nvm uninstall` (or similar) of the Node that was active at last install, artifacts can point at a missing binary until the user happens to re-run migrate.
 
