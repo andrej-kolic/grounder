@@ -1,11 +1,7 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  claude,
-  claudePeekHookCommand,
-  claudeSettingsJsonPath,
-} from "../../../src/agents/claude.js";
+import { claude, claudePeekHookCommand, claudeSettingsJsonPath } from "../../src/agents/claude.js";
 import {
   cursor,
   cursorHooksJsonPath,
@@ -13,15 +9,15 @@ import {
   grounderNoteCommandPath,
   grounderPlanCommandPath,
   grounderTaskHandoffCommandPath,
-} from "../../../src/agents/cursor.js";
-import { runtimeCliPath, runtimeInvocation } from "../../../src/agents/hook-runtime.js";
-import { runVaultInit, runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
-import { homeConfigPath } from "../../../src/connector/home.js";
-import { readGrounderState, statePath } from "../../../src/connector/state.js";
-import { VERSION } from "../../../src/index.js";
-import { fileExists } from "../../../src/util/fs.js";
-import { hashContent } from "../../../src/util/hash.js";
-import { captureStdout, createTempEnv } from "../../helpers.js";
+} from "../../src/agents/cursor.js";
+import { runtimeCliPath, runtimeInvocation } from "../../src/agents/hook-runtime.js";
+import { runSetup, runSetupWithOptions } from "../../src/commands/setup.js";
+import { homeConfigPath } from "../../src/connector/home.js";
+import { readGrounderState, statePath } from "../../src/connector/state.js";
+import { VERSION } from "../../src/index.js";
+import { fileExists } from "../../src/util/fs.js";
+import { hashContent } from "../../src/util/hash.js";
+import { captureStdout, createTempEnv } from "../helpers.js";
 
 async function expectedFileLedger(paths: string[]): Promise<Record<string, { hash: string }>> {
   const files: Record<string, { hash: string }> = {};
@@ -31,7 +27,7 @@ async function expectedFileLedger(paths: string[]): Promise<Record<string, { has
   return files;
 }
 
-describe("commands/vault/init", () => {
+describe("commands/setup", () => {
   let cleanup: (() => Promise<void>) | undefined;
   let previousGrounderHome: string | undefined;
   let restoredGrounderHome = false;
@@ -58,7 +54,7 @@ describe("commands/vault/init", () => {
     cleanup = env.cleanup;
 
     const { code, out } = await captureStdout(() =>
-      runVaultInitWithOptions({
+      runSetupWithOptions({
         vaultPath: env.vault,
         yes: true,
         homeDir: env.home,
@@ -104,7 +100,7 @@ describe("commands/vault/init", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -113,7 +109,7 @@ describe("commands/vault/init", () => {
     const noteBefore = await readFile(grounderNoteCommandPath(env.home), "utf8");
     const handoffBefore = await readFile(grounderTaskHandoffCommandPath(env.home), "utf8");
 
-    const code = await runVaultInitWithOptions({
+    const code = await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -130,7 +126,7 @@ describe("commands/vault/init", () => {
     cleanup = env.cleanup;
 
     const { code, out } = await captureStdout(() =>
-      runVaultInitWithOptions({
+      runSetupWithOptions({
         vaultPath: env.vault,
         dryRun: true,
         hooks: true,
@@ -170,7 +166,7 @@ describe("commands/vault/init", () => {
     restoredGrounderHome = true;
 
     const { code, out } = await captureStdout(() =>
-      runVaultInit([env.vault, "--dry-run", "--hooks", "--agent", "cursor"]),
+      runSetup([env.vault, "--dry-run", "--hooks", "--agent", "cursor"]),
     );
 
     expect(code).toBe(0);
@@ -188,7 +184,7 @@ describe("commands/vault/init", () => {
     await writeFile(homeConfigPath(env.home), "{not-json", "utf8");
 
     const { code, out } = await captureStdout(() =>
-      runVaultInitWithOptions({
+      runSetupWithOptions({
         vaultPath: env.vault,
         dryRun: true,
         homeDir: env.home,
@@ -198,7 +194,7 @@ describe("commands/vault/init", () => {
 
     expect(code).toBe(0);
     expect(out).toContain("Would replace invalid home config (");
-    expect(out).not.toContain("grounder vault init <path> to repair");
+    expect(out).not.toContain("grounder setup <path> to repair");
     expect(out).not.toContain("Invalid home config at");
     expect(out).toContain(`Vault root: ${env.vault}`);
     expect(out).toContain("Would write:");
@@ -211,7 +207,7 @@ describe("commands/vault/init", () => {
     await mkdir(path.dirname(homeConfigPath(env.home)), { recursive: true });
     await writeFile(homeConfigPath(env.home), "{not-json", "utf8");
 
-    const code = await runVaultInitWithOptions({
+    const code = await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
@@ -239,7 +235,7 @@ describe("commands/vault/init", () => {
 
     try {
       const { code, out } = await captureStdout(() =>
-        runVaultInitWithOptions({
+        runSetupWithOptions({
           vaultPath: env.vault,
           dryRun: true,
           homeDir: env.home,
@@ -256,7 +252,7 @@ describe("commands/vault/init", () => {
     }
   });
 
-  it("reports partial success when state.json is corrupt during first-time vault init", async () => {
+  it("reports partial success when state.json is corrupt during first-time setup", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
@@ -271,7 +267,7 @@ describe("commands/vault/init", () => {
 
     try {
       const { code, out } = await captureStdout(() =>
-        runVaultInitWithOptions({
+        runSetupWithOptions({
           vaultPath: env.vault,
           yes: true,
           homeDir: env.home,
@@ -299,17 +295,14 @@ describe("commands/vault/init", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    // First init succeeds
-    await runVaultInitWithOptions({
+    await runSetupWithOptions({
       vaultPath: env.vault,
       yes: true,
       homeDir: env.home,
       agents: [],
     });
 
-    // Re-init with a different vault path and no --force should fail immediately (exit 1)
-    // without hanging on a confirmation prompt (yes: false but no TTY needed since it errors first)
-    const code = await runVaultInitWithOptions({
+    const code = await runSetupWithOptions({
       vaultPath: `${env.vault}-other`,
       yes: false,
       homeDir: env.home,
@@ -325,7 +318,7 @@ describe("commands/vault/init", () => {
       cleanup = env.cleanup;
 
       const { code, out } = await captureStdout(() =>
-        runVaultInitWithOptions({
+        runSetupWithOptions({
           vaultPath: env.vault,
           yes: true,
           hooks: true,
@@ -380,7 +373,7 @@ describe("commands/vault/init", () => {
       cleanup = env.cleanup;
 
       const { code, out } = await captureStdout(() =>
-        runVaultInitWithOptions({
+        runSetupWithOptions({
           vaultPath: env.vault,
           yes: true,
           homeDir: env.home,
@@ -399,7 +392,7 @@ describe("commands/vault/init", () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
 
-      const code = await runVaultInitWithOptions({
+      const code = await runSetupWithOptions({
         vaultPath: env.vault,
         yes: true,
         hooks: true,
@@ -419,7 +412,7 @@ describe("commands/vault/init", () => {
       process.env.GROUNDER_HOME = env.home;
       restoredGrounderHome = true;
 
-      const code = await runVaultInit([env.vault, "--yes", "--hooks", "--agent", "cursor"]);
+      const code = await runSetup([env.vault, "--yes", "--hooks", "--agent", "cursor"]);
 
       expect(code).toBe(0);
       expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(true);

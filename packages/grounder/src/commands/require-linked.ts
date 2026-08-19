@@ -8,9 +8,9 @@ export async function requireLinkedProject(cwd: string): Promise<LinkedProject |
   const result = await resolveLinkedProject(cwd);
   if (!result.ok) {
     if (result.error === "no-vault") {
-      process.stderr.write("No vault configured. Run: grounder vault init <path>\n");
+      process.stderr.write("No vault configured. Run: grounder setup <path>\n");
     } else {
-      process.stderr.write("Folder not linked. Run: grounder init\n");
+      process.stderr.write("Folder not linked. Run: grounder link\n");
     }
     return null;
   }

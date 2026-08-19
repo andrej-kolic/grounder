@@ -3,9 +3,9 @@ import { mkdir, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { runLinkWithOptions } from "../../../src/commands/link.js";
 import { runNoteList, runNoteListWithOptions } from "../../../src/commands/note/list.js";
-import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
-import { runVaultInitWithOptions } from "../../../src/commands/vault/init.js";
+import { runSetupWithOptions } from "../../../src/commands/setup.js";
 import { captureStdout, createTempEnv, withGroundedHome } from "../../helpers.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -34,8 +34,8 @@ describe("commands/note/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
     const older = path.join(notesDir, "older.md");
@@ -60,8 +60,8 @@ describe("commands/note/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const { code, out } = await captureStdout(() =>
       runNoteListWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -76,8 +76,8 @@ describe("commands/note/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
     const a = path.join(notesDir, "a.md");
@@ -102,8 +102,8 @@ describe("commands/note/list", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
     const older = path.join(notesDir, "older.md");
@@ -139,8 +139,8 @@ describe("commands/note/list", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
     const notePath = path.join(notesDir, "phase-1.md");

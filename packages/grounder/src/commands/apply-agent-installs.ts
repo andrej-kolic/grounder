@@ -16,7 +16,7 @@ import {
 export interface ApplyAgentInstallsOptions {
   agents: AgentAdapter[];
   force?: boolean;
-  /** Explicitly install/refresh session hooks (vault init --hooks / migrate --hooks). */
+  /** Explicitly install/refresh session hooks (setup --hooks / migrate --hooks). */
   hooks?: boolean;
   /**
    * When true (migrate), also refresh hooks that were previously recorded or
@@ -102,7 +102,7 @@ function hookLabel(status: ArtifactStatus, artifactPath: string, dryRun: boolean
 
 /**
  * Materialize runtime + install/refresh agent command (and optional hook)
- * artifacts. Shared by `grounder vault init` and `grounder migrate`.
+ * artifacts. Shared by `grounder setup` and `grounder migrate`.
  */
 export async function applyAgentInstalls(
   opts: ApplyAgentInstallsOptions,

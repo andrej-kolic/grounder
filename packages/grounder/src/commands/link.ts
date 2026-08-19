@@ -1,21 +1,21 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { findGitRoot } from "../../connector/git.js";
-import { readHomeConfig, withHomeDir } from "../../connector/home.js";
-import { detectProjectId, formatProjectIdSource } from "../../connector/project-id.js";
-import { readRepoConfig, repoConfigPath, writeRepoConfig } from "../../connector/repo.js";
+import { findGitRoot } from "../connector/git.js";
+import { readHomeConfig, withHomeDir } from "../connector/home.js";
+import { detectProjectId, formatProjectIdSource } from "../connector/project-id.js";
+import { readRepoConfig, repoConfigPath, writeRepoConfig } from "../connector/repo.js";
 import {
   resolveLogsDir,
   resolveNotesDir,
   resolvePlansDir,
   resolveVaultRoot,
-} from "../../connector/vault.js";
-import { helpExitCode } from "../../help.js";
-import { flagBool, flagString, parseArgs } from "../../util/parse-args.js";
-import { resolveUserPath } from "../../util/path.js";
-import { confirm } from "../../util/prompt.js";
+} from "../connector/vault.js";
+import { helpExitCode } from "../help.js";
+import { flagBool, flagString, parseArgs } from "../util/parse-args.js";
+import { resolveUserPath } from "../util/path.js";
+import { confirm } from "../util/prompt.js";
 
-export interface RepoInitOptions {
+export interface LinkOptions {
   cwd?: string;
   yes?: boolean;
   force?: boolean;
@@ -25,14 +25,14 @@ export interface RepoInitOptions {
   homeDir?: string;
 }
 
-export async function runRepoInit(argv: string[]): Promise<number> {
-  const helpCode = helpExitCode(argv, "init");
+export async function runLink(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "link");
   if (helpCode !== null) {
     return helpCode;
   }
 
   const { flags } = parseArgs(argv);
-  return runRepoInitWithOptions({
+  return runLinkWithOptions({
     yes: flagBool(flags, "yes", "y"),
     force: flagBool(flags, "force", "f"),
     dryRun: flagBool(flags, "dry-run"),
@@ -41,7 +41,7 @@ export async function runRepoInit(argv: string[]): Promise<number> {
   });
 }
 
-export async function runRepoInitWithOptions(options: RepoInitOptions = {}): Promise<number> {
+export async function runLinkWithOptions(options: LinkOptions = {}): Promise<number> {
   return withHomeDir(options.homeDir, async () => {
     const cwd = path.resolve(options.cwd ?? process.cwd());
     const yes = options.yes ?? false;
@@ -52,7 +52,7 @@ export async function runRepoInitWithOptions(options: RepoInitOptions = {}): Pro
     let home = await readHomeConfig();
     if (!home) {
       if (!options.vault) {
-        process.stderr.write("No vault configured. Run: grounder vault init <path>\n");
+        process.stderr.write("No vault configured. Run: grounder setup <path>\n");
         return 1;
       }
       home = { vaultRoot: resolveUserPath(options.vault) };

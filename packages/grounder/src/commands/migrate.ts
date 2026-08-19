@@ -74,7 +74,7 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
 
     const home = await readHomeConfig();
     if (!home) {
-      process.stderr.write("No home config found. Run `grounder vault init <path>` first.\n");
+      process.stderr.write("No home config found. Run `grounder setup <path>` first.\n");
       return 1;
     }
 

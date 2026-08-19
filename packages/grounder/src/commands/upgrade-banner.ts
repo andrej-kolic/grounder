@@ -5,9 +5,9 @@ import { packageVersionNotice } from "./package-version-notice.js";
 /**
  * Stderr notice when the running Grounder version and the version stored for
  * this machine's configuration disagree (ordered by version when both look like
- * x.y.z). Prints on ordinary commands until migrate or vault init updates state.
+ * x.y.z). Prints on ordinary commands until migrate or setup updates state.
  * Silent if state is missing or broken. Skip for `handoff peek` (session hooks),
- * `migrate`, and `vault init` (those update state themselves).
+ * `migrate`, and `setup` (those update state themselves).
  */
 export async function notifyUpgradeIfNeeded(homeDir?: string): Promise<void> {
   try {

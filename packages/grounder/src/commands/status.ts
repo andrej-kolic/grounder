@@ -27,9 +27,9 @@ export interface StatusOptions {
 }
 
 const LABEL_WIDTH = 12;
-const VAULT_INIT = "grounder vault init <path>";
-const REPO_INIT = "grounder init";
-const REPO_INIT_FORCE = "grounder init --force";
+const VAULT_INIT = "grounder setup <path>";
+const REPO_INIT = "grounder link";
+const REPO_INIT_FORCE = "grounder link --force";
 const MIGRATE = "grounder migrate";
 const MIGRATE_FORCE = "grounder migrate --force";
 const UPGRADE_GROUNDER = "upgrade grounder";
@@ -51,7 +51,7 @@ function writeAncestorNoteIfAny(cwd: string, linkedRoot: string): void {
   process.stdout.write(
     statusLine(
       "Note:",
-      `linked ancestor — ${cwd} itself is unlinked; grounder init here would create a separate project`,
+      `linked ancestor — ${cwd} itself is unlinked; grounder link here would create a separate project`,
     ),
   );
 }

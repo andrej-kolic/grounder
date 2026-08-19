@@ -24,8 +24,8 @@ describe("help", () => {
     expect(resolveCommandHelp(["plan", "list"])?.id).toBe("plan list");
     expect(resolveCommandHelp(["note", "list"])?.id).toBe("note list");
     expect(resolveCommandHelp(["handoff"])?.id).toBe("handoff");
-    expect(resolveCommandHelp(["vault"])?.id).toBe("vault");
-    expect(resolveCommandHelp(["vault", "init"])?.id).toBe("vault init");
+    expect(resolveCommandHelp(["vault"])).toBeUndefined();
+    expect(resolveCommandHelp(["setup"])?.id).toBe("setup");
     expect(resolveCommandHelp(["path", "plans"])?.id).toBe("path plans");
     expect(resolveCommandHelp(["nope"])).toBeUndefined();
   });
@@ -65,9 +65,8 @@ describe("help", () => {
       expect(chunks.join("")).toContain("--dry-run");
 
       chunks.length = 0;
-      expect(runHelp(["vault"])).toBe(0);
-      expect(chunks.join("")).toContain("Usage: grounder vault init");
-      expect(chunks.join("")).toContain("Subcommands:");
+      expect(runHelp(["setup"])).toBe(0);
+      expect(chunks.join("")).toContain("Usage: grounder setup");
     } finally {
       spy.mockRestore();
     }

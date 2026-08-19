@@ -16,7 +16,7 @@ import { hookFileGrounderPeekCommands, runtimeInvocation } from "../../src/agent
 import { createTempEnv, type TempEnv, withGroundedHome } from "../helpers.js";
 
 /**
- * Behavioral e2e: drives `vault init` + `init` through the real built CLI
+ * Behavioral e2e: drives `setup` + `link` through the real built CLI
  * (subprocess, temp HOME/vault/repo — same shape as `test/cli.test.ts`), then
  * executes the exact runtime-prefixed shell strings baked into the installed
  * command files and hook configs, exactly as Cursor/Claude would run them
@@ -102,15 +102,15 @@ describe("e2e/agent-pipeline", () => {
     env = await createTempEnv({ packageName: "e2e-demo-app" });
     grounded = withGroundedHome(env.home);
 
-    const vaultInit = runCli(
-      ["vault", "init", env.vault, "--agent", "cursor", "--agent", "claude", "--hooks", "--yes"],
+    const setupResult = runCli(
+      ["setup", env.vault, "--agent", "cursor", "--agent", "claude", "--hooks", "--yes"],
       grounded,
       env.repo,
     );
-    assertOk(vaultInit, "vault init");
+    assertOk(setupResult, "setup");
 
-    const repoInit = runCli(["init", "--yes"], grounded, env.repo);
-    assertOk(repoInit, "init");
+    const linkResult = runCli(["link", "--yes"], grounded, env.repo);
+    assertOk(linkResult, "link");
   });
 
   afterAll(async () => {

@@ -4,8 +4,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runHandoffWithOptions } from "../../src/commands/handoff.js";
-import { runRepoInitWithOptions } from "../../src/commands/repo/init.js";
-import { runVaultInitWithOptions } from "../../src/commands/vault/init.js";
+import { runLinkWithOptions } from "../../src/commands/link.js";
+import { runSetupWithOptions } from "../../src/commands/setup.js";
 import { currentBranch } from "../../src/connector/git.js";
 import { createTempEnv, withGroundedHome } from "../helpers.js";
 
@@ -40,8 +40,8 @@ describe("commands/handoff", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const fixedTime = new Date("2026-06-26T14:30:00");
     const code = await runHandoffWithOptions({
@@ -78,8 +78,8 @@ describe("commands/handoff", () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const result = runCli(
       ["handoff", "# Handoff\n\n## Next\n1. ship it", "--title", "session"],
@@ -96,8 +96,8 @@ describe("commands/handoff", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    await runVaultInitWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const nested = path.join(env.repo, "src", "nested");
     await mkdir(nested, { recursive: true });

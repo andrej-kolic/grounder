@@ -42,11 +42,11 @@ export interface DoctorOptions {
   global?: boolean;
 }
 
-const VAULT_INIT = "grounder vault init <path>";
+const VAULT_INIT = "grounder setup <path>";
 const MIGRATE = "grounder migrate";
 const MIGRATE_FORCE = "grounder migrate --force";
 const MIGRATE_HOOKS = "grounder migrate --hooks";
-const REPO_INIT = "grounder init";
+const REPO_INIT = "grounder link";
 const UPGRADE_GROUNDER = "upgrade grounder";
 
 /** First baked Node path that is missing or not executable; `null` if all ok / none found. */
@@ -138,7 +138,7 @@ async function checkVault(home: Awaited<ReturnType<typeof readHomeConfig>>): Pro
       check: failCheck(
         "vault",
         `${vaultRoot} missing or not a directory`,
-        "Fix path or re-run vault init",
+        "Fix path or re-run setup",
       ),
       vaultRoot: null,
     };
@@ -615,7 +615,7 @@ async function runProjectChecks(
     const ancestorNote =
       linkedRoot === cwd
         ? ""
-        : ` — ancestor of ${cwd}; this folder itself is unlinked (grounder init here would create a separate project)`;
+        : ` — ancestor of ${cwd}; this folder itself is unlinked (grounder link here would create a separate project)`;
     checks.push(
       okCheck(
         "repo-config",

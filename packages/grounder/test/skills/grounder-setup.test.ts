@@ -87,11 +87,11 @@ describe("skills/grounder-setup", () => {
     expect(keys).not.toContain("context");
   });
 
-  it("previews vault init and init via --dry-run instead of listing writes", async () => {
+  it("previews setup and link via --dry-run instead of listing writes", async () => {
     const content = await readFile(skillPath, "utf8");
-    expect(content).toContain("vault init <path> --hooks --dry-run");
-    expect(content).toContain("init --dry-run");
-    expect(content).not.toContain("`vault init` writes:");
+    expect(content).toContain("setup <path> --hooks --dry-run");
+    expect(content).toContain("link --dry-run");
+    expect(content).not.toContain("`setup` writes:");
     expect(content).not.toContain("`init` writes:");
   });
 
@@ -107,9 +107,9 @@ describe("skills/grounder-setup", () => {
     const content = await readFile(skillPath, "utf8");
     expect(content).toContain("Already linked (would skip).");
     expect(content).toContain("Remaining writes come from **current** state");
-    expect(content).toContain("do not preview `init` for them");
+    expect(content).toContain("do not preview `link` for them");
     expect(content).toContain("Missing Connect does not change that");
-    expect(content).toContain("If Link is `done`, skip `init`");
+    expect(content).toContain("If Link is `done`, skip `link`");
   });
 
   it("narrates a four-step board then connect/link/refresh lines before dry-run", async () => {

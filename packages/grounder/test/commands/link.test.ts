@@ -2,13 +2,13 @@ import { execSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runRepoInitWithOptions } from "../../../src/commands/repo/init.js";
-import { writeHomeConfig } from "../../../src/connector/home.js";
-import { readRepoConfig, repoConfigPath } from "../../../src/connector/repo.js";
-import { fileExists } from "../../../src/util/fs.js";
-import { captureStdout, createTempEnv } from "../../helpers.js";
+import { runLinkWithOptions } from "../../src/commands/link.js";
+import { writeHomeConfig } from "../../src/connector/home.js";
+import { readRepoConfig, repoConfigPath } from "../../src/connector/repo.js";
+import { fileExists } from "../../src/util/fs.js";
+import { captureStdout, createTempEnv } from "../helpers.js";
 
-describe("commands/repo/init", () => {
+describe("commands/link", () => {
   let cleanup: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
@@ -30,7 +30,7 @@ describe("commands/repo/init", () => {
     cleanup = env.cleanup;
 
     const { code, out } = await captureStdout(() =>
-      runRepoInitWithOptions({
+      runLinkWithOptions({
         cwd: env.repo,
         dryRun: true,
         homeDir: env.home,
@@ -61,8 +61,8 @@ describe("commands/repo/init", () => {
     const env = await setupLinkedEnv("old-name");
     cleanup = env.cleanup;
 
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
-    const code = await runRepoInitWithOptions({
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const code = await runLinkWithOptions({
       cwd: env.repo,
       dryRun: true,
       id: "new-id",
@@ -77,7 +77,7 @@ describe("commands/repo/init", () => {
     const env = await setupLinkedEnv();
     cleanup = env.cleanup;
 
-    const code = await runRepoInitWithOptions({
+    const code = await runLinkWithOptions({
       cwd: env.repo,
       yes: true,
       homeDir: env.home,
@@ -95,9 +95,9 @@ describe("commands/repo/init", () => {
     const env = await setupLinkedEnv();
     cleanup = env.cleanup;
 
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     const { code, out } = await captureStdout(() =>
-      runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home }),
+      runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home }),
     );
 
     expect(code).toBe(0);
@@ -111,9 +111,9 @@ describe("commands/repo/init", () => {
     const env = await setupLinkedEnv();
     cleanup = env.cleanup;
 
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     const { code, out } = await captureStdout(() =>
-      runRepoInitWithOptions({
+      runLinkWithOptions({
         cwd: env.repo,
         dryRun: true,
         homeDir: env.home,
@@ -131,9 +131,9 @@ describe("commands/repo/init", () => {
     const env = await setupLinkedEnv();
     cleanup = env.cleanup;
 
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     const { code, out } = await captureStdout(() =>
-      runRepoInitWithOptions({
+      runLinkWithOptions({
         cwd: env.repo,
         dryRun: true,
         force: true,
@@ -151,8 +151,8 @@ describe("commands/repo/init", () => {
     const env = await setupLinkedEnv("old-name");
     cleanup = env.cleanup;
 
-    await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
-    const code = await runRepoInitWithOptions({
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const code = await runLinkWithOptions({
       cwd: env.repo,
       yes: true,
       force: true,
@@ -169,7 +169,7 @@ describe("commands/repo/init", () => {
     cleanup = env.cleanup;
     process.env.GROUNDER_HOME = env.home;
 
-    const code = await runRepoInitWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const code = await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     expect(code).toBe(1);
   });
 
@@ -188,7 +188,7 @@ describe("commands/repo/init", () => {
       `${JSON.stringify({ name: "child-app" }, null, 2)}\n`,
     );
 
-    const code = await runRepoInitWithOptions({
+    const code = await runLinkWithOptions({
       cwd: packageDir,
       yes: true,
       homeDir: env.home,
@@ -208,7 +208,7 @@ describe("commands/repo/init", () => {
     process.env.GROUNDER_HOME = env.home;
     await writeHomeConfig({ vaultRoot: env.vault });
 
-    const code = await runRepoInitWithOptions({
+    const code = await runLinkWithOptions({
       cwd: env.repo,
       yes: true,
       id: "my-folder",
