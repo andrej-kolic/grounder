@@ -187,31 +187,21 @@ describe("commands/vault/init", () => {
     await mkdir(path.dirname(homeConfigPath(env.home)), { recursive: true });
     await writeFile(homeConfigPath(env.home), "{not-json", "utf8");
 
-    const stderrChunks: string[] = [];
-    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-      stderrChunks.push(String(chunk));
-      return true;
-    });
+    const { code, out } = await captureStdout(() =>
+      runVaultInitWithOptions({
+        vaultPath: env.vault,
+        dryRun: true,
+        homeDir: env.home,
+        agents: [],
+      }),
+    );
 
-    try {
-      const { code, out } = await captureStdout(() =>
-        runVaultInitWithOptions({
-          vaultPath: env.vault,
-          dryRun: true,
-          homeDir: env.home,
-          agents: [],
-        }),
-      );
-
-      expect(code).toBe(0);
-      const stderrOut = stderrChunks.join("");
-      expect(stderrOut).toContain("Note: existing home config was invalid and will be replaced");
-      expect(stderrOut).toContain(`Invalid home config at ${homeConfigPath(env.home)}`);
-      expect(out).toContain(`Vault root: ${env.vault}`);
-      expect(out).toContain("Would write:");
-    } finally {
-      stderrSpy.mockRestore();
-    }
+    expect(code).toBe(0);
+    expect(out).toContain("Would replace invalid home config (");
+    expect(out).not.toContain("grounder vault init <path> to repair");
+    expect(out).not.toContain("Invalid home config at");
+    expect(out).toContain(`Vault root: ${env.vault}`);
+    expect(out).toContain("Would write:");
   });
 
   it("self-heals a corrupt home config on apply, without needing --force", async () => {
@@ -232,6 +222,38 @@ describe("commands/vault/init", () => {
     expect(JSON.parse(await readFile(homeConfigPath(env.home), "utf8"))).toEqual({
       vaultRoot: env.vault,
     });
+  });
+
+  it("dry-run fails when state.json is corrupt instead of hiding the problem", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await mkdir(path.dirname(statePath(env.home)), { recursive: true });
+    await writeFile(statePath(env.home), "{not-json", "utf8");
+
+    const stderrChunks: string[] = [];
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderrChunks.push(String(chunk));
+      return true;
+    });
+
+    try {
+      const { code, out } = await captureStdout(() =>
+        runVaultInitWithOptions({
+          vaultPath: env.vault,
+          dryRun: true,
+          homeDir: env.home,
+          agents: ["cursor"],
+        }),
+      );
+
+      expect(code).toBe(1);
+      expect(out).toContain("Would write:");
+      const stderrOut = stderrChunks.join("");
+      expect(stderrOut).toContain("Dry run failed: agent install would not succeed");
+    } finally {
+      stderrSpy.mockRestore();
+    }
   });
 
   it("reports partial success when state.json is corrupt during first-time vault init", async () => {

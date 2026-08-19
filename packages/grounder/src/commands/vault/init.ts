@@ -4,10 +4,12 @@ import { resolveAgents } from "../../agents/index.js";
 import {
   type HomeConfig,
   homeConfigPath,
+  InvalidHomeConfigError,
   readHomeConfig,
   withHomeDir,
   writeHomeConfig,
 } from "../../connector/home.js";
+import { assertAgentSchemasSupported, readGrounderState } from "../../connector/state.js";
 import { helpExitCode } from "../../help.js";
 import { flagBool, flagStrings, parseArgs } from "../../util/parse-args.js";
 import { resolveUserPath } from "../../util/path.js";
@@ -37,13 +39,18 @@ export interface VaultInitOptions {
  */
 async function readExistingHomeForInit(): Promise<{
   home: HomeConfig | null;
-  invalidDetail: string | null;
+  invalidReason: string | null;
 }> {
   try {
-    return { home: await readHomeConfig(), invalidDetail: null };
+    return { home: await readHomeConfig(), invalidReason: null };
   } catch (error: unknown) {
-    const detail = error instanceof Error ? error.message : String(error);
-    return { home: null, invalidDetail: detail };
+    const reason =
+      error instanceof InvalidHomeConfigError
+        ? error.reason
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    return { home: null, invalidReason: reason };
   }
 }
 
@@ -85,7 +92,7 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
     const dryRun = options.dryRun ?? false;
     const homeDir = options.homeDir;
 
-    const { home: existingHome, invalidDetail } = await readExistingHomeForInit();
+    const { home: existingHome, invalidReason } = await readExistingHomeForInit();
     const projectsDir = projectsParent(vaultRoot);
     const agents = await resolveAgents(options.agents);
 
@@ -96,9 +103,11 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
       return 1;
     }
 
-    if (invalidDetail) {
-      process.stderr.write(
-        `Note: existing home config was invalid and will be replaced (${invalidDetail}).\n`,
+    if (invalidReason) {
+      process.stdout.write(
+        dryRun
+          ? `Would replace invalid home config (${invalidReason}).\n`
+          : `Will replace invalid home config (${invalidReason}).\n`,
       );
     }
     process.stdout.write(`Vault root: ${vaultRoot}\n`);
@@ -126,6 +135,14 @@ export async function runVaultInitWithOptions(options: VaultInitOptions): Promis
     process.stdout.write("\n");
 
     if (dryRun) {
+      try {
+        const state = await readGrounderState(homeDir);
+        assertAgentSchemasSupported(state, agents);
+      } catch (error: unknown) {
+        const detail = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`Dry run failed: agent install would not succeed:\n  ${detail}\n`);
+        return 1;
+      }
       return 0;
     }
 

@@ -7,6 +7,20 @@ export interface HomeConfig {
   vaultRoot: string;
 }
 
+export class InvalidHomeConfigError extends Error {
+  readonly configPath: string;
+  readonly reason: string;
+
+  constructor(configPath: string, reason: string) {
+    super(
+      `Invalid home config at ${configPath}: ${reason}. Run: grounder vault init <path> to repair (recreates this file).`,
+    );
+    this.name = "InvalidHomeConfigError";
+    this.configPath = configPath;
+    this.reason = reason;
+  }
+}
+
 export function resolveHomeDir(override?: string): string {
   if (override) {
     return override;
@@ -61,14 +75,10 @@ export async function readHomeConfig(): Promise<HomeConfig | null> {
     raw = JSON.parse(await readFile(configPath, "utf8")) as Partial<HomeConfig>;
   } catch (error: unknown) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(
-      `Invalid home config at ${configPath}: ${detail}. Run: grounder vault init <path> to repair (recreates this file).`,
-    );
+    throw new InvalidHomeConfigError(configPath, detail);
   }
   if (typeof raw.vaultRoot !== "string" || raw.vaultRoot.length === 0) {
-    throw new Error(
-      `Invalid home config at ${configPath}: missing vaultRoot. Run: grounder vault init <path> to repair (recreates this file).`,
-    );
+    throw new InvalidHomeConfigError(configPath, "missing vaultRoot");
   }
 
   return { vaultRoot: raw.vaultRoot };
