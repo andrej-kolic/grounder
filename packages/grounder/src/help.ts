@@ -135,6 +135,21 @@ Subcommands:
   --limit <n>  Max plans to print (default: 5)`,
   },
   {
+    id: "search",
+    group: "Write",
+    summary: "Search linked project vault for keywords (scoped retrieval)",
+    listUsage: "search <query>",
+    usage:
+      "grounder search <query> [--terms <csv>] [--limit <n>] [--max-hits <n>] [--context <n>] [--markdown] [--json]",
+    flags: `Flags:
+  --terms <csv>   Extra keyword variants (comma-separated)
+  --limit <n>     Max files to print (default: 10)
+  --max-hits <n>  Stop after this many line matches (default: 200)
+  --context <n>   Context lines around each snippet (default: 1)
+  --markdown      Agent relay: file:// links + quoted snippets
+  --json          Structured output ({ query, terms, summary, hits[] })`,
+  },
+  {
     id: "path notes",
     group: "Paths",
     summary: "Print resolved notes directory",
@@ -238,6 +253,7 @@ export const DISPATCHED_COMMAND_IDS = [
   "handoff peek",
   "plan",
   "plan list",
+  "search",
   "path",
   "path notes",
   "path logs",

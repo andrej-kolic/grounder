@@ -1,0 +1,243 @@
+import path from "node:path";
+import { withHomeDir } from "../connector/home.js";
+import { resolveProjectVaultRoot } from "../connector/vault.js";
+import { helpExitCode } from "../help.js";
+import { flagBool, flagString, parseArgs } from "../util/parse-args.js";
+import { type SearchOutcome, searchVault } from "../vault/search.js";
+import { requireLinkedProject } from "./require-linked.js";
+
+/** Options for {@link runSearchWithOptions} (CLI parsing and tests). */
+export interface SearchCommandOptions {
+  cwd?: string;
+  homeDir?: string;
+  query: string;
+  terms?: string[];
+  limit?: number;
+  maxHits?: number;
+  context?: number;
+  markdown?: boolean;
+  json?: boolean;
+}
+
+const DEFAULT_LIMIT = 10;
+const DEFAULT_MAX_HITS = 200;
+const DEFAULT_CONTEXT = 1;
+
+const USAGE =
+  "Usage: grounder search <query> [--terms <csv>] [--limit <n>] [--max-hits <n>] [--context <n>] [--markdown] [--json]\n";
+
+function usageError(): number {
+  process.stderr.write(USAGE);
+  return 1;
+}
+
+function parsePositiveInt(raw: string | boolean | undefined, label: string): number | null {
+  if (raw === undefined) {
+    return null;
+  }
+  if (typeof raw !== "string") {
+    return null;
+  }
+  const trimmed = raw.trim();
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!/^\d+$/.test(trimmed) || Number.isNaN(parsed) || parsed < 1) {
+    process.stderr.write(`Invalid ${label}: must be a positive integer.\n`);
+    return null;
+  }
+  return parsed;
+}
+
+function parseTermsCsv(raw: string | undefined): string[] {
+  if (!raw) {
+    return [];
+  }
+  return raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+function fileStem(filePath: string): string {
+  return path.basename(filePath, ".md");
+}
+
+function formatSummary(outcome: SearchOutcome): string {
+  if (outcome.totalMatchCount === 0) {
+    return `No matches for "${outcome.query}".`;
+  }
+  return `Found ${outcome.totalMatchCount} matches in ${outcome.totalFileCount} files.`;
+}
+
+function writePlainOutput(outcome: SearchOutcome): void {
+  process.stdout.write(`${formatSummary(outcome)}\n`);
+  if (outcome.totalMatchCount === 0) {
+    return;
+  }
+
+  if (outcome.truncated) {
+    process.stdout.write(
+      `Showing top ${outcome.files.length} of ${outcome.totalFileCount} files.\n`,
+    );
+  }
+
+  process.stdout.write("\n");
+
+  outcome.files.forEach((file, index) => {
+    if (index > 0) {
+      process.stdout.write("\n");
+    }
+    const label = fileStem(file.filePath);
+    const topicTag = file.topicsMatch ? " [topics]" : "";
+    process.stdout.write(`${index + 1}. ${label}${topicTag}  \n  ${file.filePath}\n`);
+    for (const hit of file.hits) {
+      const snippet = hit.snippet.replace(/\s+/g, " ").trim();
+      process.stdout.write(`  L${hit.line} (${hit.matchedTerm}): ${snippet}\n`);
+    }
+  });
+}
+
+function fileUri(filePath: string): string {
+  return `file://${filePath}`;
+}
+
+function writeMarkdownOutput(outcome: SearchOutcome): void {
+  process.stdout.write(`${formatSummary(outcome)}\n`);
+  if (outcome.totalMatchCount === 0) {
+    return;
+  }
+
+  if (outcome.truncated) {
+    process.stdout.write(
+      `Showing top ${outcome.files.length} of ${outcome.totalFileCount} files.\n`,
+    );
+  }
+
+  process.stdout.write("\n");
+
+  for (const file of outcome.files) {
+    const label = fileStem(file.filePath);
+    process.stdout.write(`### [${label}](${fileUri(file.filePath)})\n\n`);
+    for (const hit of file.hits) {
+      process.stdout.write(`> L${hit.line} (${hit.matchedTerm}):\n`);
+      for (const line of hit.snippet.split("\n")) {
+        process.stdout.write(`> ${line}\n`);
+      }
+      process.stdout.write("\n");
+    }
+  }
+}
+
+function writeJsonOutput(outcome: SearchOutcome): void {
+  const payload = {
+    query: outcome.query,
+    terms: outcome.terms,
+    summary: formatSummary(outcome),
+    truncated: outcome.truncated,
+    totalMatchCount: outcome.totalMatchCount,
+    totalFileCount: outcome.totalFileCount,
+    hits: outcome.files.map((file) => ({
+      file: file.filePath,
+      mtimeMs: file.mtimeMs,
+      topicsMatch: file.topicsMatch,
+      matches: file.hits.map((hit) => ({
+        line: hit.line,
+        term: hit.matchedTerm,
+        snippet: hit.snippet,
+      })),
+    })),
+  };
+  process.stdout.write(`${JSON.stringify(payload)}\n`);
+}
+
+/**
+ * CLI entry for `grounder search <query>`.
+ * @returns Exit code (`0` on success, `1` on usage or config errors).
+ */
+export async function runSearch(argv: string[]): Promise<number> {
+  const helpCode = helpExitCode(argv, "search");
+  if (helpCode !== null) {
+    return helpCode;
+  }
+
+  const { positional, flags } = parseArgs(argv);
+
+  if (positional.length === 0) {
+    return usageError();
+  }
+
+  const allowedFlags = new Set(["terms", "limit", "max-hits", "context", "markdown", "json"]);
+  for (const key of flags.keys()) {
+    if (!allowedFlags.has(key)) {
+      return usageError();
+    }
+  }
+
+  const markdown = flagBool(flags, "markdown");
+  const json = flagBool(flags, "json");
+  if (markdown && json) {
+    process.stderr.write("Use only one of --markdown or --json.\n");
+    return 1;
+  }
+
+  const limit = parsePositiveInt(flags.get("limit"), "--limit");
+  if (limit === null && flags.has("limit")) {
+    return 1;
+  }
+
+  const maxHits = parsePositiveInt(flags.get("max-hits"), "--max-hits");
+  if (maxHits === null && flags.has("max-hits")) {
+    return 1;
+  }
+
+  const context = parsePositiveInt(flags.get("context"), "--context");
+  if (context === null && flags.has("context")) {
+    return 1;
+  }
+
+  const query = positional.join(" ").trim();
+  if (!query) {
+    return usageError();
+  }
+
+  return runSearchWithOptions({
+    query,
+    terms: parseTermsCsv(flagString(flags, "terms")),
+    limit: limit ?? undefined,
+    maxHits: maxHits ?? undefined,
+    context: context ?? undefined,
+    markdown,
+    json,
+  });
+}
+
+/**
+ * Resolves the linked project, searches its vault root, prints formatted hits.
+ */
+export async function runSearchWithOptions(options: SearchCommandOptions): Promise<number> {
+  return withHomeDir(options.homeDir, async () => {
+    const linked = await requireLinkedProject(options.cwd ?? process.cwd());
+    if (!linked) {
+      return 1;
+    }
+
+    const rootDir = resolveProjectVaultRoot(linked.home, linked.repo);
+    const outcome = await searchVault({
+      rootDir,
+      query: options.query,
+      terms: options.terms,
+      limit: options.limit ?? DEFAULT_LIMIT,
+      maxHits: options.maxHits ?? DEFAULT_MAX_HITS,
+      context: options.context ?? DEFAULT_CONTEXT,
+    });
+
+    if (options.json) {
+      writeJsonOutput(outcome);
+    } else if (options.markdown) {
+      writeMarkdownOutput(outcome);
+    } else {
+      writePlainOutput(outcome);
+    }
+
+    return 0;
+  });
+}
