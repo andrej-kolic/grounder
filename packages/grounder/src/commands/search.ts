@@ -1,7 +1,9 @@
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { withHomeDir } from "../connector/home.js";
 import { resolveProjectVaultRoot } from "../connector/vault.js";
 import { helpExitCode } from "../help.js";
+import { fileExists } from "../util/fs.js";
 import { flagBool, flagString, parseArgs } from "../util/parse-args.js";
 import { type SearchOutcome, searchVault } from "../vault/search.js";
 import { requireLinkedProject } from "./require-linked.js";
@@ -21,7 +23,6 @@ export interface SearchCommandOptions {
 
 const DEFAULT_LIMIT = 10;
 const DEFAULT_MAX_HITS = 200;
-const DEFAULT_CONTEXT = 1;
 
 const USAGE =
   "Usage: grounder search <query> [--terms <csv>] [--limit <n>] [--max-hits <n>] [--context <n>] [--markdown] [--json]\n";
@@ -47,6 +48,22 @@ function parsePositiveInt(raw: string | boolean | undefined, label: string): num
   return parsed;
 }
 
+function parseNonNegativeInt(raw: string | boolean | undefined, label: string): number | null {
+  if (raw === undefined) {
+    return null;
+  }
+  if (typeof raw !== "string") {
+    return null;
+  }
+  const trimmed = raw.trim();
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!/^\d+$/.test(trimmed) || Number.isNaN(parsed) || parsed < 0) {
+    process.stderr.write(`Invalid ${label}: must be a non-negative integer.\n`);
+    return null;
+  }
+  return parsed;
+}
+
 function parseTermsCsv(raw: string | undefined): string[] {
   if (!raw) {
     return [];
@@ -64,6 +81,9 @@ function fileStem(filePath: string): string {
 function formatSummary(outcome: SearchOutcome): string {
   if (outcome.totalMatchCount === 0) {
     return `No matches for "${outcome.query}".`;
+  }
+  if (outcome.truncated) {
+    return `Found ${outcome.totalMatchCount} matches in ${outcome.totalFileCount} files (showing ${outcome.files.length}).`;
   }
   return `Found ${outcome.totalMatchCount} matches in ${outcome.totalFileCount} files.`;
 }
@@ -97,7 +117,15 @@ function writePlainOutput(outcome: SearchOutcome): void {
 }
 
 function fileUri(filePath: string): string {
-  return `file://${filePath}`;
+  return pathToFileURL(filePath).href;
+}
+
+function formatSnippetBlock(snippet: string): string {
+  let fence = "```";
+  while (snippet.includes(fence)) {
+    fence += "`";
+  }
+  return `${fence}\n${snippet}\n${fence}\n`;
 }
 
 function writeMarkdownOutput(outcome: SearchOutcome): void {
@@ -118,10 +146,8 @@ function writeMarkdownOutput(outcome: SearchOutcome): void {
     const label = fileStem(file.filePath);
     process.stdout.write(`### [${label}](${fileUri(file.filePath)})\n\n`);
     for (const hit of file.hits) {
-      process.stdout.write(`> L${hit.line} (${hit.matchedTerm}):\n`);
-      for (const line of hit.snippet.split("\n")) {
-        process.stdout.write(`> ${line}\n`);
-      }
+      process.stdout.write(`L${hit.line} (${hit.matchedTerm}):\n\n`);
+      process.stdout.write(formatSnippetBlock(hit.snippet));
       process.stdout.write("\n");
     }
   }
@@ -189,7 +215,7 @@ export async function runSearch(argv: string[]): Promise<number> {
     return 1;
   }
 
-  const context = parsePositiveInt(flags.get("context"), "--context");
+  const context = parseNonNegativeInt(flags.get("context"), "--context");
   if (context === null && flags.has("context")) {
     return 1;
   }
@@ -221,13 +247,19 @@ export async function runSearchWithOptions(options: SearchCommandOptions): Promi
     }
 
     const rootDir = resolveProjectVaultRoot(linked.home, linked.repo);
+    if (!(await fileExists(rootDir))) {
+      process.stderr.write(`Project vault root not found: ${rootDir}\n`);
+      process.stderr.write("Run: grounder setup <vault-path>\n");
+      return 1;
+    }
+
     const outcome = await searchVault({
       rootDir,
       query: options.query,
       terms: options.terms,
       limit: options.limit ?? DEFAULT_LIMIT,
       maxHits: options.maxHits ?? DEFAULT_MAX_HITS,
-      context: options.context ?? DEFAULT_CONTEXT,
+      ...(options.context !== undefined ? { context: options.context } : {}),
     });
 
     if (options.json) {

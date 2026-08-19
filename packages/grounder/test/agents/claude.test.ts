@@ -42,6 +42,7 @@ describe("agents/claude", () => {
     it("lists the same command paths install writes", () => {
       expect(claude.expectedArtifacts("/home/user")).toEqual([
         "/home/user/.claude/commands/grounder-note.md",
+        "/home/user/.claude/commands/grounder-search.md",
         "/home/user/.claude/commands/grounder-plan.md",
         "/home/user/.claude/commands/grounder-task-handoff.md",
         "/home/user/.claude/commands/grounder-task.md",

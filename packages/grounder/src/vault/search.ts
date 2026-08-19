@@ -25,13 +25,13 @@ export interface SearchOptions {
   query: string;
   /** Extra keyword variants (deduped with query). */
   terms?: readonly string[];
-  /** Max distinct files in the result (default 10). */
+  /** Max distinct files in the result (default 5). */
   limit?: number;
   /** Stop collecting line hits after this many (default 200). */
   maxHits?: number;
   /** Context lines around each match (default 1). */
   context?: number;
-  /** Max line hits kept per file after grouping (default 3). */
+  /** Max line hits kept per file after grouping (default 1). */
   maxHitsPerFile?: number;
 }
 
@@ -47,7 +47,9 @@ export interface SearchOutcome {
 const DEFAULT_LIMIT = 10;
 const DEFAULT_MAX_HITS = 200;
 const DEFAULT_CONTEXT = 1;
-const DEFAULT_MAX_HITS_PER_FILE = 3;
+const DEFAULT_MAX_HITS_PER_FILE = 1;
+/** Cap line hits stored per file during scan (counts stay full for ranking). */
+const MAX_STORED_HITS_PER_FILE = 50;
 
 /** Known vault subfolders — light tiebreaker after recency. */
 const FOLDER_SIGNAL: Readonly<Record<string, number>> = {
@@ -55,6 +57,35 @@ const FOLDER_SIGNAL: Readonly<Record<string, number>> = {
   plans: 2,
   logs: 1,
 };
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Single-token terms only — phrases may contain spaces or punctuation. */
+function isWordLikeTerm(term: string): boolean {
+  return /^[\w-]+$/.test(term);
+}
+
+function pruneOverlappingTerms(query: string, terms: readonly string[]): string[] {
+  const queryKey = query.trim().toLowerCase();
+  return terms.filter((term) => {
+    const lower = term.toLowerCase();
+    if (lower === queryKey) {
+      return true;
+    }
+    return !terms.some((other) => {
+      if (other === term) {
+        return false;
+      }
+      const otherLower = other.toLowerCase();
+      if (otherLower.length <= lower.length || !isWordLikeTerm(term) || !isWordLikeTerm(other)) {
+        return false;
+      }
+      return otherLower.startsWith(lower);
+    });
+  });
+}
 
 function normalizeTerms(query: string, extra?: readonly string[]): string[] {
   const seen = new Set<string>();
@@ -71,15 +102,20 @@ function normalizeTerms(query: string, extra?: readonly string[]): string[] {
     seen.add(key);
     out.push(term);
   }
-  return out;
+  return pruneOverlappingTerms(query, out);
 }
 
 function termMatchesLine(line: string, term: string): boolean {
-  return line.toLowerCase().includes(term.toLowerCase());
+  if (term.includes(" ")) {
+    return line.toLowerCase().includes(term.toLowerCase());
+  }
+  const re = new RegExp(`\\b${escapeRegex(term)}\\b`, "i");
+  return re.test(line);
 }
 
 function findMatchingTerm(line: string, terms: readonly string[]): string | undefined {
-  for (const term of terms) {
+  const byLength = [...terms].sort((a, b) => b.length - a.length);
+  for (const term of byLength) {
     if (termMatchesLine(line, term)) {
       return term;
     }
@@ -102,6 +138,13 @@ function folderSignal(rootDir: string, filePath: string): number {
   const rel = path.relative(rootDir, filePath);
   const first = rel.split(path.sep)[0];
   return first ? (FOLDER_SIGNAL[first] ?? 0) : 0;
+}
+
+/** Deprioritize archived plans/notes — still searchable, ranked lower. */
+function archivePenalty(rootDir: string, filePath: string): number {
+  const rel = path.relative(rootDir, filePath);
+  const segments = rel.split(path.sep);
+  return segments.some((segment) => segment.toLowerCase() === "archive") ? 1 : 0;
 }
 
 function buildSnippet(lines: readonly string[], lineIndex: number, context: number): string {
@@ -147,12 +190,68 @@ interface RawFileHits {
   mtimeMs: number;
   topicsMatch: boolean;
   hits: SearchLineHit[];
+  distinctTermCount: number;
+  totalHitCount: number;
+  filenameTermCount: number;
+  phraseMatch: boolean;
+}
+
+function countFilenameTermMatches(
+  rootDir: string,
+  filePath: string,
+  terms: readonly string[],
+): number {
+  const rel = path.relative(rootDir, filePath);
+  const haystack = rel.replace(/[/\\]/g, " ").replace(/\.md$/i, "").toLowerCase();
+  let count = 0;
+  for (const term of terms) {
+    const lower = term.toLowerCase();
+    if (lower.includes(" ")) {
+      if (haystack.includes(lower)) {
+        count++;
+      }
+      continue;
+    }
+    const re = new RegExp(`\\b${escapeRegex(lower)}\\b`, "i");
+    if (re.test(haystack)) {
+      count++;
+    }
+  }
+  return count;
+}
+
+function contentHasPhrase(content: string, query: string): boolean {
+  const trimmed = query.trim();
+  if (!trimmed.includes(" ")) {
+    return false;
+  }
+  return content.toLowerCase().includes(trimmed.toLowerCase());
+}
+
+function relevanceScore(file: RawFileHits): number {
+  return (
+    file.distinctTermCount * 1000 +
+    Math.min(file.totalHitCount, 100) * 10 +
+    (file.topicsMatch ? 500 : 0) +
+    file.filenameTermCount * 200 +
+    (file.phraseMatch ? 300 : 0)
+  );
+}
+
+function pickBestHits(hits: SearchLineHit[], maxHitsPerFile: number): SearchLineHit[] {
+  if (hits.length <= maxHitsPerFile) {
+    return hits;
+  }
+  const sorted = [...hits].sort((a, b) => b.matchedTerm.length - a.matchedTerm.length);
+  return sorted.slice(0, maxHitsPerFile);
 }
 
 /**
  * Case-insensitive markdown scan under `rootDir`.
  * Frontmatter `topics:` matches boost file ranking; body and frontmatter lines
- * both contribute line hits. Pure fs — no index, no deps.
+ * both contribute line hits. Files rank by relevance (distinct terms, hit
+ * density, filename/path terms, topics), then archive, recency, folder.
+ * Pure fs — no index, no deps.
  */
 export async function searchVault(options: SearchOptions): Promise<SearchOutcome> {
   const terms = normalizeTerms(options.query, options.terms);
@@ -160,6 +259,7 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
   const maxHits = options.maxHits ?? DEFAULT_MAX_HITS;
   const context = options.context ?? DEFAULT_CONTEXT;
   const maxHitsPerFile = options.maxHitsPerFile ?? DEFAULT_MAX_HITS_PER_FILE;
+  const perFileStoreCap = Math.min(MAX_STORED_HITS_PER_FILE, maxHits);
 
   if (terms.length === 0) {
     return {
@@ -175,13 +275,8 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
   const filePaths = await listMarkdownFiles(options.rootDir);
   const rawFiles: RawFileHits[] = [];
   let totalMatchCount = 0;
-  let stopScan = false;
 
   for (const filePath of filePaths) {
-    if (stopScan) {
-      break;
-    }
-
     let content: string;
     let mtimeMs: number;
     try {
@@ -194,43 +289,55 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
     const frontmatter = parseHandoffFrontmatter(content);
     const topicsMatch = topicsMatchTerms(frontmatter.topics, terms);
     const fileHits: SearchLineHit[] = [];
+    const matchedTerms = new Set<string>();
+    let totalHitCount = 0;
 
     for (let i = 0; i < lines.length; i++) {
-      if (totalMatchCount >= maxHits) {
-        stopScan = true;
-        break;
-      }
-
       const line = lines[i] ?? "";
       const matchedTerm = findMatchingTerm(line, terms);
       if (!matchedTerm) {
         continue;
       }
 
-      fileHits.push({
-        line: i + 1,
-        matchedTerm,
-        snippet: buildSnippet(lines, i, context),
-      });
+      matchedTerms.add(matchedTerm.toLowerCase());
+      totalHitCount++;
       totalMatchCount++;
+
+      if (fileHits.length < perFileStoreCap) {
+        fileHits.push({
+          line: i + 1,
+          matchedTerm,
+          snippet: buildSnippet(lines, i, context),
+        });
+      }
     }
 
-    if (fileHits.length > 0) {
+    if (matchedTerms.size > 0) {
       rawFiles.push({
         filePath,
         mtimeMs,
         topicsMatch,
-        hits: fileHits.slice(0, maxHitsPerFile),
+        hits: fileHits,
+        distinctTermCount: matchedTerms.size,
+        totalHitCount,
+        filenameTermCount: countFilenameTermMatches(options.rootDir, filePath, terms),
+        phraseMatch: contentHasPhrase(content, options.query),
       });
     }
   }
 
   rawFiles.sort((a, b) => {
+    const scoreDiff = relevanceScore(b) - relevanceScore(a);
+    if (scoreDiff !== 0) {
+      return scoreDiff;
+    }
+    const archiveDiff =
+      archivePenalty(options.rootDir, a.filePath) - archivePenalty(options.rootDir, b.filePath);
+    if (archiveDiff !== 0) {
+      return archiveDiff;
+    }
     if (a.mtimeMs !== b.mtimeMs) {
       return b.mtimeMs - a.mtimeMs;
-    }
-    if (a.topicsMatch !== b.topicsMatch) {
-      return a.topicsMatch ? -1 : 1;
     }
     const folderDiff =
       folderSignal(options.rootDir, b.filePath) - folderSignal(options.rootDir, a.filePath);
@@ -246,7 +353,7 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
     filePath,
     mtimeMs,
     topicsMatch,
-    hits,
+    hits: pickBestHits(hits, maxHitsPerFile),
   }));
 
   return {

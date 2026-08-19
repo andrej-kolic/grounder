@@ -272,7 +272,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("warn  install-state");
     expect(out).toContain("install state missing (pre-ledger / never migrated)");
     expect(out).toContain("warn  agent-cursor");
-    expect(out).toContain("Cursor: 4 command file(s) locally modified (needs --force to refresh)");
+    expect(out).toContain("Cursor: 5 command file(s) locally modified (needs --force to refresh)");
     expect(out).toContain("grounder migrate --force");
     // Hooks content is still current — no schema-int warn without a ledger.
     expect(out).toContain("ok    agent-cursor-hooks");
@@ -311,7 +311,7 @@ describe("commands/doctor", () => {
 
     expect(code).toBe(0);
     expect(out).toContain("warn  agent-cursor");
-    expect(out).toContain("Cursor: 4 command file(s) locally modified (needs --force to refresh)");
+    expect(out).toContain("Cursor: 5 command file(s) locally modified (needs --force to refresh)");
     expect(out).toContain("grounder migrate --force");
     expect(out).not.toContain("package-version");
     expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
