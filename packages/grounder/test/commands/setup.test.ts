@@ -89,7 +89,7 @@ describe("commands/setup", () => {
       grounderVersion: VERSION,
       agents: {
         cursor: {
-          commandsSchema: 2,
+          commandsSchema: 3,
           files: await expectedFileLedger(cursor.expectedArtifacts(env.home)),
         },
       },
@@ -354,12 +354,12 @@ describe("commands/setup", () => {
         grounderVersion: VERSION,
         agents: {
           cursor: {
-            commandsSchema: 2,
+            commandsSchema: 3,
             hooksSchema: 1,
             files: await expectedFileLedger(cursor.expectedArtifacts(env.home)),
           },
           claude: {
-            commandsSchema: 2,
+            commandsSchema: 3,
             hooksSchema: 1,
             files: await expectedFileLedger(claude.expectedArtifacts(env.home)),
           },

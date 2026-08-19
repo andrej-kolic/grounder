@@ -466,7 +466,7 @@ describe("commands/doctor", () => {
     expect(code).toBe(0);
     expect(out).toContain("warn  agent-cursor");
     expect(out).toContain(
-      "Cursor: commands schema behind in ledger (recorded 1, current 2; files match)",
+      "Cursor: commands schema behind in ledger (recorded 1, current 3; files match)",
     );
     expect(out).toContain("→ grounder migrate");
     expect(out).toContain("ok    agent-cursor-hooks");
@@ -678,7 +678,7 @@ describe("commands/doctor", () => {
 
     expect(code).toBe(1);
     expect(out).toContain("fail  agent-cursor");
-    expect(out).toContain("commands schema newer than this grounder (recorded 99, supported 2)");
+    expect(out).toContain("commands schema newer than this grounder (recorded 99, supported 3)");
     expect(out).toContain("fail  agent-cursor-hooks");
     expect(out).toContain("hooks schema newer than this grounder (recorded 50, supported 1)");
     expect(out).toContain("upgrade grounder");
