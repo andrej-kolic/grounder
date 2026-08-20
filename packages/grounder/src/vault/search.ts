@@ -221,8 +221,12 @@ interface RawFileHits {
   hits: SearchLineHit[];
   distinctTermCount: number;
   totalHitCount: number;
+  /** IDF-weighted density — computed after the full walk using global termDocFreq. */
+  idfDensity: number;
   filenameTermCount: number;
   phraseMatch: boolean;
+  /** Per-term line-hit counts for this file; used to compute idfDensity. */
+  perTermHits: Map<string, number>;
 }
 
 function countFilenameTermMatches(
@@ -260,7 +264,7 @@ function contentHasPhrase(content: string, query: string): boolean {
 function relevanceScore(file: RawFileHits, rootDir: string, query: string): number {
   return (
     file.distinctTermCount * 1000 +
-    Math.min(file.totalHitCount, 100) * 10 +
+    Math.min(file.idfDensity, 100) * 10 +
     (file.topicsMatch ? 800 : 0) +
     file.filenameTermCount * 200 +
     (file.phraseMatch ? 300 : 0) -
@@ -328,6 +332,7 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
     const topicsMatch = topicsMatchTerms(frontmatter.topics, terms);
     const fileHits: SearchLineHit[] = [];
     const matchedTerms = new Set<string>();
+    const perTermHits = new Map<string, number>();
     let totalHitCount = 0;
 
     for (let i = 0; i < lines.length; i++) {
@@ -339,6 +344,7 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
 
       const termKey = matchedTerm.toLowerCase();
       matchedTerms.add(termKey);
+      perTermHits.set(termKey, (perTermHits.get(termKey) ?? 0) + 1);
       totalHitCount++;
       totalMatchCount++;
 
@@ -362,10 +368,22 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
         hits: fileHits,
         distinctTermCount: matchedTerms.size,
         totalHitCount,
+        idfDensity: 0,
         filenameTermCount: countFilenameTermMatches(options.rootDir, filePath, terms),
         phraseMatch: contentHasPhrase(content, options.query),
+        perTermHits,
       });
     }
+  }
+
+  // Scale hit density by IDF so rare identifiers outweigh common tokens like "grounder".
+  for (const file of rawFiles) {
+    let density = 0;
+    for (const [term, count] of file.perTermHits) {
+      const df = termHitCounts[term] ?? 1;
+      density += count / Math.log(1 + df);
+    }
+    file.idfDensity = density;
   }
 
   rawFiles.sort((a, b) => {

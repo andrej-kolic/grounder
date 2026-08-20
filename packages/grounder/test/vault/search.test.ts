@@ -109,6 +109,43 @@ describe("vault/search", () => {
     }
   });
 
+  it("IDF: rare-term file outranks common-term file at equal distinctTermCount", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "grounder-search-"));
+    try {
+      // Seed 8 files containing "grounder" → high df → heavy IDF discount.
+      for (let i = 0; i < 8; i++) {
+        await writeMd(rootDir, `notes/note-${i}.md`, "grounder setup grounder grounder\n");
+      }
+      // commonPath: 4 hits of the ubiquitous term "grounder" (df≈9).
+      const commonPath = await writeMd(
+        rootDir,
+        "plans/common.md",
+        "grounder grounder grounder grounder\n",
+      );
+      // rarePath: 3 hits of a rare identifier "hooksSchema" (df=1).
+      const rarePath = await writeMd(
+        rootDir,
+        "plans/rare.md",
+        "hooksSchema hooksSchema hooksSchema\n",
+      );
+
+      const outcome = await searchVault({
+        rootDir,
+        query: "grounder",
+        terms: ["hooksSchema"],
+        limit: 5,
+      });
+
+      const filePaths = outcome.files.map((f) => f.filePath);
+      // rarePath matches only one term; commonPath matches only one term.
+      // IDF discounts the ubiquitous "grounder" more heavily than the rare
+      // "hooksSchema", so rarePath should rank above commonPath.
+      expect(filePaths.indexOf(rarePath)).toBeLessThan(filePaths.indexOf(commonPath));
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
+  });
+
   it("ranks non-archive files above archive when relevance is equal", async () => {
     const rootDir = await mkdtemp(path.join(os.tmpdir(), "grounder-search-"));
     try {
