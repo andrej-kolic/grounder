@@ -9,3 +9,4 @@ coverage/
 
 .grounder.json
 fixtures/dev/.grounder.json
+.tmp/
