@@ -144,7 +144,7 @@ Subcommands:
     flags: `Flags:
   --terms <csv>   Extra keyword variants (comma-separated)
   --limit <n>     Max files to print (default: 10)
-  --max-hits <n>  Stop after this many line matches (default: 200)
+  --max-hits <n>  Max stored line snippets per file (default: 200; hard cap 50)
   --context <n>   Context lines around each snippet (default: 1)
   --since <date>  Only files modified on or after date (YYYY-MM-DD or Nd, e.g. 7d)
   --after <date>  Alias for --since

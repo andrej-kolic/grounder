@@ -208,6 +208,7 @@ See [Upgrading](#upgrading) for the usual post-package-upgrade flow. Untouched c
 | Flag             | Commands                    | Description                                                                                             |
 | ---------------- | --------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `--title <slug>` | `note`, `handoff`           | Filename slug (default: slugified text / first line)                                                    |
+| `--topics <list>` | `note`, `handoff`          | Comma-separated keywords written to `topics:` frontmatter for search (e.g. `auth,jwt,session`)         |
 | `--limit <n>`    | `note list`                 | Max notes to print (default: 5)                                                                         |
 | `--limit <n>`    | `handoff list`              | Max handoffs to print (default: 5)                                                                      |
 | `--limit <n>`    | `plan list`                 | Max plans to print (default: 5)                                                                         |
@@ -223,6 +224,7 @@ See [Upgrading](#upgrading) for the usual post-package-upgrade flow. Untouched c
 | ---------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--title <name>` | `plan`   | Filename stem when creating/updating by name (trailing `.md` ok; sanitized, max 80 chars; no auto-slug). Mutually exclusive with `--path`.                 |
 | `--path <file>`  | `plan`   | Update an existing plan by path (must resolve under this project's `plans/`; no title sanitization; always overwrites). Mutually exclusive with `--title`. |
+| `--topics <list>` | `plan`  | Comma-separated keywords written to `topics:` frontmatter for search (e.g. `caching,redis,api`).                                                         |
 | `--force`        | `plan`   | With `--title`: overwrite an existing plan (preserves original `created`, sets `updated`). Not used with `--path`.                                         |
 
 
@@ -242,7 +244,7 @@ grounder search "handling migrations of slash commands" \
 | --- | --- |
 | `--terms <csv>` | Extra keyword variants (comma-separated). Dominates ranking quality for agent use. |
 | `--limit <n>` | Max files to print (default: 10) |
-| `--max-hits <n>` | Cap line matches collected during scan (default: 200) |
+| `--max-hits <n>` | Max line snippets stored per file during scan (default: 200; hard-capped at 50). Does not stop the tree walk. |
 | `--context <n>` | Context lines around each snippet (default: 1) |
 | `--since <date>` | Only files modified on or after date (`YYYY-MM-DD` or `7d`, `30d`, …) |
 | `--after <date>` | Alias for `--since` |

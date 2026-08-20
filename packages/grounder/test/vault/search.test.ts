@@ -206,4 +206,100 @@ describe("vault/search", () => {
       await rm(rootDir, { recursive: true, force: true });
     }
   });
+
+  it("topics: match outranks a denser file that only hits in the body", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "grounder-search-"));
+    try {
+      const densePath = await writeMd(
+        rootDir,
+        "notes/dense.md",
+        Array.from({ length: 12 }, () => "versioning").join("\n"),
+      );
+      const topicsPath = await writeMd(
+        rootDir,
+        "notes/tagged.md",
+        ["---", 'topics: ["versioning"]', "---", "", "one versioning mention"].join("\n"),
+      );
+
+      const now = Date.now();
+      await utimes(densePath, now / 1000, now / 1000);
+      await utimes(topicsPath, (now - 5000) / 1000, (now - 5000) / 1000);
+
+      const outcome = await searchVault({
+        rootDir,
+        query: "versioning",
+        limit: 5,
+      });
+
+      expect(outcome.files[0]?.filePath).toBe(topicsPath);
+      expect(outcome.files[0]?.topicsMatch).toBe(true);
+      expect(outcome.files[1]?.filePath).toBe(densePath);
+      expect(outcome.files[1]?.topicsMatch).toBe(false);
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it("demotes discussions/search dumps when the query is not about search", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "grounder-search-"));
+    try {
+      const realPath = await writeMd(rootDir, "plans/schema.md", "migrate ledger\n");
+      const dumpPath = await writeMd(
+        rootDir,
+        "discussions/search/dump.md",
+        Array.from({ length: 20 }, () => "migrate ledger").join("\n"),
+      );
+
+      const now = Date.now();
+      await utimes(dumpPath, now / 1000, now / 1000);
+      await utimes(realPath, (now - 5000) / 1000, (now - 5000) / 1000);
+
+      const demoted = await searchVault({
+        rootDir,
+        query: "migrate",
+        terms: ["ledger"],
+        limit: 5,
+      });
+      expect(demoted.files[0]?.filePath).toBe(realPath);
+      expect(demoted.files[1]?.filePath).toBe(dumpPath);
+
+      const aboutSearch = await searchVault({
+        rootDir,
+        query: "search",
+        terms: ["migrate"],
+        limit: 5,
+      });
+      expect(aboutSearch.files[0]?.filePath).toBe(dumpPath);
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it("demotes search-feature.md when the query is not about search", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "grounder-search-"));
+    try {
+      const realPath = await writeMd(rootDir, "plans/schema.md", "migrate ledger\n");
+      const metaPath = await writeMd(
+        rootDir,
+        "plans/search-feature.md",
+        Array.from({ length: 20 }, () => "migrate ledger").join("\n"),
+      );
+
+      const now = Date.now();
+      await utimes(metaPath, now / 1000, now / 1000);
+      await utimes(realPath, (now - 5000) / 1000, (now - 5000) / 1000);
+
+      const outcome = await searchVault({
+        rootDir,
+        query: "migrate",
+        terms: ["ledger"],
+        limit: 5,
+      });
+
+      expect(outcome.files[0]?.filePath).toBe(realPath);
+      expect(outcome.files[1]?.filePath).toBe(metaPath);
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
+  });
 });

@@ -62,7 +62,7 @@ Why long queries are not scanned: a sentence like `handling migrations of slash 
 - Frontmatter `topics:` exact-match against terms → `topicsMatch` (ranking boost). Body and frontmatter lines both produce line hits.
 - Filename/path segments also count as term matches (`filenameTermCount`).
 
-The scan **always finishes the tree**. Early `--max-hits` stop-scan was removed: it made ranking depend on directory walk order.
+The scan **always finishes the tree**. Early `--max-hits` stop-scan was removed: it made ranking depend on directory walk order. `--max-hits` now only caps **stored snippets per file** (`min(50, maxHits)`); ranking still uses full per-file hit counts.
 
 ### 2.5. Date filter (`--since` / `--after`)
 
@@ -94,7 +94,7 @@ Then, as tiebreakers only: **non-archive before archive**, newer `mtime`, folder
 
 - Default `--limit` in code: **10 files** (`commands/search.ts` / `searchVault`). `--limit` help text matches.
 - Default `--context` in `searchVault` if omitted: **1** line. `/grounder-search` passes `--context 2` on the initial search; **`--context 3`** on the optional broaden call.
-- Default line hits shown per file: **1** (longest `matchedTerm`). Ranking still uses full hit counts (capped at 50 stored per file during scan).
+- Default line hits shown per file: **1** (longest `matchedTerm`). Ranking still uses full hit counts. `--max-hits` caps stored snippets per file during scan (`min(50, maxHits)`; default 200).
 
 ### 5. Formats
 
@@ -197,7 +197,7 @@ You may list a design/archive authority first **among the four full-reads**. Do 
 | Recency-first + substring match (`cb6fedb`) | Newest mention of `migrate` beat the schema-versioning plan; `version` hit `versioning` | Dropped |
 | Distinct-term score + word boundaries + archive penalty (`b51359b`) | Design docs with several product tokens rise; active files beat archive on ties | **Keep** |
 | Scan the full NL query as a term | Dogfood notes that quote the probe query ranked #1 | Dropped (`f25d1d2`: scan query only if 1–2 words) |
-| `--max-hits` abort mid-walk | `totalFileCount` / rank depended on `readdir` order | Dropped (always finish the tree) |
+| `--max-hits` abort mid-walk | `totalFileCount` / rank depended on `readdir` order | Dropped (always finish the tree). Flag kept as a per-file snippet store cap |
 | 3 snippets per file in agent output | Noisy; ranking already has counts | Show 1; store up to 50 for scoring |
 | Raw hit-count density | Common tokens (`grounder`) swamped rare identifiers | **Keep** IDF-lite (`idfDensity`) |
 | Verbatim-only phrase match | NL queries rarely appear verbatim in vault | **Keep** partial n-gram match (+100; trigrams for 4+ words) |

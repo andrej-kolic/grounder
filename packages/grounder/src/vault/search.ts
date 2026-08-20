@@ -25,9 +25,12 @@ export interface SearchOptions {
   query: string;
   /** Extra keyword variants (deduped with query). */
   terms?: readonly string[];
-  /** Max distinct files in the result (default 5). */
+  /** Max distinct files in the result (default 10). */
   limit?: number;
-  /** Stop collecting line hits after this many (default 200). */
+  /**
+   * Cap stored line snippets per file during scan (default 200; hard-capped at
+   * 50). Does not abort the tree walk; ranking still uses full hit counts.
+   */
   maxHits?: number;
   /** Context lines around each match (default 1). */
   context?: number;
