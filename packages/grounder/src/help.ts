@@ -140,12 +140,14 @@ Subcommands:
     summary: "Search linked project vault for keywords (scoped retrieval)",
     listUsage: "search <query>",
     usage:
-      "grounder search <query> [--terms <csv>] [--limit <n>] [--max-hits <n>] [--context <n>] [--markdown] [--json]",
+      "grounder search <query> [--terms <csv>] [--limit <n>] [--max-hits <n>] [--context <n>] [--since <date>] [--markdown] [--json]",
     flags: `Flags:
   --terms <csv>   Extra keyword variants (comma-separated)
   --limit <n>     Max files to print (default: 10)
   --max-hits <n>  Stop after this many line matches (default: 200)
   --context <n>   Context lines around each snippet (default: 1)
+  --since <date>  Only files modified on or after date (YYYY-MM-DD or Nd, e.g. 7d)
+  --after <date>  Alias for --since
   --markdown      Agent relay: file:// links + fenced snippets
   --json          Structured output ({ query, terms, termHitCounts, summary, hits[] })`,
   },

@@ -17,6 +17,7 @@ export interface SearchCommandOptions {
   limit?: number;
   maxHits?: number;
   context?: number;
+  since?: Date;
   markdown?: boolean;
   json?: boolean;
 }
@@ -25,7 +26,7 @@ const DEFAULT_LIMIT = 10;
 const DEFAULT_MAX_HITS = 200;
 
 const USAGE =
-  "Usage: grounder search <query> [--terms <csv>] [--limit <n>] [--max-hits <n>] [--context <n>] [--markdown] [--json]\n";
+  "Usage: grounder search <query> [--terms <csv>] [--limit <n>] [--max-hits <n>] [--context <n>] [--since <date>] [--markdown] [--json]\n";
 
 function usageError(): number {
   process.stderr.write(USAGE);
@@ -59,6 +60,37 @@ function parseNonNegativeInt(raw: string | boolean | undefined, label: string): 
   const parsed = Number.parseInt(trimmed, 10);
   if (!/^\d+$/.test(trimmed) || Number.isNaN(parsed) || parsed < 0) {
     process.stderr.write(`Invalid ${label}: must be a non-negative integer.\n`);
+    return null;
+  }
+  return parsed;
+}
+
+/**
+ * Parses `--since` / `--after`: ISO date (`2026-08-01`) or relative (`7d`, `30d`).
+ * Returns `null` on invalid input (after writing an error message).
+ */
+function parseSinceDate(raw: string | boolean | undefined): Date | null | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (typeof raw !== "string") {
+    process.stderr.write("Invalid --since: expected a date string.\n");
+    return null;
+  }
+  const trimmed = raw.trim();
+  const relMatch = /^(\d+)d$/i.exec(trimmed);
+  if (relMatch) {
+    const days = Number.parseInt(relMatch[1] as string, 10);
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    process.stderr.write(
+      `Invalid --since: "${trimmed}" is not a valid date (use YYYY-MM-DD or Nd).\n`,
+    );
     return null;
   }
   return parsed;
@@ -192,7 +224,16 @@ export async function runSearch(argv: string[]): Promise<number> {
     return usageError();
   }
 
-  const allowedFlags = new Set(["terms", "limit", "max-hits", "context", "markdown", "json"]);
+  const allowedFlags = new Set([
+    "terms",
+    "limit",
+    "max-hits",
+    "context",
+    "since",
+    "after",
+    "markdown",
+    "json",
+  ]);
   for (const key of flags.keys()) {
     if (!allowedFlags.has(key)) {
       return usageError();
@@ -221,6 +262,12 @@ export async function runSearch(argv: string[]): Promise<number> {
     return 1;
   }
 
+  const sinceRaw = flags.get("since") ?? flags.get("after");
+  const since = parseSinceDate(sinceRaw);
+  if (since === null) {
+    return 1;
+  }
+
   const query = positional.join(" ").trim();
   if (!query) {
     return usageError();
@@ -232,6 +279,7 @@ export async function runSearch(argv: string[]): Promise<number> {
     limit: limit ?? undefined,
     maxHits: maxHits ?? undefined,
     context: context ?? undefined,
+    since: since ?? undefined,
     markdown,
     json,
   });
@@ -261,6 +309,7 @@ export async function runSearchWithOptions(options: SearchCommandOptions): Promi
       limit: options.limit ?? DEFAULT_LIMIT,
       maxHits: options.maxHits ?? DEFAULT_MAX_HITS,
       ...(options.context !== undefined ? { context: options.context } : {}),
+      ...(options.since !== undefined ? { since: options.since } : {}),
     });
 
     if (options.json) {

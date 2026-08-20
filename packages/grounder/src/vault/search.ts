@@ -33,6 +33,8 @@ export interface SearchOptions {
   context?: number;
   /** Max line hits kept per file after grouping (default 1). */
   maxHitsPerFile?: number;
+  /** Exclude files with mtime before this date. */
+  since?: Date;
 }
 
 export interface SearchOutcome {
@@ -314,6 +316,10 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
     try {
       [content, { mtimeMs }] = await Promise.all([readFile(filePath, "utf8"), stat(filePath)]);
     } catch {
+      continue;
+    }
+
+    if (options.since !== undefined && mtimeMs < options.since.getTime()) {
       continue;
     }
 
