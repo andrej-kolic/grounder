@@ -69,4 +69,16 @@ describe("templates/grounder-search", () => {
     const body = await readFile(cursorSearchTemplate, "utf8");
     expect(body).toContain('required_permissions: ["all"]');
   });
+
+  it("documents deterministic broaden strategy and termHitCounts triggers", async () => {
+    for (const filePath of searchTemplates) {
+      const body = await readFile(filePath, "utf8");
+      expect(body).toContain("termHitCounts");
+      expect(body).toContain("count of 0");
+      expect(body).toContain("--context 3 --json");
+      expect(body).toContain("drop slot-3");
+      expect(body).toContain("replace **that term**");
+      expect(body).toContain("Keep slots 1–2");
+    }
+  });
 });

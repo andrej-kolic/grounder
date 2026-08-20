@@ -63,4 +63,38 @@ describe("commands/search json output", () => {
     expect(hit?.alsoMatchedHint).toContain("—");
     expect(hit?.alsoMatchedHint).toContain("session hooks");
   });
+
+  it("emits termHitCounts for every term, including zero-hit terms", async () => {
+    const env = await createTempEnv({ packageName: "my-app", initGit: false });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await writeHomeConfig({ vaultRoot: env.vault });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
+    await mkdir(notesDir, { recursive: true });
+    await writeFile(path.join(notesDir, "hooks.md"), "session hooks must exit 0\n", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runSearchWithOptions({
+        homeDir: env.home,
+        cwd: env.repo,
+        query: "session hooks",
+        terms: ["session hooks", "nonexistent-vault-token"],
+        json: true,
+      }),
+    );
+
+    expect(code).toBe(0);
+    const payload = JSON.parse(out.trim()) as {
+      terms: string[];
+      termHitCounts: Record<string, number>;
+    };
+
+    expect(payload.terms).toContain("session hooks");
+    expect(payload.terms).toContain("nonexistent-vault-token");
+    expect(payload.termHitCounts["session hooks"]).toBeGreaterThan(0);
+    expect(payload.termHitCounts["nonexistent-vault-token"]).toBe(0);
+  });
 });
