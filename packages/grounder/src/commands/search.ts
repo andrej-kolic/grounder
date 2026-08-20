@@ -33,7 +33,11 @@ function usageError(): number {
   return 1;
 }
 
-function parsePositiveInt(raw: string | boolean | undefined, label: string): number | null {
+function parseIntFlag(
+  raw: string | boolean | undefined,
+  label: string,
+  min: number,
+): number | null {
   if (raw === undefined) {
     return null;
   }
@@ -42,24 +46,9 @@ function parsePositiveInt(raw: string | boolean | undefined, label: string): num
   }
   const trimmed = raw.trim();
   const parsed = Number.parseInt(trimmed, 10);
-  if (!/^\d+$/.test(trimmed) || Number.isNaN(parsed) || parsed < 1) {
-    process.stderr.write(`Invalid ${label}: must be a positive integer.\n`);
-    return null;
-  }
-  return parsed;
-}
-
-function parseNonNegativeInt(raw: string | boolean | undefined, label: string): number | null {
-  if (raw === undefined) {
-    return null;
-  }
-  if (typeof raw !== "string") {
-    return null;
-  }
-  const trimmed = raw.trim();
-  const parsed = Number.parseInt(trimmed, 10);
-  if (!/^\d+$/.test(trimmed) || Number.isNaN(parsed) || parsed < 0) {
-    process.stderr.write(`Invalid ${label}: must be a non-negative integer.\n`);
+  const desc = min === 0 ? "a non-negative integer" : "a positive integer";
+  if (!/^\d+$/.test(trimmed) || Number.isNaN(parsed) || parsed < min) {
+    process.stderr.write(`Invalid ${label}: must be ${desc}.\n`);
     return null;
   }
   return parsed;
@@ -211,11 +200,7 @@ function vaultRelativePath(rootDir: string, filePath: string): string {
 
 function alsoMatchedHint(filePath: string, matchedTerms: readonly string[]): string {
   const stem = fileStem(filePath);
-  if (matchedTerms.length === 0) {
-    return stem;
-  }
-  const gloss = matchedTerms.slice(0, 2).join(", ");
-  return `${stem} — ${gloss}`;
+  return `${stem} — ${matchedTerms.slice(0, 2).join(", ")}`;
 }
 
 function writeJsonOutput(outcome: SearchOutcome, rootDir: string): void {
@@ -283,17 +268,17 @@ export async function runSearch(argv: string[]): Promise<number> {
     return 1;
   }
 
-  const limit = parsePositiveInt(flags.get("limit"), "--limit");
+  const limit = parseIntFlag(flags.get("limit"), "--limit", 1);
   if (limit === null && flags.has("limit")) {
     return 1;
   }
 
-  const maxHits = parsePositiveInt(flags.get("max-hits"), "--max-hits");
+  const maxHits = parseIntFlag(flags.get("max-hits"), "--max-hits", 1);
   if (maxHits === null && flags.has("max-hits")) {
     return 1;
   }
 
-  const context = parseNonNegativeInt(flags.get("context"), "--context");
+  const context = parseIntFlag(flags.get("context"), "--context", 0);
   if (context === null && flags.has("context")) {
     return 1;
   }
