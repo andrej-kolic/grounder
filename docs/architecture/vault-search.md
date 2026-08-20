@@ -1,0 +1,234 @@
+# Vault search and `/grounder-search`
+
+How Grounder retrieves prior project-vault context — and why ranking lives in the CLI while the slash command only drives it.
+
+User-facing flags live in `grounder search --help`. This doc is for contributors who will change either layer.
+
+## Problem
+
+Agents looking for “what did we already decide about X” used to:
+
+- Grep the git repo and the vault interchangeably
+- Rank by recency or by whichever file they opened first
+- Paste CLI JSON / snippets into chat
+- Spend many tool rounds debating which hit to read
+
+That is slow, model-dependent, and mixes two different trees (source vs vault). Search exists so **one deterministic ranker** picks files, and the agent **reads and synthesizes** a short hybrid answer.
+
+## Two layers (do not collapse them)
+
+| Layer | Job | Must not |
+| --- | --- | --- |
+| `vault/search.ts` + `commands/search.ts` | Scan `*.md` under the **linked project vault root**, score, print | Guess user intent, paraphrase queries, synthesize prose |
+| `/grounder-search` templates | Turn a user utterance into `query` + `--terms`, run CLI, full-read top hits, write the hybrid answer | Re-rank, grep the vault, explore `packages/…` |
+
+**`--terms` is the only model-dependent input that changes ranking.** Protocol (two rounds, `--json`, numbered `file://` links) is compatible across models. File order is not, unless terms match.
+
+If a future change “fixes ranking” by adding more prose to the slash command, you are treating a CLI problem as a prompt problem. If it “fixes synthesis” by making the CLI print an essay, you are treating a prompt problem as a CLI problem.
+
+## Scope
+
+Search is **this linked project only**.
+
+`grounder search` resolves the linked repo, then scans `resolveProjectVaultRoot` — `<vault>/10-Projects/{projectId}/` — recursively for `*.md` (`notes/`, `logs/`, `plans/`, plus anything else under that folder, including `discussions/` and `archive/`).
+
+It does **not** search:
+
+- Sibling projects under `10-Projects/`
+- The git working tree
+- Installed slash-command files under `~/.cursor/commands/`
+
+Missing project vault root → exit 1, hint `grounder setup`. Unlinked cwd → `requireLinkedProject` error.
+
+## CLI algorithm
+
+Pure filesystem scan. No index, no extra deps.
+
+### 1. Normalize terms
+
+Inputs: positional `query` + optional `--terms` CSV (comma-split, trimmed).
+
+- Dedup case-insensitively.
+- **Long query (3+ words) is not a line-scan term.** It only contributes `phraseMatch` (substring of the whole file). Short queries (1–2 words) are also scanned as a term.
+- Overlapping single-token stems: if both `version` and `versioning` are present, drop the shorter **unless it is the query**. Phrases with spaces are never pruned this way.
+
+Why long queries are not scanned: a sentence like `handling migrations of slash commands` almost never appears verbatim except in **search dogfood** (`discussions/search/Search Results.md`). Scanning it as a term made those meta notes win on hit density.
+
+### 2. Match lines
+
+- Single-token terms: Unicode-ish word boundary (`\bterm\b`), case-insensitive. `version` does not match `versioning`.
+- Multi-word terms: case-insensitive substring (so `slash commands` and `grounder migrate` work).
+- On a line, the **longest** matching term wins as `matchedTerm` (label only; all matching terms still count toward distinct-term score).
+- Frontmatter `topics:` exact-match against terms → `topicsMatch` (ranking boost). Body and frontmatter lines both produce line hits.
+- Filename/path segments also count as term matches (`filenameTermCount`).
+
+The scan **always finishes the tree**. Early `--max-hits` stop-scan was removed: it made ranking depend on directory walk order.
+
+### 3. Score (higher wins)
+
+```text
+distinctTermCount * 1000
++ min(totalHitCount, 100) * 10
++ topicsMatch ? 800 : 0
++ filenameTermCount * 200
++ phraseMatch ? 300 : 0
+− searchMetaPenalty * 5000
+```
+
+Then, as tiebreakers only: **non-archive before archive**, newer `mtime`, folder signal (`notes`/`plans` 2, `logs` 1), then path.
+
+**Distinct terms dominate.** Complementary vault words in the **same** file beat a file that repeats one token. That is why `--terms` must be 3–5 *different* product tokens, not English synonyms of the query.
+
+`searchMetaPenalty` is 1 when the query does **not** contain `search` and the path is `discussions/search/…` or the stem is `search-feature` / `search results`. Weight 5000 is intentional: dogfood notes quote every probe query and otherwise swamp real plans.
+
+### 4. Slice for output
+
+- Default `--limit` in code: **10 files** (`commands/search.ts` / `searchVault`).
+- Default `--context` in `searchVault` if omitted: **1** line. `/grounder-search` always passes `--context 2`.
+- Default line hits shown per file: **1** (longest `matchedTerm`). Ranking still uses full hit counts (capped at 50 stored per file during scan).
+
+`help.ts` currently prints `--limit` default 5 and `--context` default 0 — those strings are stale. Trust the code, then fix help in the same change if you touch defaults.
+
+### 5. Formats
+
+| Flag | Who | Shape |
+| --- | --- | --- |
+| (plain) | Humans | Stem + absolute path + one-line snippets |
+| `--markdown` | Lookup-mode slash command | `file://` links (spaces percent-encoded via `pathToFileURL`) + fenced snippets |
+| `--json` | Default slash command | `{ query, terms, summary, totalFileCount, hits[] }` — **parse privately, never paste** |
+
+`--markdown` and `--json` are mutually exclusive.
+
+## Slash-command protocol
+
+Installed from `templates/agents/{cursor,claude}/commands/grounder-search.md` via `grounder setup` / `grounder migrate`. `{{GROUNDER_CLI}}` becomes the baked runtime invocation. Cursor requires Shell `required_permissions: ["all"]` (vault is outside the workspace).
+
+After **any** template edit, run `grounder migrate` (hash-safe if the on-disk file is untouched). A new parent chat is not required; `/grounder-search` re-reads the installed file. Un-migrated sessions keep the old spec.
+
+### Modes
+
+- **Hybrid (default):** one `search … --json`, full-read CLI hits **1–4** in one parallel batch, synthesize.
+- **Lookup:** user asked for an exact mention / line → relay `--markdown` as-is (no full reads).
+
+### Query and terms (the ranking contract)
+
+**Query** = leftover topic after stripping retrieval wrappers (`find`, `search for`, `documents discussing`, `notes about`, `look up`). Same words, same order. Do **not** paraphrase (`slash command migrations` is wrong if the leftover is `handling migrations of slash commands`). Do not recycle the query as a `--terms` item.
+
+**Terms** — fill 3–5 slots, then stop:
+
+1. Product noun/phrase (`slash commands`)
+2. Product verb or CLI name (`grounder migrate` — never lone `migrate`)
+3. One on-disk identifier (`commandsSchema`, `state.json`, `hash drift`, …)
+4–5. Another vault/product token
+
+**Never as terms** (unless the user asked about code layout): repo paths, `packages/…`, source module / file stems (`install-command`, `apply-agent-installs`, `hook-runtime`, `vault/search.ts`). Those match code-ish plan checklists and **reorder the head**.
+
+### Turn budget
+
+Exactly two assistant turns with tools, then the answer:
+
+1. Shell only: `search "<query>" --terms "<csv>" --context 2 --json` (quote `--terms` — unquoted CSV with spaces corrupts argv). Optional second search **in the same round** only if `totalFileCount` is 0, or ≤2 and every hit is meta.
+2. Read only: hits 1–4, parallel, no substitutions.
+3. First chat text = the hybrid answer.
+
+No Glob, Grep, extra Shell, `UpdateCurrentStep`, `TodoWrite`. Rounds 1–2 should have **no text part**.
+
+### Output contract
+
+- One opening sentence of what the vault **says** (not a search recap).
+- `## Read these` / `## Also matched` (not bold-only, not `###`).
+- Visible title = path **relative to the project vault root** (`plans/…`, never `10-Projects/grounder/plans/…`).
+- Href = `file://` from `hits[].file`; percent-encode spaces **in the URL only**.
+- Number 1…n continuously across sections. Also matched = leftover top-10 **in CLI order**.
+- Claims only from files you full-read. Also-matched gloss = path stem or `matches[].term`, one short phrase.
+
+You may list a design/archive authority first **among the four full-reads**. Do not reshuffle Also matched.
+
+## How we got here (do not replay)
+
+### Ranking (CLI)
+
+| Attempt | What happened | Keep / drop |
+| --- | --- | --- |
+| Recency-first + substring match (`cb6fedb`) | Newest mention of `migrate` beat the schema-versioning plan; `version` hit `versioning` | Dropped |
+| Distinct-term score + word boundaries + archive penalty (`b51359b`) | Design docs with several product tokens rise; active files beat archive on ties | **Keep** |
+| Scan the full NL query as a term | Dogfood notes that quote the probe query ranked #1 | Dropped (`f25d1d2`: scan query only if 1–2 words) |
+| `--max-hits` abort mid-walk | `totalFileCount` / rank depended on `readdir` order | Dropped (always finish the tree) |
+| 3 snippets per file in agent output | Noisy; ranking already has counts | Show 1; store up to 50 for scoring |
+| Semantic / BM25 / embeddings | Needs an index, deps, and a rebuild story | **Rejected for v1** — vaults are small; scan is sub-second |
+
+### Slash command (prompt)
+
+Cross-model runs on the same probe (`find documents discussing handling migrations of slash commands`) taught these leaks. Each “fix” that only added a softer sentence failed on at least one family; **counterexamples** worked better than adjectives.
+
+| Leak | What models did | What actually constrained them |
+| --- | --- | --- |
+| Priming | Worked example **was** the probe, so every model copied the terms CSV | Terms example is a **different** topic (session hooks). Probe may appear only as a query-strip counterexample |
+| Module names as terms | `install-command`, then `apply-agent-installs` — pulled doctor/checklists to #1 | Name **both** stems in the never-list; “source modules” alone was too abstract |
+| Query rewrite | Composer shortened to `slash command migrations` | Explicit wrong query next to the leftover-topic rule |
+| Parent-vault titles | Gemini used `10-Projects/grounder/plans/…` | Wrong-title example with that prefix |
+| `%20` in link text | Sonnet encoded the visible title | Correct vs wrong markdown pair |
+| Extra tools | Glob, `UpdateCurrentStep`, duplicate Shell, third turn | Allowlist: Shell then Read only |
+| JSON / snippets in chat | Relayed stdout | “Parse `--json` internally only” |
+| Also-matched order | Reshuffle / restart at 1 | “CLI leftover order” + continued numbering |
+| Silence | “I’ll search…”, “**Analyzing…**” in the same message as tools | Still leaky on Gemini/Grok/Composer. Do not spend another round of adjectives here without a mechanical check (see Open) |
+
+**Forbidden terms are a stability rule, not a “worse hits” rule.** `install-command` once surfaced a living doctor/migrate plan that the clean term set missed. We still ban it: otherwise every model searches the *codebase vocabulary* and ranking diverges.
+
+## Canonical probe (for the next change)
+
+Use this utterance, **without** putting its terms CSV back as the worked example:
+
+```text
+find documents discussing handling migrations of slash commands
+```
+
+Healthy `query` / `--terms`:
+
+```text
+query: handling migrations of slash commands
+terms: slash commands,grounder migrate,hash drift,commandsSchema,state.json
+```
+
+Healthy CLI head (this vault, 2026-08-20):
+
+1. `plans/archive/0.3.0/schema_versioning_for_grounder_ac9204ad.plan.md`
+2. `plans/archive/0.3.0/0-3-0-release-review.md`
+3. `plans/archive/0.4.0/doctor-hash-drift-check-output-unification.md`
+4. `plans/archive/0.3.0/rutime-improvements.md`
+
+Replay each model’s **exact argv** against `grounder search … --json` before blaming synthesis. Protocol (silence, tool names, heading shape) lives in subagent transcripts, not in the parent’s summary.
+
+Evaluate **one change at a time** (CLI xor template). Migrating templates mid-experiment without recording the installed file hash makes before/after incomparable.
+
+## Open (known, not “just prompt harder”)
+
+- **Silence** is still violated by chatty models; Composer may put the real answer on `UpdateCurrentStep` and stub the user-visible message. Prompt text has diminishing returns.
+- **`--terms` quality** remains the ranking incompatibility. The recipe + never-list is the v1 mitigation.
+- **`help.ts` defaults** disagree with `search.ts` (see above).
+- Template tests are string-contains on the markdown, not live agents. They catch priming regressions; they cannot catch Gemini narration.
+
+## Key code map
+
+| Concern | Location |
+| --- | --- |
+| Scan + rank | `packages/grounder/src/vault/search.ts` |
+| CLI parse / formats | `packages/grounder/src/commands/search.ts` |
+| Help text | `packages/grounder/src/help.ts` (`id: "search"`) |
+| Project vault root | `connector/vault.ts` `resolveProjectVaultRoot` → `vault/layout.ts` `projectDir` |
+| Cursor / Claude templates | `templates/agents/{cursor,claude}/commands/grounder-search.md` |
+| `{{GROUNDER_CLI}}` bake | `agents/install-command.ts` |
+| Command file list | `agents/cursor.ts`, `agents/claude.ts` (`grounder-search.md`) |
+| Template contract tests | `test/templates/grounder-search.test.ts` |
+| Rank unit tests | `test/vault/search.test.ts` |
+| `file://` encoding | `test/commands/search/markdown-output.test.ts` |
+
+## Rejected alternatives
+
+- **Agent greps the vault** — duplicates the ranker, blows the turn budget, ignores `topics:` / distinct-term scoring.
+- **Search the git repo from `/grounder-search`** — wrong tree; that is a code question, not vault memory.
+- **Embeddings / sqlite FTS for v1** — vaults are small; an index is another stale artifact. Revisit if scan latency or corpus size actually hurts.
+- **Recency as the primary key** — newest handoff mentioning a word beats the design doc every time.
+- **Let the model pick which of the top 10 to read** — they skip the authority doc. Always read 1–4 in CLI order; judge relevance only while writing.
+- **Relay `--json` to the user** — the hybrid contract is the product; JSON is an internal wire format.
+- **One mega example that is also the eval probe** — models copy it and you cannot tell whether the recipe works.

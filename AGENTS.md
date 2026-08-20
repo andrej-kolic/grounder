@@ -29,8 +29,10 @@ vault/                # vault on disk
   list-handoffs.ts    # list logs/*.md newest-first
   list-plans.ts       # list plans/*.md newest mtime first
   find-usable-handoff.ts # newest-first, skipping empty/unreadable (peek + list --head)
+  search.ts           # vault markdown scan + rank (grounder search)
 commands/             # mirrors CLI structure
   require-linked.ts   # CLI stderr wrapper around resolveLinkedProject
+  search.ts           # grounder search (linked project vault root)
   setup.ts            # grounder setup (agent-blind; uses agents registry)
   link.ts             # grounder link (creates notes/ + logs/ + plans/)
   note.ts             # grounder note
@@ -71,11 +73,13 @@ packages/grounder/templates/
       grounder-task.md            # recall — read-only hydrate
       grounder-task-handoff.md    # write session checkpoint
       grounder-plan.md            # named living plan
+      grounder-search.md          # vault retrieval — CLI ranks, agent synthesizes
     claude/commands/
       grounder-note.md
       grounder-task.md
       grounder-task-handoff.md
       grounder-plan.md
+      grounder-search.md
   vault/
     session-handoff.md            # lean section reference for slash commands
     plan.md                       # section reference for /grounder-plan
