@@ -96,15 +96,15 @@ Vault notes discuss …
 
 Parse JSON privately. Take `hits[].file` in CLI order. Use `hits[].matches[].term` (and `topicsMatch`) only to phrase Also matched / roles — do not quote snippets.
 
-**Broaden once (silent)** only if `totalFileCount` is 0, or ≤2 and every hit is meta (`discussions/search/`, or snippet only quotes the query). Otherwise do not re-search.
+**Broaden once (silent)** only if: `totalFileCount` is 0; or ≤2 and every hit is meta (`discussions/search/`, or snippet only quotes the query); or any term in `termHitCounts` has a count of 0 (that term produced no files — it was a bad guess and must be replaced). Otherwise do not re-search.
 
    Broaden call (use `--context 3` — weaker matches need more context):
 
 ```bash
-{{GROUNDER_CLI}} search "<query>" --terms "<csv-minus-slot3>" --context 3 --json
+{{GROUNDER_CLI}} search "<query>" --terms "<csv-with-replacement>" --context 3 --json
 ```
 
-   **Broaden strategy (deterministic):** drop the slot-3 term (the on-disk identifier, e.g. `commandsSchema`) first — keep slots 1–2 (product noun/verb) unchanged — then re-run. Do not invent new terms or rewrite existing ones.
+   **Broaden strategy (deterministic):** check `termHitCounts` first — if any term has count 0, replace **that term** (not slot-3) with a different product/vault token. If no zero-hit term, drop slot-3 (the on-disk identifier). Keep slots 1–2 (product noun/verb) unchanged. Do not invent new terms or rewrite existing ones.
 
 3. **Read (tool round 2)** — mandatory unless lookup:
    - Full-read CLI hits **1–4** in rank order, **all in one parallel batch**.
