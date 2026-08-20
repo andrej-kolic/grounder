@@ -262,16 +262,21 @@ function contentHasPhrase(content: string, query: string): boolean {
   return content.toLowerCase().includes(trimmed.toLowerCase());
 }
 
-/** Any bigram (2 consecutive query words) appears as a substring in content. Only for queries ≥3 words. */
+/**
+ * Partial n-gram match: 2 consecutive words for 3-word queries, 3 consecutive
+ * words for 4+ word queries. Trigrams reduce false positives on docs that share
+ * only a common bigram ("slash commands") without the migration context.
+ */
 function contentHasPartialPhrase(content: string, query: string): boolean {
   const words = query.trim().split(/\s+/).filter(Boolean);
   if (words.length < 3) {
     return false;
   }
   const lower = content.toLowerCase();
-  for (let i = 0; i < words.length - 1; i++) {
-    const bigram = `${words[i]} ${words[i + 1]}`.toLowerCase();
-    if (lower.includes(bigram)) {
+  const windowSize = words.length >= 4 ? 3 : 2;
+  for (let i = 0; i <= words.length - windowSize; i++) {
+    const ngram = words.slice(i, i + windowSize).join(" ").toLowerCase();
+    if (lower.includes(ngram)) {
       return true;
     }
   }
@@ -285,7 +290,7 @@ function relevanceScore(file: RawFileHits, rootDir: string, query: string): numb
     (file.topicsMatch ? 800 : 0) +
     file.filenameTermCount * 200 +
     (file.phraseMatch ? 300 : 0) +
-    (file.partialPhraseMatch ? 150 : 0) -
+    (file.partialPhraseMatch ? 100 : 0) -
     // Strong enough to lose to real notes with similar distinct-term coverage
     // (meta dumps / search dogfood often win on raw hit density alone).
     searchMetaPenalty(rootDir, file.filePath, query) * 5000
@@ -330,7 +335,10 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
   const filePaths = await listMarkdownFiles(options.rootDir);
   const rawFiles: RawFileHits[] = [];
   let totalMatchCount = 0;
-  const termHitCounts: Record<string, number> = {};
+  // Pre-populate with 0 so zero-hit terms are explicit in JSON output.
+  const termHitCounts: Record<string, number> = Object.fromEntries(
+    terms.map((t) => [t.toLowerCase(), 0]),
+  );
 
   for (const filePath of filePaths) {
     let content: string;
