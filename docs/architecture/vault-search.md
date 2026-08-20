@@ -64,16 +64,25 @@ Why long queries are not scanned: a sentence like `handling migrations of slash 
 
 The scan **always finishes the tree**. Early `--max-hits` stop-scan was removed: it made ranking depend on directory walk order.
 
+### 2.5. Date filter (`--since` / `--after`)
+
+Optional. Parsed in `commands/search.ts` (`parseSinceDate`): ISO date (`2026-08-01`) or relative shorthand (`7d`, `30d`). Before scoring, skip any file whose `mtimeMs` is before the cutoff. Useful for freshness-sensitive queries (recent handoffs, “what did I write about X lately”). `/grounder-search` does not pass this by default.
+
 ### 3. Score (higher wins)
+
+Hit density uses **IDF-lite** per term: during the walk, accumulate `termHitCounts` (files containing each term). Each file’s `idfDensity` is the sum of `perTermHits / log(1 + df)` across its matched terms. Common tokens (high document frequency) contribute less; rare identifiers contribute more.
 
 ```text
 distinctTermCount * 1000
-+ min(totalHitCount, 100) * 10
++ min(idfDensity, 100) * 10
 + topicsMatch ? 800 : 0
 + filenameTermCount * 200
 + phraseMatch ? 300 : 0
++ partialPhraseMatch ? 100 : 0
 − searchMetaPenalty * 5000
 ```
+
+**Partial phrase:** for queries with 3+ words, check consecutive word n-grams in file content (bigrams for 3-word queries; **trigrams** for 4+ words). Verbatim `phraseMatch` (+300) almost never fires on natural-language queries; partial match (+100) catches shared phrases like “slash commands” without letting loose bigrams outrank migration-context docs.
 
 Then, as tiebreakers only: **non-archive before archive**, newer `mtime`, folder signal (`notes`/`plans` 2, `logs` 1), then path.
 
@@ -83,21 +92,40 @@ Then, as tiebreakers only: **non-archive before archive**, newer `mtime`, folder
 
 ### 4. Slice for output
 
-- Default `--limit` in code: **10 files** (`commands/search.ts` / `searchVault`).
-- Default `--context` in `searchVault` if omitted: **1** line. `/grounder-search` always passes `--context 2`.
+- Default `--limit` in code: **10 files** (`commands/search.ts` / `searchVault`). `--limit` help text matches.
+- Default `--context` in `searchVault` if omitted: **1** line. `/grounder-search` passes `--context 2` on the initial search; **`--context 3`** on the optional broaden call.
 - Default line hits shown per file: **1** (longest `matchedTerm`). Ranking still uses full hit counts (capped at 50 stored per file during scan).
-
-`help.ts` currently prints `--limit` default 5 and `--context` default 0 — those strings are stale. Trust the code, then fix help in the same change if you touch defaults.
 
 ### 5. Formats
 
 | Flag | Who | Shape |
 | --- | --- | --- |
-| (plain) | Humans | Stem + absolute path + one-line snippets |
+| (plain) | Humans | Summary line + optional truncation header; numbered stem + absolute path + one-line snippets |
 | `--markdown` | Lookup-mode slash command | `file://` links (spaces percent-encoded via `pathToFileURL`) + fenced snippets |
-`--json` | Default slash command | `{ query, terms, summary, hits[] }` — each hit: `file` (Read path), `relativePath`, `fileUri`, `alsoMatchedHint`, `matches[]`; **parse privately, never paste** |
+| `--json` | Default slash command | See below — **parse privately, never paste** |
 
 `--markdown` and `--json` are mutually exclusive.
+
+**`--json` payload** (top-level):
+
+| Field | Purpose |
+| --- | --- |
+| `query`, `terms` | Echo normalized inputs |
+| `termHitCounts` | `{ "<term>": n }` — every term pre-init to `0`; zero-hit terms stay explicit for broaden decisions |
+| `summary` | Human-readable count line (same as plain header) |
+| `truncated`, `totalMatchCount`, `totalFileCount` | Truncation signal + scan totals |
+| `hits[]` | Ranked file list |
+
+Each `hits[]` entry:
+
+| Field | Purpose |
+| --- | --- |
+| `file` | Absolute path — use for Read tool |
+| `relativePath` | Vault-relative title (`plans/…`, not `10-Projects/…`) |
+| `fileUri` | Pre-encoded `file://` href for markdown links |
+| `alsoMatchedHint` | Stem + matched terms gloss (`stem — term1, term2`) for Also matched lines |
+| `mtimeMs`, `topicsMatch` | Metadata |
+| `matches[]` | `{ line, term, snippet }` per hit line |
 
 ## Slash-command protocol
 
@@ -127,11 +155,27 @@ After **any** template edit, run `grounder migrate` (hash-safe if the on-disk fi
 
 Exactly two assistant turns with tools, then the answer:
 
-1. Shell only: `search "<query>" --terms "<csv>" --context 2 --json` (quote `--terms` — unquoted CSV with spaces corrupts argv). Optional second search **in the same round** only if `totalFileCount` is 0, or ≤2 and every hit is meta.
+1. Shell only: `search "<query>" --terms "<csv>" --context 2 --json` (quote `--terms` — unquoted CSV with spaces corrupts argv). Optional second search **in the same round** only when broaden triggers (below).
 2. Read only: hits 1–4, parallel, no substitutions.
 3. First chat text = the hybrid answer.
 
 No Glob, Grep, extra Shell, `UpdateCurrentStep`, `TodoWrite`. Rounds 1–2 should have **no text part**.
+
+### Broaden (one silent retry max)
+
+Re-run search in round 1 **only if**:
+
+- `totalFileCount` is 0, **or**
+- ≤2 hits and every hit is meta (`discussions/search/`, or snippet only quotes the query), **or**
+- any term in `termHitCounts` has count **0** (bad term — replace it)
+
+Broaden call uses `--context 3` (weaker matches need richer snippets):
+
+```bash
+search "<query>" --terms "<csv-with-replacement>" --context 3 --json
+```
+
+**Deterministic strategy:** check `termHitCounts` first — if any term has count 0, replace **that term** with a different product/vault token. If no zero-hit term, drop slot-3 (the on-disk identifier). Keep slots 1–2 (product noun/verb) unchanged. Do not invent new terms or rewrite existing ones.
 
 ### Output contract
 
@@ -155,6 +199,8 @@ You may list a design/archive authority first **among the four full-reads**. Do 
 | Scan the full NL query as a term | Dogfood notes that quote the probe query ranked #1 | Dropped (`f25d1d2`: scan query only if 1–2 words) |
 | `--max-hits` abort mid-walk | `totalFileCount` / rank depended on `readdir` order | Dropped (always finish the tree) |
 | 3 snippets per file in agent output | Noisy; ranking already has counts | Show 1; store up to 50 for scoring |
+| Raw hit-count density | Common tokens (`grounder`) swamped rare identifiers | **Keep** IDF-lite (`idfDensity`) |
+| Verbatim-only phrase match | NL queries rarely appear verbatim in vault | **Keep** partial n-gram match (+100; trigrams for 4+ words) |
 | Semantic / BM25 / embeddings | Needs an index, deps, and a rebuild story | **Rejected for v1** — vaults are small; scan is sub-second |
 
 ### Slash command (prompt)
@@ -204,9 +250,9 @@ Evaluate **one change at a time** (CLI xor template). Migrating templates mid-ex
 ## Open (known, not “just prompt harder”)
 
 - **Silence** is still violated by chatty models; Composer may put the real answer on `UpdateCurrentStep` and stub the user-visible message. Prompt text has diminishing returns.
-- **`--terms` quality** remains the ranking incompatibility. The recipe + never-list is the v1 mitigation.
-- **`help.ts` defaults** disagree with `search.ts` (see above).
-- Template tests are string-contains on the markdown, not live agents. They catch priming regressions; they cannot catch Gemini narration.
+- **`--terms` quality** remains the ranking incompatibility. The recipe + never-list + `termHitCounts` zero-hit broaden is the v1 mitigation.
+- **Read order in synthesis** — some models substitute hits 1–4 despite template rules; template tests cannot catch live agent behavior.
+- Template tests are string-contains on the markdown, not live agents. They catch priming regressions and broaden protocol text; they cannot catch Gemini narration or Composer read-order swaps.
 
 ## Key code map
 
@@ -221,7 +267,9 @@ Evaluate **one change at a time** (CLI xor template). Migrating templates mid-ex
 | Command file list | `agents/cursor.ts`, `agents/claude.ts` (`grounder-search.md`) |
 | Template contract tests | `test/templates/grounder-search.test.ts` |
 | Rank unit tests | `test/vault/search.test.ts` |
+| CLI output / scope / errors | `test/commands/search/*.test.ts` |
 | `file://` encoding | `test/commands/search/markdown-output.test.ts` |
+| Contributor overview | `docs/architecture/vault-search.md` (this file) |
 
 ## Rejected alternatives
 
