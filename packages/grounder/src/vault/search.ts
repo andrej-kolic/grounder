@@ -90,7 +90,10 @@ function pruneOverlappingTerms(query: string, terms: readonly string[]): string[
 function normalizeTerms(query: string, extra?: readonly string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const raw of [query, ...(extra ?? [])]) {
+  // Long natural-language queries rarely appear verbatim except in dogfood/meta
+  // notes — keep them for phraseMatch scoring via `options.query`, not line scan.
+  const scanQuery = query.trim().split(/\s+/).filter(Boolean).length <= 2;
+  for (const raw of [...(scanQuery ? [query] : []), ...(extra ?? [])]) {
     const term = raw.trim();
     if (!term) {
       continue;
@@ -103,6 +106,28 @@ function normalizeTerms(query: string, extra?: readonly string[]): string[] {
     out.push(term);
   }
   return pruneOverlappingTerms(query, out);
+}
+
+/**
+ * Soft-demote search dogfood notes when the user is not asking about search.
+ * (`discussions/search/…`, `search-feature.md`, `Search Results.md`)
+ */
+function searchMetaPenalty(rootDir: string, filePath: string, query: string): number {
+  if (/\bsearch\b/i.test(query)) {
+    return 0;
+  }
+  const rel = path.relative(rootDir, filePath);
+  const segments = rel.split(path.sep).map((segment) => segment.toLowerCase());
+  for (let i = 0; i < segments.length - 1; i++) {
+    if (segments[i] === "discussions" && segments[i + 1] === "search") {
+      return 1;
+    }
+  }
+  const stem = path.basename(filePath, path.extname(filePath)).toLowerCase();
+  if (stem === "search-feature" || stem === "search results") {
+    return 1;
+  }
+  return 0;
 }
 
 function termMatchesLine(line: string, term: string): boolean {
@@ -228,13 +253,16 @@ function contentHasPhrase(content: string, query: string): boolean {
   return content.toLowerCase().includes(trimmed.toLowerCase());
 }
 
-function relevanceScore(file: RawFileHits): number {
+function relevanceScore(file: RawFileHits, rootDir: string, query: string): number {
   return (
     file.distinctTermCount * 1000 +
     Math.min(file.totalHitCount, 100) * 10 +
-    (file.topicsMatch ? 500 : 0) +
+    (file.topicsMatch ? 800 : 0) +
     file.filenameTermCount * 200 +
-    (file.phraseMatch ? 300 : 0)
+    (file.phraseMatch ? 300 : 0) -
+    // Strong enough to lose to real notes with similar distinct-term coverage
+    // (meta dumps / search dogfood often win on raw hit density alone).
+    searchMetaPenalty(rootDir, file.filePath, query) * 5000
   );
 }
 
@@ -250,8 +278,8 @@ function pickBestHits(hits: SearchLineHit[], maxHitsPerFile: number): SearchLine
  * Case-insensitive markdown scan under `rootDir`.
  * Frontmatter `topics:` matches boost file ranking; body and frontmatter lines
  * both contribute line hits. Files rank by relevance (distinct terms, hit
- * density, filename/path terms, topics), then archive, recency, folder.
- * Pure fs — no index, no deps.
+ * density, filename/path terms, topics; demotes search dogfood when query is
+ * unrelated), then archive, recency, folder. Pure fs — no index, no deps.
  */
 export async function searchVault(options: SearchOptions): Promise<SearchOutcome> {
   const terms = normalizeTerms(options.query, options.terms);
@@ -327,7 +355,9 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
   }
 
   rawFiles.sort((a, b) => {
-    const scoreDiff = relevanceScore(b) - relevanceScore(a);
+    const scoreDiff =
+      relevanceScore(b, options.rootDir, options.query) -
+      relevanceScore(a, options.rootDir, options.query);
     if (scoreDiff !== 0) {
       return scoreDiff;
     }

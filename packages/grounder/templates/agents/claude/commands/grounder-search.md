@@ -4,60 +4,63 @@ Use this when the user asks to find prior project-vault context by topic, keywor
 
 Scope is this linked project only — the CLI resolves and searches under the linked project vault root. Do not search outside it.
 
+## Turn budget (speed)
+
+Exactly **two** tool rounds, then the answer:
+
+1. Shell: one `search … --json` (optional second search only per broaden rule below — still no chat).
+2. Reads: **one** parallel batch of full-file reads.
+3. Final answer to the user.
+
+**No assistant/user-visible text before step 3.** No status lines, no “I’ll search…”, no triage narration, no debating which hit to open. Tool calls only until the final block.
+
 ## Output contract (default — hybrid)
 
-**Silent preflight — mandatory:**
-- Do not narrate steps ("searching…", "narrowing…", "reading files…").
 - Do not echo commands or shell output.
-- **Never show CLI JSON, snippets, or raw stdout** — parse `--json` internally only.
-- Send **one** final synthesized response to the user.
+- **Never paste CLI JSON, snippets, or raw stdout into chat** — parse `--json` internally only.
+- One final synthesized response only.
 
-Structure like a **curated reading list**, not homework. Keep summaries tight — one bold label line per file, then a handful of short bullets (not paragraphs).
+Structure:
 
-1. **Opening** — one sentence: what vault notes discuss [topic], ordered by relevance.
-2. **Primary design docs** — top 1–3 files. For each:
-   - `### N. \`plans/…\`` (numbered, vault-relative path)
-   - **Bold one-line role** (e.g. "**The main design document.**")
-   - 3–6 short bullets max; optional one-line status if relevant
-3. **Operational / follow-up plans** — same shape, numbered from 4+
-4. **Lighter mentions** — table: `| Document | What it says |` — one short phrase per row
-5. **Not really about [topic]** — brief list of keyword hits that aren't on-topic
-6. **Start here** — 1–3 paths, one line
+1. **Opening** — one sentence.
+2. **Read these** — files you fully read: path + optional role + short bullets.
+3. **Also matched** — unread CLI hits: path + one phrase each. Omit if empty.
 
-**Lookup mode** (skip synthesis): exact mention / line reference only → relay CLI `--markdown` stdout as-is after one search pass.
+**Lookup mode:** exact mention / line reference only → relay CLI `--markdown` as-is (one search, no full reads).
 
 ## Steps
 
-1. Reformulate the user's query into 3–5 practical keyword variants:
-   - Keep the original phrase as the primary `query`.
-   - Add likely synonyms, abbreviations, and alternate phrasing.
-   - Do **not** add shorter stems when a longer form is already present (e.g. skip `version` when the query is `versioning`).
-   - Prefer concrete terms over broad words; avoid generic tokens that appear in unrelated contexts unless the user asked for them.
+1. **Terms (private)** — 3–5 short `--terms`:
+   - User phrase = `query` only (do not recycle it as a long term).
+   - Single tokens or ≤2-word phrases; prefer vault/product language (`slash commands`, `grounder migrate`, `hash drift`).
+   - **Include ≥1 concrete identifier** when the topic has one (`commandsSchema`, `hooksSchema`, `state.json`, `chezmoi`, etc.) — do not rely only on soft words like `migrate`.
+   - No long paraphrases. No lone generics (`command`, `file`, `update`).
+   - **No repo/source paths or module names** as terms (`install-command`, `vault/search.ts`, `packages/…`) unless the user explicitly asked about code layout.
 
-2. **One CLI call** (do **not** pass `--limit` unless the user asks for more):
+2. **Search (tool round 1):**
 
 ```bash
-{{GROUNDER_CLI}} search "<query>" --terms <csv> --context 2 --json
+{{GROUNDER_CLI}} search "<query>" --terms "<csv>" --context 2 --json
 ```
 
-`--context 2` gives enough snippet context for triage; CLI returns **1 match per file** by default.
+**Always quote `--terms`.** Unquoted CSV with spaces corrupts argv.
 
-Parse the JSON privately. Extract ranked paths from `hits[].file`.
+Parse JSON privately. Take `hits[].file` in CLI order.
 
-**No retry for noisy or truncated results** — synthesis filters noise; truncation only affects the candidate tail you didn't read anyway.
+**Broaden once (silent)** only if `totalFileCount` is 0, or ≤2 and every hit is meta (`discussions/search/`, or snippet only quotes the query). Otherwise do not re-search.
 
-**Optional second call (0 files only):** if `totalFileCount` is 0, broaden `--terms` once and re-run silently. Never retry because results feel noisy.
-
-3. **Read top candidates** (required unless lookup mode):
-   - Read the **full file** for CLI-ranked hits **1–5** (fewer if filenames/snippets already show a hit is tangential).
+3. **Read (tool round 2)** — mandatory unless lookup:
+   - Full-read CLI hits **1–4** in rank order, **all in one parallel batch**.
+   - **No skips, no substitutions, no “maybe also hit 5.”** Trust CLI order; judge relevance only when writing the answer.
    - Grant read permissions for vault paths outside the workspace when needed.
 
-4. **Synthesize** from full reads plus CLI metadata for lower-ranked hits:
-   - Ground every claim in file content — do not invent.
-   - Rank and tier using substance from full reads, not keyword density alone.
-   - Prefer archive/design docs when they are the authoritative source.
+4. **Answer** — synthesize immediately after reads:
+   - Claims only from file content.
+   - Useful full reads → **Read these** (thin/off-topic reads get one blunt line there or drop to **Also matched**).
+   - Remaining top-10 CLI hits you did not deep-summarize → **Also matched** (one phrase from snippet/path).
+   - Prefer design/archive docs when they are the authority.
 
 Run from the linked project folder or any subdirectory beneath it.
 The vault is outside the workspace — grant shell permissions if Claude Code prompts you.
 Do not write to vault files during search.
-Do not grep the vault yourself — the CLI ranks candidates; you read, judge, and synthesize.
+Do not grep the vault yourself — the CLI ranks; you read and synthesize.
