@@ -1,18 +1,22 @@
 Search this project's vault content for relevant context.
 
+**Silence:** write **no assistant text** until step 3. Rounds 1–2 are tool calls with an empty/absent text part — not “I’ll search…”, not “I’ll read…”, not “**Analyzing…**”, not query/terms narration.
+
 Use this when the user asks to find prior project-vault context by topic, keyword, concept, or phrase.
 
 Scope is this linked project only — the CLI resolves and searches under the linked project vault root. Do not search outside it.
 
 ## Turn budget (speed)
 
-Exactly **two** tool rounds, then the answer:
+**Rounds 1–2: tool calls only — no text part in those messages.** Not even one sentence.
 
-1. Shell: one `search … --json` (optional second search only per broaden rule below — still no chat).
-2. Reads: **one** parallel batch of full-file reads.
-3. Final answer to the user.
+Exactly **two** assistant turns with tools, then the answer. Allowed tools, nothing else:
 
-**No assistant/user-visible text before step 3.** No status lines, no “I’ll search…”, no triage narration, no debating which hit to open. Tool calls only until the final block.
+1. Round 1 — Shell only: one `search … --json` (optional second search in the *same* round only per the broaden rule below). Message = that tool call, nothing else.
+2. Round 2 — Read only: **one** parallel batch of full-file reads (hits 1–4). Message = those Read calls, nothing else.
+3. Final answer to the user (first and only chat text).
+
+**Do not** Glob, Grep, extra Shell, or status/UI tools (`UpdateCurrentStep`, `TodoWrite`, and similar). Do not add a third tool turn. Do not explore the repo.
 
 ## Output contract (default — hybrid)
 
@@ -21,9 +25,12 @@ Exactly **two** tool rounds, then the answer:
 - One final synthesized response only.
 
 **Path links (mandatory for every listed file):**
-- Visible title = vault-relative path (under the project vault root).
+- Visible title = path relative to the **project vault root** (the folder that contains `notes/`, `logs/`, and `plans/`). Example: `plans/archive/0.2.0 and older/doc.md`.
+- **Wrong titles:** `10-Projects/grounder/plans/…` (parent-vault prefix) or any path above that root.
 - Link target = `file://` URL from the absolute `hits[].file` (same idea as CLI `--markdown`).
-- Percent-encode spaces in the URL (`0.2.0%20and%20older`), not in the visible title.
+- Percent-encode spaces in the **href only**, never in the visible title:
+  - Correct: `[plans/archive/0.2.0 and older/doc.md](file:///…/0.2.0%20and%20older/doc.md)`
+  - Wrong: `[plans/archive/0.2.0%20and%20older/doc.md](file:///…)` — `%20` in the title
 - Markdown form: `[plans/archive/…/doc.md](file:///absolute/path/to/doc.md)`
 
 **Numbering (mandatory):**
@@ -36,17 +43,17 @@ Structure:
 2. **Read these** — hits 1–4 only; numbered linked paths + optional role + short bullets under each. You may list a design/archive authority first *among those four*.
 3. **Also matched** — leftover top-10 **in CLI order** (do not reshuffle); numbered linked paths + one short phrase each. Omit if empty.
 
-Example shape:
+Example shape (`##` headings required — not bold-only, not `###`):
 
 ```markdown
-Vault notes discuss … 
+Vault notes discuss …
 
 ## Read these
 1. [plans/archive/0.3.0/schema_….md](file:///…/schema_….md) — design authority
    - …
 2. [plans/…](file:///…) — …
 ## Also matched
-3. [plans/…](file:///…) — one phrase
+3. [plans/archive/0.2.0 and older/doc.md](file:///…/0.2.0%20and%20older/doc.md) — one phrase
 4. [plans/…](file:///…) — one phrase
 ```
 
@@ -56,10 +63,15 @@ Vault notes discuss …
 
 1. **Query and terms (private)** — the CLI line-scans `--terms`. `query` is a scan term only when it is 1–2 words; longer queries only boost a file if that **exact** phrase appears (rare). Rank is dominated by how many distinct terms hit the **same** file — complementary vault words beat extra English synonyms and source module names.
 
-   **Query** = topic only:
-   - Strip retrieval wrappers (`find`, `search for`, `documents discussing`, `notes about`, `look up`).
+   **Query** = leftover topic after stripping wrappers. Same words, same order:
+   - Strip only retrieval wrappers (`find`, `search for`, `documents discussing`, `notes about`, `look up`).
    - Do not pass the whole utterance.
+   - Do not paraphrase, shorten, or coin a new phrase.
    - Do not recycle the query as a `--terms` item.
+
+   Example — user: `find documents discussing handling migrations of slash commands`
+   - query: `handling migrations of slash commands`
+   - wrong query: `slash command migrations` (rewritten / shortened)
 
    **Terms** — fill 3–5 slots, then stop:
    1. Product noun/phrase from the topic (`slash commands`)
@@ -67,12 +79,12 @@ Vault notes discuss …
    3. One on-disk identifier (`commandsSchema`, `hooksSchema`, `state.json`, `hash drift`, `chezmoi`)
    4–5. Only another vault/product token. No paraphrase of the query.
 
-   **Never as terms** (unless the user asked about code layout): repo paths, `packages/…`, source module names (`install-command`, `vault/search.ts`).
+   **Never as terms** (unless the user asked about code layout): repo paths, `packages/…`, source module / file stems (`install-command`, `apply-agent-installs`, `hook-runtime`, `vault/search.ts`). Those distort CLI rank. Prefer product words (`grounder migrate`, `state.json`, `commandsSchema`).
 
-   Example — user: `find documents discussing handling migrations of slash commands`
-   - query: `handling migrations of slash commands`
-   - terms: `slash commands,grounder migrate,hash drift,commandsSchema,state.json`
-   - not: `install-command`, `migrate`, `find documents`
+   Example — user: `look up why session start hooks must exit 0`
+   - query: `why session start hooks must exit 0`
+   - terms: `session hooks,fail silent,hooks.json,hooksSchema,SessionStart`
+   - not: `hook-runtime`, `apply-agent-installs`, `exit`, `look up`
 
 2. **Search (tool round 1):**
 
