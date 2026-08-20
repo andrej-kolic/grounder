@@ -29,7 +29,10 @@ describe("templates/grounder-search", () => {
       expect(body).toContain("wrong query: `slash command migrations`");
       expect(body).toContain("leftover top-10 **in CLI order**");
       expect(body).toContain("Unread hits must not grow new facts");
-      expect(body).toContain("hits[].matches[].term");
+      expect(body).toContain("matches[].term");
+      expect(body).toContain("hits[].relativePath");
+      expect(body).toContain("hits[].fileUri");
+      expect(body).toContain("alsoMatchedHint");
       expect(body).not.toContain("Obsidian vault");
     }
   });
@@ -44,7 +47,9 @@ describe("templates/grounder-search", () => {
       expect(body).toContain("Do not add a third tool turn");
       expect(body).toContain("10-Projects/grounder/plans/");
       expect(body).toContain("plans/archive/0.2.0 and older/doc.md");
-      expect(body).toContain("`%20` in the title");
+      expect(body).toContain("I have searched");
+      expect(body).toContain("hits[i].file");
+      expect(body).toContain("bare links are invalid");
       expect(body).toContain("`##` headings required");
     }
   });

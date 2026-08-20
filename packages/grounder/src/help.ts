@@ -149,7 +149,7 @@ Subcommands:
   --since <date>  Only files modified on or after date (YYYY-MM-DD or Nd, e.g. 7d)
   --after <date>  Alias for --since
   --markdown      Agent relay: file:// links + fenced snippets
-  --json          Structured output ({ query, terms, termHitCounts, summary, hits[] })`,
+  --json          Structured output (relativePath, fileUri, alsoMatchedHint per hit)`,
   },
   {
     id: "path notes",

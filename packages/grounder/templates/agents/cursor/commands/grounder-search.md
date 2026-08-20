@@ -25,13 +25,11 @@ Exactly **two** assistant turns with tools, then the answer. Allowed tools, noth
 - One final synthesized response only.
 
 **Path links (mandatory for every listed file):**
-- Visible title = path relative to the **project vault root** (the folder that contains `notes/`, `logs/`, and `plans/`). Example: `plans/archive/0.2.0 and older/doc.md`.
-- **Wrong titles:** `10-Projects/grounder/plans/…` (parent-vault prefix) or any path above that root.
-- Link target = `file://` URL from the absolute `hits[].file` (same idea as CLI `--markdown`).
-- Percent-encode spaces in the **href only**, never in the visible title:
-  - Correct: `[plans/archive/0.2.0 and older/doc.md](file:///…/0.2.0%20and%20older/doc.md)`
-  - Wrong: `[plans/archive/0.2.0%20and%20older/doc.md](file:///…)` — `%20` in the title
-- Markdown form: `[plans/archive/…/doc.md](file:///absolute/path/to/doc.md)`
+- Visible title = `hits[].relativePath` from JSON **exactly** (project-vault-relative; the folder that contains `notes/`, `logs/`, and `plans/`). Example: `plans/archive/0.2.0 and older/doc.md`.
+- **Do not** derive the title from `hits[].file`, path segments, or parent-vault prefixes.
+- **Wrong titles:** `10-Projects/grounder/plans/…`, `%20` in the visible title, or any path above the project vault root.
+- Link href = `hits[].fileUri` from JSON (spaces already percent-encoded).
+- Markdown form: `[hits[i].relativePath](hits[i].fileUri)`
 
 **Numbering (mandatory):**
 - Number every listed file, continuing across sections (`1…` in **Read these**, then `5…` in **Also matched`).
@@ -39,9 +37,9 @@ Exactly **two** assistant turns with tools, then the answer. Allowed tools, noth
 
 Structure:
 
-1. **Opening** — one sentence of what the vault says (not a search recap).
+1. **Opening** — one sentence of what the vault says (not a search recap). Never start with “I have searched…”, “I found…”, or similar.
 2. **Read these** — hits 1–4 only; numbered linked paths + optional role + short bullets under each. You may list a design/archive authority first *among those four*.
-3. **Also matched** — leftover top-10 **in CLI order** (do not reshuffle); numbered linked paths + one short phrase each. Omit if empty.
+3. **Also matched** — leftover top-10 **in CLI order** (do not reshuffle); numbered linked paths + one short phrase each (`hits[].alsoMatchedHint` or `matches[].term`). Every line must end with ` — phrase`; bare links are invalid. Omit if empty.
 
 Example shape (`##` headings required — not bold-only, not `###`):
 
@@ -94,7 +92,7 @@ Vault notes discuss …
 
 **Always quote `--terms`.** Unquoted CSV with spaces corrupts argv.
 
-Parse JSON privately. Take `hits[].file` in CLI order. Use `hits[].matches[].term` (and `topicsMatch`) only to phrase Also matched / roles — do not quote snippets.
+Parse JSON privately. Take hits in CLI order (`hits[0]` …). For links use `relativePath` + `fileUri`; for Also matched gloss use `alsoMatchedHint` or `matches[].term` — do not quote snippets.
 
 **Broaden once (silent)** only if: `totalFileCount` is 0; or ≤2 and every hit is meta (`discussions/search/`, or snippet only quotes the query); or any term in `termHitCounts` has a count of 0 (that term produced no files — it was a bad guess and must be replaced). Otherwise do not re-search.
 
@@ -108,14 +106,15 @@ Parse JSON privately. Take `hits[].file` in CLI order. Use `hits[].matches[].ter
 
 3. **Read (tool round 2)** — mandatory unless lookup:
    - Full-read CLI hits **1–4** in rank order, **all in one parallel batch**.
+   - Read path = `hits[i].file` (absolute). Link title/href = `hits[i].relativePath` + `hits[i].fileUri`.
    - **No skips, no substitutions, no “maybe also hit 5.”** Trust CLI order; judge relevance only when writing the answer.
    - Request vault read permissions as needed.
 
 4. **Answer** — synthesize immediately after reads:
    - Claims only from files you full-read. Unread hits must not grow new facts.
    - **Read these:** useful full-reads (those 1–4 only). Thin/off-topic reads get one blunt numbered line there or move to **Also matched**.
-   - **Also matched:** remaining top-10 you did not deep-summarize, **in CLI leftover order**. One short phrase each — from the path stem or JSON `matches[].term`, not a sentence and not a guess from an unrelated filename.
-   - Every file line uses the numbered `file://` form above; continue numbering across sections.
+   - **Also matched:** remaining top-10 you did not deep-summarize, **in CLI leftover order**. Copy `alsoMatchedHint` or phrase from `matches[].term`; every line ends with ` — phrase`.
+   - Every file line: `[relativePath](fileUri)` from JSON; continue numbering across sections.
    - Prefer design/archive docs when they are the authority among the files you read.
 
 Run from the linked project folder or any subdirectory beneath it.

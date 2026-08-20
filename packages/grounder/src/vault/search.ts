@@ -264,8 +264,8 @@ function contentHasPhrase(content: string, query: string): boolean {
 
 /**
  * Partial n-gram match: 2 consecutive words for 3-word queries, 3 consecutive
- * words for 4+ word queries. Trigrams reduce false positives on docs that share
- * only a common bigram ("slash commands") without the migration context.
+ * words for 4+ word queries. Trigrams cut false positives where a doc only
+ * shares a loose bigram (e.g. "slash commands") without migration context.
  */
 function contentHasPartialPhrase(content: string, query: string): boolean {
   const words = query.trim().split(/\s+/).filter(Boolean);
@@ -275,7 +275,10 @@ function contentHasPartialPhrase(content: string, query: string): boolean {
   const lower = content.toLowerCase();
   const windowSize = words.length >= 4 ? 3 : 2;
   for (let i = 0; i <= words.length - windowSize; i++) {
-    const ngram = words.slice(i, i + windowSize).join(" ").toLowerCase();
+    const ngram = words
+      .slice(i, i + windowSize)
+      .join(" ")
+      .toLowerCase();
     if (lower.includes(ngram)) {
       return true;
     }

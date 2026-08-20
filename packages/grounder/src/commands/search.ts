@@ -5,7 +5,7 @@ import { resolveProjectVaultRoot } from "../connector/vault.js";
 import { helpExitCode } from "../help.js";
 import { fileExists } from "../util/fs.js";
 import { flagBool, flagString, parseArgs } from "../util/parse-args.js";
-import { type SearchOutcome, searchVault } from "../vault/search.js";
+import { type SearchFileHit, type SearchOutcome, searchVault } from "../vault/search.js";
 import { requireLinkedProject } from "./require-linked.js";
 
 /** Options for {@link runSearchWithOptions} (CLI parsing and tests). */
@@ -185,7 +185,21 @@ function writeMarkdownOutput(outcome: SearchOutcome): void {
   }
 }
 
-function writeJsonOutput(outcome: SearchOutcome): void {
+function vaultRelativePath(rootDir: string, filePath: string): string {
+  return path.relative(rootDir, filePath).split(path.sep).join("/");
+}
+
+function alsoMatchedHint(filePath: string, hits: SearchFileHit["hits"]): string {
+  const stem = fileStem(filePath);
+  const terms = [...new Set(hits.map((hit) => hit.matchedTerm))];
+  if (terms.length === 0) {
+    return stem;
+  }
+  const gloss = terms.slice(0, 2).join(", ");
+  return `${stem} — ${gloss}`;
+}
+
+function writeJsonOutput(outcome: SearchOutcome, rootDir: string): void {
   const payload = {
     query: outcome.query,
     terms: outcome.terms,
@@ -196,6 +210,9 @@ function writeJsonOutput(outcome: SearchOutcome): void {
     totalFileCount: outcome.totalFileCount,
     hits: outcome.files.map((file) => ({
       file: file.filePath,
+      relativePath: vaultRelativePath(rootDir, file.filePath),
+      fileUri: fileUri(file.filePath),
+      alsoMatchedHint: alsoMatchedHint(file.filePath, file.hits),
       mtimeMs: file.mtimeMs,
       topicsMatch: file.topicsMatch,
       matches: file.hits.map((hit) => ({
@@ -313,7 +330,7 @@ export async function runSearchWithOptions(options: SearchCommandOptions): Promi
     });
 
     if (options.json) {
-      writeJsonOutput(outcome);
+      writeJsonOutput(outcome, rootDir);
     } else if (options.markdown) {
       writeMarkdownOutput(outcome);
     } else {

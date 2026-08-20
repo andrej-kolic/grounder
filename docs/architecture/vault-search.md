@@ -95,7 +95,7 @@ Then, as tiebreakers only: **non-archive before archive**, newer `mtime`, folder
 | --- | --- | --- |
 | (plain) | Humans | Stem + absolute path + one-line snippets |
 | `--markdown` | Lookup-mode slash command | `file://` links (spaces percent-encoded via `pathToFileURL`) + fenced snippets |
-| `--json` | Default slash command | `{ query, terms, summary, totalFileCount, hits[] }` — **parse privately, never paste** |
+`--json` | Default slash command | `{ query, terms, summary, hits[] }` — each hit: `file` (Read path), `relativePath`, `fileUri`, `alsoMatchedHint`, `matches[]`; **parse privately, never paste** |
 
 `--markdown` and `--json` are mutually exclusive.
 
@@ -137,8 +137,8 @@ No Glob, Grep, extra Shell, `UpdateCurrentStep`, `TodoWrite`. Rounds 1–2 shoul
 
 - One opening sentence of what the vault **says** (not a search recap).
 - `## Read these` / `## Also matched` (not bold-only, not `###`).
-- Visible title = path **relative to the project vault root** (`plans/…`, never `10-Projects/grounder/plans/…`).
-- Href = `file://` from `hits[].file`; percent-encode spaces **in the URL only**.
+- Visible title = `hits[].relativePath` from JSON exactly (`plans/…`, never `10-Projects/grounder/plans/…`).
+- Href = `hits[].fileUri`; percent-encoding is CLI-owned.
 - Number 1…n continuously across sections. Also matched = leftover top-10 **in CLI order**.
 - Claims only from files you full-read. Also-matched gloss = path stem or `matches[].term`, one short phrase.
 

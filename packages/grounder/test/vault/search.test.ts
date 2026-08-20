@@ -169,4 +169,41 @@ describe("vault/search", () => {
       await rm(rootDir, { recursive: true, force: true });
     }
   });
+
+  it("long-query partial phrase needs a 3-word slice, not a loose bigram only", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "grounder-search-"));
+    try {
+      const hooksPath = await writeMd(
+        rootDir,
+        "plans/archive/0.2.0 and older/cursor-hooks-fixes.md",
+        [
+          "Cursor hooks migrated from npx to runtime",
+          "slash commands still use npx at this stage",
+          "vault init --hooks replaces legacy entries",
+        ].join("\n"),
+      );
+      const schemaPath = await writeMd(
+        rootDir,
+        "plans/archive/0.3.0/schema_versioning_for_grounder_ac9204ad.plan.md",
+        [
+          "handling migrations of slash commands via grounder migrate",
+          "commandsSchema and state.json ledger with hash drift detection",
+          "chezmoi-style drift for user-editable slash command markdown",
+        ].join("\n"),
+      );
+
+      const outcome = await searchVault({
+        rootDir,
+        query: "handling migrations of slash comands",
+        terms: ["slash commands", "grounder migrate", "commandsSchema", "state.json", "hash drift"],
+        limit: 5,
+      });
+
+      expect(outcome.files[0]?.filePath).toBe(schemaPath);
+      const hooksRank = outcome.files.findIndex((file) => file.filePath === hooksPath);
+      expect(hooksRank).toBeGreaterThan(0);
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
+  });
 });
