@@ -67,22 +67,22 @@ Vault notes discuss …
    - Do not paraphrase, shorten, or coin a new phrase.
    - Do not recycle the query as a `--terms` item.
 
-   Example — user: `find documents discussing handling migrations of slash commands`
-   - query: `handling migrations of slash commands`
-   - wrong query: `slash command migrations` (rewritten / shortened)
+   Example — user: `find documents discussing retry of expired jobs`
+   - query: `retry of expired jobs`
+   - wrong query: `expired job retries` (rewritten / shortened)
 
-   **Terms** — fill 3–5 slots, then stop:
-   1. Product noun/phrase from the topic (`slash commands`)
-   2. Product verb or CLI name if the topic has one (`grounder migrate` — never the lone generic `migrate`)
-   3. One on-disk identifier (`commandsSchema`, `hooksSchema`, `state.json`, `hash drift`, `chezmoi`)
+   **Terms** — fill 3–5 slots from *this* topic’s vault vocabulary, then stop:
+   1. Domain noun/phrase from the topic
+   2. Named command or product verb if the topic has one — never a lone generic verb (`migrate`, `install`)
+   3. One on-disk identifier (filename, config key, schema field)
    4–5. Only another vault/product token. No paraphrase of the query.
 
-   **Never as terms** (unless the user asked about code layout): repo paths, `packages/…`, source module / file stems (`install-command`, `apply-agent-installs`, `hook-runtime`, `vault/search.ts`). Those distort CLI rank. Prefer product words (`grounder migrate`, `state.json`, `commandsSchema`).
+   **Never as terms** (unless the user asked about code layout): repo paths, `packages/…`, source module / file stems. Those distort CLI rank toward implementation notes. Prefer words that appear in vault notes (named commands, config files, domain identifiers).
 
-   Example — user: `look up why session start hooks must exit 0`
-   - query: `why session start hooks must exit 0`
-   - terms: `session hooks,fail silent,hooks.json,hooksSchema,SessionStart`
-   - not: `hook-runtime`, `apply-agent-installs`, `exit`, `look up`
+   Example — user: `look up why the retry queue must skip expired jobs`
+   - query: `why the retry queue must skip expired jobs`
+   - terms: `retry queue,dead letter,jobs.json,RetryPolicy,ttl`
+   - not: `queue-worker`, `process-jobs`, `skip`, `look up`
 
 2. **Search (tool round 1):**
 

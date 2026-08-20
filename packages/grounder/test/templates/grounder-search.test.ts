@@ -20,13 +20,13 @@ describe("templates/grounder-search", () => {
         '{{GROUNDER_CLI}} search "<query>" --terms "<csv>" --context 2 --json',
       );
       expect(body).toContain("Strip only retrieval wrappers");
-      expect(body).toContain("never the lone generic `migrate`");
-      expect(body).toContain("install-command");
-      expect(body).toContain("apply-agent-installs");
-      expect(body).toContain("`slash commands`");
-      expect(body).toContain("`grounder migrate`");
-      expect(body).toContain("session hooks,fail silent,hooks.json,hooksSchema,SessionStart");
-      expect(body).toContain("wrong query: `slash command migrations`");
+      expect(body).toContain("never a lone generic verb");
+      expect(body).toContain("source module / file stems");
+      expect(body).toContain("retry queue,dead letter,jobs.json,RetryPolicy,ttl");
+      expect(body).toContain("wrong query: `expired job retries`");
+      expect(body).not.toContain("commandsSchema");
+      expect(body).not.toContain("install-command");
+      expect(body).not.toContain("`grounder migrate`");
       expect(body).toContain("leftover top-10 **in CLI order**");
       expect(body).toContain("Unread hits must not grow new facts");
       expect(body).toContain("matches[].term");
@@ -54,11 +54,11 @@ describe("templates/grounder-search", () => {
     }
   });
 
-  it("does not prime slash-command migration terms as the worked example", async () => {
+  it("does not prime this-repo vocabulary as the worked example", async () => {
     for (const filePath of searchTemplates) {
       const body = await readFile(filePath, "utf8");
-      expect(body).toContain("look up why session start hooks must exit 0");
-      expect(body).toContain("wrong query: `slash command migrations`");
+      expect(body).toContain("look up why the retry queue must skip expired jobs");
+      expect(body).not.toContain("session start hooks");
       expect(body).not.toContain(
         "terms: `slash commands,grounder migrate,hash drift,commandsSchema,state.json`",
       );
