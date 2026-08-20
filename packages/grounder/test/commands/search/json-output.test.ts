@@ -64,6 +64,73 @@ describe("commands/search json output", () => {
     expect(hit?.alsoMatchedHint).toContain("session hooks");
   });
 
+  it("alsoMatchedHint lists two distinct file terms, not only the snippet label", async () => {
+    const env = await createTempEnv({ packageName: "my-app", initGit: false });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await writeHomeConfig({ vaultRoot: env.vault });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
+    await mkdir(notesDir, { recursive: true });
+    const notePath = path.join(notesDir, "migrate.md");
+    await writeFile(notePath, "slash commands via grounder migrate\n", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runSearchWithOptions({
+        homeDir: env.home,
+        cwd: env.repo,
+        query: "handling migrations",
+        terms: ["slash commands", "grounder migrate"],
+        json: true,
+      }),
+    );
+
+    expect(code).toBe(0);
+    const payload = JSON.parse(out.trim()) as {
+      hits: Array<{ file: string; alsoMatchedHint: string; matches: Array<{ term: string }> }>;
+    };
+    const hit = payload.hits.find((entry) => entry.file === notePath);
+    expect(hit?.matches).toHaveLength(1);
+    expect(hit?.matches[0]?.term).toBe("grounder migrate");
+    expect(hit?.alsoMatchedHint).toContain("grounder migrate");
+    expect(hit?.alsoMatchedHint).toContain("slash commands");
+  });
+
+  it("keys termHitCounts with the original terms spelling", async () => {
+    const env = await createTempEnv({ packageName: "my-app", initGit: false });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await writeHomeConfig({ vaultRoot: env.vault });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
+    await mkdir(notesDir, { recursive: true });
+    await writeFile(path.join(notesDir, "hooks.md"), "SessionStart must exit 0\n", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runSearchWithOptions({
+        homeDir: env.home,
+        cwd: env.repo,
+        query: "hooks",
+        terms: ["SessionStart"],
+        json: true,
+      }),
+    );
+
+    expect(code).toBe(0);
+    const payload = JSON.parse(out.trim()) as {
+      terms: string[];
+      termHitCounts: Record<string, number>;
+    };
+
+    expect(payload.terms).toContain("SessionStart");
+    expect(payload.termHitCounts.SessionStart).toBeGreaterThan(0);
+    expect(payload.termHitCounts.sessionstart).toBeUndefined();
+  });
+
   it("emits termHitCounts for every term, including zero-hit terms", async () => {
     const env = await createTempEnv({ packageName: "my-app", initGit: false });
     cleanup = env.cleanup;

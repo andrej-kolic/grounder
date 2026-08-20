@@ -85,6 +85,28 @@ Ship plan capture.
     expect(content).not.toContain('"old"');
   });
 
+  it("preserves existing topics when overwrite omits them", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const plansDir = path.join(env.vault, "plans");
+
+    await writePlan(plansDir, "evolving", body, {
+      projectId: "my-app",
+      topics: ["caching", "redis"],
+      now: createdAt,
+    });
+
+    const result = await writePlan(plansDir, "evolving", "# new\n", {
+      projectId: "my-app",
+      force: true,
+      now: updatedAt,
+    });
+
+    expect(result.status).toBe("overwritten");
+    const content = await readFile(result.path, "utf8");
+    expect(content).toContain('topics: ["caching", "redis"]\n');
+  });
+
   it("creates plans dir when missing", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;

@@ -16,6 +16,8 @@ export interface SearchFileHit {
   mtimeMs: number;
   topicsMatch: boolean;
   hits: SearchLineHit[];
+  /** Distinct matching terms (original spelling), longest first. */
+  matchedTerms: string[];
 }
 
 export interface SearchOptions {
@@ -28,7 +30,7 @@ export interface SearchOptions {
   /** Max distinct files in the result (default 10). */
   limit?: number;
   /**
-   * Cap stored line snippets per file during scan (default 200; hard-capped at
+   * Cap stored line snippets per file during scan (default 50; hard-capped at
    * 50). Does not abort the tree walk; ranking still uses full hit counts.
    */
   maxHits?: number;
@@ -52,7 +54,7 @@ export interface SearchOutcome {
 }
 
 const DEFAULT_LIMIT = 10;
-const DEFAULT_MAX_HITS = 200;
+const DEFAULT_MAX_HITS = 50;
 const DEFAULT_CONTEXT = 1;
 const DEFAULT_MAX_HITS_PER_FILE = 1;
 /** Cap line hits stored per file during scan (counts stay full for ranking). */
@@ -145,14 +147,12 @@ function termMatchesLine(line: string, term: string): boolean {
   return re.test(line);
 }
 
-function findMatchingTerm(line: string, terms: readonly string[]): string | undefined {
-  const byLength = [...terms].sort((a, b) => b.length - a.length);
-  for (const term of byLength) {
-    if (termMatchesLine(line, term)) {
-      return term;
-    }
-  }
-  return undefined;
+function matchingTermsOnLine(line: string, terms: readonly string[]): string[] {
+  return terms.filter((term) => termMatchesLine(line, term));
+}
+
+function longestTerm(matches: readonly string[]): string {
+  return matches.reduce((best, term) => (term.length > best.length ? term : best));
 }
 
 function topicsMatchTerms(
@@ -341,8 +341,8 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
   const filePaths = await listMarkdownFiles(options.rootDir);
   const rawFiles: RawFileHits[] = [];
   let totalMatchCount = 0;
-  // Pre-populate with 0 so zero-hit terms are explicit in JSON output.
-  const termHitCounts: Record<string, number> = Object.fromEntries(
+  // Lowercased doc-freq for ranking; JSON output remaps to original `terms` spelling.
+  const termDocFreq: Record<string, number> = Object.fromEntries(
     terms.map((t) => [t.toLowerCase(), 0]),
   );
 
@@ -369,21 +369,23 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i] ?? "";
-      const matchedTerm = findMatchingTerm(line, terms);
-      if (!matchedTerm) {
+      const lineMatches = matchingTermsOnLine(line, terms);
+      if (lineMatches.length === 0) {
         continue;
       }
 
-      const termKey = matchedTerm.toLowerCase();
-      matchedTerms.add(termKey);
-      perTermHits.set(termKey, (perTermHits.get(termKey) ?? 0) + 1);
+      for (const term of lineMatches) {
+        const termKey = term.toLowerCase();
+        matchedTerms.add(termKey);
+        perTermHits.set(termKey, (perTermHits.get(termKey) ?? 0) + 1);
+      }
       totalHitCount++;
       totalMatchCount++;
 
       if (fileHits.length < perFileStoreCap) {
         fileHits.push({
           line: i + 1,
-          matchedTerm,
+          matchedTerm: longestTerm(lineMatches),
           snippet: buildSnippet(lines, i, context),
         });
       }
@@ -391,7 +393,7 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
 
     if (matchedTerms.size > 0) {
       for (const t of matchedTerms) {
-        termHitCounts[t] = (termHitCounts[t] ?? 0) + 1;
+        termDocFreq[t] = (termDocFreq[t] ?? 0) + 1;
       }
       rawFiles.push({
         filePath,
@@ -413,7 +415,7 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
   for (const file of rawFiles) {
     let density = 0;
     for (const [term, count] of file.perTermHits) {
-      const df = termHitCounts[term] ?? 1;
+      const df = termDocFreq[term] ?? 1;
       density += count / Math.log(1 + df);
     }
     file.idfDensity = density;
@@ -444,17 +446,22 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
 
   const totalFileCount = rawFiles.length;
   const truncated = totalFileCount > limit;
-  const files = rawFiles.slice(0, limit).map(({ filePath, mtimeMs, topicsMatch, hits }) => ({
-    filePath,
-    mtimeMs,
-    topicsMatch,
-    hits: pickBestHits(hits, maxHitsPerFile),
+  const files = rawFiles.slice(0, limit).map((file) => ({
+    filePath: file.filePath,
+    mtimeMs: file.mtimeMs,
+    topicsMatch: file.topicsMatch,
+    hits: pickBestHits(file.hits, maxHitsPerFile),
+    matchedTerms: terms
+      .filter((term) => file.perTermHits.has(term.toLowerCase()))
+      .sort((a, b) => b.length - a.length),
   }));
 
   return {
     query: options.query,
     terms,
-    termHitCounts,
+    termHitCounts: Object.fromEntries(
+      terms.map((term) => [term, termDocFreq[term.toLowerCase()] ?? 0]),
+    ),
     totalMatchCount,
     totalFileCount,
     files,

@@ -31,6 +31,7 @@ describe("grounder cli", () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("Setup:");
       expect(result.stdout).toContain("Write:");
+      expect(result.stdout).toContain("Retrieve:");
       expect(result.stdout).toContain("Maintain:");
       expect(result.stdout).toContain("grounder help <command>");
       // `help` is discoverable via global options / pointer, not the command list.
@@ -50,6 +51,7 @@ describe("grounder cli", () => {
       expect(result.stdout).toContain("Commands:");
       expect(result.stdout).toContain("Setup\nsetup");
       expect(result.stdout).toContain("Write\nnote");
+      expect(result.stdout).toContain("Retrieve\nsearch");
       expect(result.stdout).toContain("Usage: grounder setup");
       expect(result.stdout).toContain("Usage: grounder note");
       expect(result.stdout).toContain("Usage: grounder plan");

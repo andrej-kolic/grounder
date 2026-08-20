@@ -36,7 +36,7 @@ export async function runHandoff(argv: string[]): Promise<number> {
   const text = positional.join(" ").trim();
 
   if (!text) {
-    process.stderr.write("Usage: grounder handoff <text>\n");
+    process.stderr.write("Usage: grounder handoff <text> [--title <slug>] [--topics <list>]\n");
     return 1;
   }
 

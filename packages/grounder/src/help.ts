@@ -1,6 +1,6 @@
 /** Help tiers and command metadata for the grounder CLI. */
 
-export type HelpGroup = "Setup" | "Write" | "Paths" | "Maintain" | "Advanced";
+export type HelpGroup = "Setup" | "Write" | "Retrieve" | "Paths" | "Maintain" | "Advanced";
 
 export interface CommandMeta {
   /** Canonical id (`note`, `handoff list`, `setup`, …). */
@@ -18,7 +18,7 @@ export interface CommandMeta {
   list?: boolean;
 }
 
-const GROUP_ORDER: HelpGroup[] = ["Setup", "Write", "Paths", "Maintain", "Advanced"];
+const GROUP_ORDER: HelpGroup[] = ["Setup", "Write", "Retrieve", "Paths", "Maintain", "Advanced"];
 
 const QUICKSTART = `Quickstart:
   grounder setup <path-to-your-vault>
@@ -120,7 +120,8 @@ Subcommands:
   --path <file>   Update an existing plan by path (must resolve under this
                   project's plans/; no title sanitization; always overwrites)
   --force         With --title: overwrite an existing plan (preserves created)
-  --topics <list> Comma-separated keywords for search (e.g. "caching,redis,api")
+  --topics <list> Comma-separated keywords for search (e.g. "caching,redis,api").
+                  On update, omit to keep existing topics.
 
 Subcommands:
   plan list   Print recent plans (count header + numbered title/path, newest first)`,
@@ -136,7 +137,7 @@ Subcommands:
   },
   {
     id: "search",
-    group: "Write",
+    group: "Retrieve",
     summary: "Search linked project vault for keywords (scoped retrieval)",
     listUsage: "search <query>",
     usage:
@@ -144,9 +145,9 @@ Subcommands:
     flags: `Flags:
   --terms <csv>   Extra keyword variants (comma-separated)
   --limit <n>     Max files to print (default: 10)
-  --max-hits <n>  Max stored line snippets per file (default: 200; hard cap 50)
+  --max-hits <n>  Max stored line snippets per file during scan (default: 50)
   --context <n>   Context lines around each snippet (default: 1)
-  --since <date>  Only files modified on or after date (YYYY-MM-DD or Nd, e.g. 7d)
+  --since <date>  Only files modified on or after date (YYYY-MM-DD local midnight, or Nd, e.g. 7d)
   --after <date>  Alias for --since
   --markdown      Agent relay: file:// links + fenced snippets
   --json          Structured output (relativePath, fileUri, alsoMatchedHint per hit)`,

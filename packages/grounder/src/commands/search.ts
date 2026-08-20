@@ -5,7 +5,7 @@ import { resolveProjectVaultRoot } from "../connector/vault.js";
 import { helpExitCode } from "../help.js";
 import { fileExists } from "../util/fs.js";
 import { flagBool, flagString, parseArgs } from "../util/parse-args.js";
-import { type SearchFileHit, type SearchOutcome, searchVault } from "../vault/search.js";
+import { type SearchOutcome, searchVault } from "../vault/search.js";
 import { requireLinkedProject } from "./require-linked.js";
 
 /** Options for {@link runSearchWithOptions} (CLI parsing and tests). */
@@ -23,7 +23,7 @@ export interface SearchCommandOptions {
 }
 
 const DEFAULT_LIMIT = 10;
-const DEFAULT_MAX_HITS = 200;
+const DEFAULT_MAX_HITS = 50;
 
 const USAGE =
   "Usage: grounder search <query> [--terms <csv>] [--limit <n>] [--max-hits <n>] [--context <n>] [--since <date>] [--markdown] [--json]\n";
@@ -66,8 +66,9 @@ function parseNonNegativeInt(raw: string | boolean | undefined, label: string): 
 }
 
 /**
- * Parses `--since` / `--after`: ISO date (`2026-08-01`) or relative (`7d`, `30d`).
- * Returns `null` on invalid input (after writing an error message).
+ * Parses `--since` / `--after`: calendar date (`2026-08-01` = local midnight),
+ * ISO datetime, or relative (`7d`, `30d`). Returns `null` on invalid input
+ * (after writing an error message).
  */
 function parseSinceDate(raw: string | boolean | undefined): Date | null | undefined {
   if (raw === undefined) {
@@ -85,6 +86,25 @@ function parseSinceDate(raw: string | boolean | undefined): Date | null | undefi
     d.setDate(d.getDate() - days);
     d.setHours(0, 0, 0, 0);
     return d;
+  }
+  const isoDay = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (isoDay) {
+    const year = Number.parseInt(isoDay[1] as string, 10);
+    const month = Number.parseInt(isoDay[2] as string, 10);
+    const day = Number.parseInt(isoDay[3] as string, 10);
+    const parsed = new Date(year, month - 1, day);
+    if (
+      parsed.getFullYear() !== year ||
+      parsed.getMonth() !== month - 1 ||
+      parsed.getDate() !== day
+    ) {
+      process.stderr.write(
+        `Invalid --since: "${trimmed}" is not a valid date (use YYYY-MM-DD or Nd).\n`,
+      );
+      return null;
+    }
+    parsed.setHours(0, 0, 0, 0);
+    return parsed;
   }
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) {
@@ -189,13 +209,12 @@ function vaultRelativePath(rootDir: string, filePath: string): string {
   return path.relative(rootDir, filePath).split(path.sep).join("/");
 }
 
-function alsoMatchedHint(filePath: string, hits: SearchFileHit["hits"]): string {
+function alsoMatchedHint(filePath: string, matchedTerms: readonly string[]): string {
   const stem = fileStem(filePath);
-  const terms = [...new Set(hits.map((hit) => hit.matchedTerm))];
-  if (terms.length === 0) {
+  if (matchedTerms.length === 0) {
     return stem;
   }
-  const gloss = terms.slice(0, 2).join(", ");
+  const gloss = matchedTerms.slice(0, 2).join(", ");
   return `${stem} — ${gloss}`;
 }
 
@@ -212,7 +231,7 @@ function writeJsonOutput(outcome: SearchOutcome, rootDir: string): void {
       file: file.filePath,
       relativePath: vaultRelativePath(rootDir, file.filePath),
       fileUri: fileUri(file.filePath),
-      alsoMatchedHint: alsoMatchedHint(file.filePath, file.hits),
+      alsoMatchedHint: alsoMatchedHint(file.filePath, file.matchedTerms),
       mtimeMs: file.mtimeMs,
       topicsMatch: file.topicsMatch,
       matches: file.hits.map((hit) => ({

@@ -75,6 +75,22 @@ describe("commands/search errors", () => {
     expect(err).toContain("Usage: grounder search");
   });
 
+  it("rejects invalid calendar dates for --since", async () => {
+    const env = await createTempEnv({ packageName: "my-app", initGit: false });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await writeHomeConfig({ vaultRoot: env.vault });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const { code, err } = await captureStderr(() =>
+      runSearch(["hooks", "--since", "2026-02-31", "--json"]),
+    );
+
+    expect(code).toBe(1);
+    expect(err).toContain('Invalid --since: "2026-02-31"');
+  });
+
   it("rejects invalid --since values", async () => {
     const env = await createTempEnv({ packageName: "my-app", initGit: false });
     cleanup = env.cleanup;

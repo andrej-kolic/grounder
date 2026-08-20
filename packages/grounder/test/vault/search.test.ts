@@ -53,6 +53,49 @@ describe("vault/search", () => {
     }
   });
 
+  it("counts every matching term on a line toward distinct-term score and termHitCounts", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "grounder-search-"));
+    try {
+      const packedPath = await writeMd(
+        rootDir,
+        "plans/packed.md",
+        ["slash commands via grounder migrate", "hash drift in commandsSchema and state.json"].join(
+          "\n",
+        ),
+      );
+      const sparsePath = await writeMd(rootDir, "plans/sparse.md", "slash commands only\n");
+
+      const now = Date.now();
+      await utimes(sparsePath, now / 1000, now / 1000);
+      await utimes(packedPath, (now - 5000) / 1000, (now - 5000) / 1000);
+
+      const outcome = await searchVault({
+        rootDir,
+        query: "handling migrations",
+        terms: ["slash commands", "grounder migrate", "hash drift", "commandsSchema", "state.json"],
+        limit: 5,
+      });
+
+      expect(outcome.files[0]?.filePath).toBe(packedPath);
+      expect(outcome.files[1]?.filePath).toBe(sparsePath);
+      expect(outcome.termHitCounts["slash commands"]).toBe(2);
+      expect(outcome.termHitCounts["grounder migrate"]).toBe(1);
+      expect(outcome.termHitCounts["hash drift"]).toBe(1);
+      expect(outcome.termHitCounts.commandsSchema).toBe(1);
+      expect(outcome.termHitCounts["state.json"]).toBe(1);
+      expect(outcome.files[0]?.hits[0]?.matchedTerm).toBe("grounder migrate");
+      expect(outcome.files[0]?.matchedTerms).toEqual([
+        "grounder migrate",
+        "slash commands",
+        "commandsSchema",
+        "hash drift",
+        "state.json",
+      ]);
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
+  });
+
   it("caps file results at limit and sets truncated", async () => {
     const rootDir = await mkdtemp(path.join(os.tmpdir(), "grounder-search-"));
     try {

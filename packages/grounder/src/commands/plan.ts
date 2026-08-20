@@ -10,8 +10,8 @@ import { updatePlanAtPath, writePlan } from "../vault/write-plan.js";
 import { requireLinkedProject } from "./require-linked.js";
 
 const USAGE =
-  "Usage: grounder plan <text> --title <name> [--force]\n" +
-  "   or: grounder plan <text> --path <file>";
+  "Usage: grounder plan <text> --title <name> [--force] [--topics <list>]\n" +
+  "   or: grounder plan <text> --path <file> [--topics <list>]";
 
 /** Options for {@link runPlanWithOptions} (CLI parsing and tests). */
 export interface PlanOptions {

@@ -25,7 +25,7 @@ export async function runNote(argv: string[]): Promise<number> {
   const text = positional.join(" ").trim();
 
   if (!text) {
-    process.stderr.write("Usage: grounder note <text> [--title <slug>]\n");
+    process.stderr.write("Usage: grounder note <text> [--title <slug>] [--topics <list>]\n");
     return 1;
   }
 

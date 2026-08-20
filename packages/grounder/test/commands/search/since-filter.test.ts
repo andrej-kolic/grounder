@@ -55,6 +55,44 @@ describe("commands/search since filter", () => {
     expect(files).not.toContain(oldPath);
   });
 
+  it("treats YYYY-MM-DD as local midnight", async () => {
+    const env = await createTempEnv({ packageName: "my-app", initGit: false });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await writeHomeConfig({ vaultRoot: env.vault });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
+    await mkdir(notesDir, { recursive: true });
+    const beforePath = path.join(notesDir, "before.md");
+    const afterPath = path.join(notesDir, "after.md");
+    await writeFile(beforePath, "migrate ledger notes\n", "utf8");
+    await writeFile(afterPath, "migrate ledger notes\n", "utf8");
+
+    const beforeMtime = new Date(2026, 6, 31, 23, 30, 0).getTime();
+    const afterMtime = new Date(2026, 7, 1, 0, 30, 0).getTime();
+    await utimes(beforePath, beforeMtime / 1000, beforeMtime / 1000);
+    await utimes(afterPath, afterMtime / 1000, afterMtime / 1000);
+
+    const { runSearch } = await import("../../../src/commands/search.js");
+    const prevCwd = process.cwd();
+    process.chdir(env.repo);
+    try {
+      const { code, out } = await captureStdout(() =>
+        runSearch(["migrate", "--since", "2026-08-01", "--json"]),
+      );
+
+      expect(code).toBe(0);
+      const payload = JSON.parse(out.trim()) as { hits: Array<{ file: string }> };
+      const files = payload.hits.map((hit) => hit.file);
+      expect(files).toContain(afterPath);
+      expect(files).not.toContain(beforePath);
+    } finally {
+      process.chdir(prevCwd);
+    }
+  });
+
   it("accepts --after as an alias for --since via argv", async () => {
     const env = await createTempEnv({ packageName: "my-app", initGit: false });
     cleanup = env.cleanup;

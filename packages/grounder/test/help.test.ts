@@ -57,6 +57,7 @@ describe("help", () => {
       expect(full).toContain("Commands:");
       expect(full).toContain("Setup\n");
       expect(full).toContain("Write\n");
+      expect(full).toContain("Retrieve\n");
       expect(full).toContain("--dry-run");
 
       chunks.length = 0;

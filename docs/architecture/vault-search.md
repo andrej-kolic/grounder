@@ -62,11 +62,11 @@ Why long queries are not scanned: a sentence like `handling migrations of slash 
 - Frontmatter `topics:` exact-match against terms → `topicsMatch` (ranking boost). Body and frontmatter lines both produce line hits.
 - Filename/path segments also count as term matches (`filenameTermCount`).
 
-The scan **always finishes the tree**. Early `--max-hits` stop-scan was removed: it made ranking depend on directory walk order. `--max-hits` now only caps **stored snippets per file** (`min(50, maxHits)`); ranking still uses full per-file hit counts.
+The scan **always finishes the tree**. Early `--max-hits` stop-scan was removed: it made ranking depend on directory walk order. `--max-hits` now only caps **stored snippets per file** (`min(50, maxHits)`, default 50); ranking still uses full per-file hit counts.
 
 ### 2.5. Date filter (`--since` / `--after`)
 
-Optional. Parsed in `commands/search.ts` (`parseSinceDate`): ISO date (`2026-08-01`) or relative shorthand (`7d`, `30d`). Before scoring, skip any file whose `mtimeMs` is before the cutoff. Useful for freshness-sensitive queries (recent handoffs, “what did I write about X lately”). `/grounder-search` does not pass this by default.
+Optional. Parsed in `commands/search.ts` (`parseSinceDate`): calendar date (`2026-08-01` = local midnight) or relative shorthand (`7d`, `30d`). Before scoring, skip any file whose `mtimeMs` is before the cutoff. Useful for freshness-sensitive queries (recent handoffs, “what did I write about X lately”). `/grounder-search` does not pass this by default.
 
 ### 3. Score (higher wins)
 
@@ -94,7 +94,7 @@ Then, as tiebreakers only: **non-archive before archive**, newer `mtime`, folder
 
 - Default `--limit` in code: **10 files** (`commands/search.ts` / `searchVault`). `--limit` help text matches.
 - Default `--context` in `searchVault` if omitted: **1** line. `/grounder-search` passes `--context 2` on the initial search; **`--context 3`** on the optional broaden call.
-- Default line hits shown per file: **1** (longest `matchedTerm`). Ranking still uses full hit counts. `--max-hits` caps stored snippets per file during scan (`min(50, maxHits)`; default 200).
+- Default line hits shown per file: **1** (longest `matchedTerm`). Ranking still uses full hit counts. `--max-hits` caps stored snippets per file during scan (`min(50, maxHits)`; default 50).
 
 ### 5. Formats
 
@@ -111,7 +111,7 @@ Then, as tiebreakers only: **non-archive before archive**, newer `mtime`, folder
 | Field | Purpose |
 | --- | --- |
 | `query`, `terms` | Echo normalized inputs |
-| `termHitCounts` | `{ "<term>": n }` — every term pre-init to `0`; zero-hit terms stay explicit for broaden decisions |
+| `termHitCounts` | `{ "<term>": n }` — keys match `terms` spelling; every term pre-init to `0`; zero-hit terms stay explicit for broaden decisions |
 | `summary` | Human-readable count line (same as plain header) |
 | `truncated`, `totalMatchCount`, `totalFileCount` | Truncation signal + scan totals |
 | `hits[]` | Ranked file list |
@@ -123,7 +123,7 @@ Each `hits[]` entry:
 | `file` | Absolute path — use for Read tool |
 | `relativePath` | Vault-relative title (`plans/…`, not `10-Projects/…`) |
 | `fileUri` | Pre-encoded `file://` href for markdown links |
-| `alsoMatchedHint` | Stem + matched terms gloss (`stem — term1, term2`) for Also matched lines |
+| `alsoMatchedHint` | Stem + up to two distinct file terms (`stem — term1, term2`), from all matches not just the shown snippet |
 | `mtimeMs`, `topicsMatch` | Metadata |
 | `matches[]` | `{ line, term, snippet }` per hit line |
 
