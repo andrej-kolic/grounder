@@ -98,6 +98,12 @@ Parse JSON privately. Take `hits[].file` in CLI order. Use `hits[].matches[].ter
 
 **Broaden once (silent)** only if `totalFileCount` is 0, or ≤2 and every hit is meta (`discussions/search/`, or snippet only quotes the query). Otherwise do not re-search.
 
+   Broaden call (use `--context 3` — weaker matches need more context):
+
+```bash
+{{GROUNDER_CLI}} search "<query>" --terms "<csv-minus-slot3>" --context 3 --json
+```
+
    **Broaden strategy (deterministic):** drop the slot-3 term (the on-disk identifier, e.g. `commandsSchema`) first — keep slots 1–2 (product noun/verb) unchanged — then re-run. Do not invent new terms or rewrite existing ones.
 
 3. **Read (tool round 2)** — mandatory unless lookup:
