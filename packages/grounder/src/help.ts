@@ -143,11 +143,11 @@ Subcommands:
       "grounder search <query> [--terms <csv>] [--limit <n>] [--max-hits <n>] [--context <n>] [--markdown] [--json]",
     flags: `Flags:
   --terms <csv>   Extra keyword variants (comma-separated)
-  --limit <n>     Max files to print (default: 5)
+  --limit <n>     Max files to print (default: 10)
   --max-hits <n>  Stop after this many line matches (default: 200)
-  --context <n>   Context lines around each snippet (default: 0)
+  --context <n>   Context lines around each snippet (default: 1)
   --markdown      Agent relay: file:// links + fenced snippets
-  --json          Structured output ({ query, terms, summary, hits[] })`,
+  --json          Structured output ({ query, terms, termHitCounts, summary, hits[] })`,
   },
   {
     id: "path notes",

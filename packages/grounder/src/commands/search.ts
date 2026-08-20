@@ -157,6 +157,7 @@ function writeJsonOutput(outcome: SearchOutcome): void {
   const payload = {
     query: outcome.query,
     terms: outcome.terms,
+    termHitCounts: outcome.termHitCounts,
     summary: formatSummary(outcome),
     truncated: outcome.truncated,
     totalMatchCount: outcome.totalMatchCount,

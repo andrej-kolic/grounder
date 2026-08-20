@@ -38,6 +38,8 @@ export interface SearchOptions {
 export interface SearchOutcome {
   query: string;
   terms: string[];
+  /** How many files each term matched (keyed by lowercased term). */
+  termHitCounts: Record<string, number>;
   totalMatchCount: number;
   totalFileCount: number;
   files: SearchFileHit[];
@@ -293,6 +295,7 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
     return {
       query: options.query,
       terms: [],
+      termHitCounts: {},
       totalMatchCount: 0,
       totalFileCount: 0,
       files: [],
@@ -303,6 +306,7 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
   const filePaths = await listMarkdownFiles(options.rootDir);
   const rawFiles: RawFileHits[] = [];
   let totalMatchCount = 0;
+  const termHitCounts: Record<string, number> = {};
 
   for (const filePath of filePaths) {
     let content: string;
@@ -327,7 +331,8 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
         continue;
       }
 
-      matchedTerms.add(matchedTerm.toLowerCase());
+      const termKey = matchedTerm.toLowerCase();
+      matchedTerms.add(termKey);
       totalHitCount++;
       totalMatchCount++;
 
@@ -341,6 +346,9 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
     }
 
     if (matchedTerms.size > 0) {
+      for (const t of matchedTerms) {
+        termHitCounts[t] = (termHitCounts[t] ?? 0) + 1;
+      }
       rawFiles.push({
         filePath,
         mtimeMs,
@@ -389,6 +397,7 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
   return {
     query: options.query,
     terms,
+    termHitCounts,
     totalMatchCount,
     totalFileCount,
     files,
