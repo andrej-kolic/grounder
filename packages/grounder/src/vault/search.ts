@@ -225,6 +225,7 @@ interface RawFileHits {
   idfDensity: number;
   filenameTermCount: number;
   phraseMatch: boolean;
+  partialPhraseMatch: boolean;
   /** Per-term line-hit counts for this file; used to compute idfDensity. */
   perTermHits: Map<string, number>;
 }
@@ -261,13 +262,30 @@ function contentHasPhrase(content: string, query: string): boolean {
   return content.toLowerCase().includes(trimmed.toLowerCase());
 }
 
+/** Any bigram (2 consecutive query words) appears as a substring in content. Only for queries ≥3 words. */
+function contentHasPartialPhrase(content: string, query: string): boolean {
+  const words = query.trim().split(/\s+/).filter(Boolean);
+  if (words.length < 3) {
+    return false;
+  }
+  const lower = content.toLowerCase();
+  for (let i = 0; i < words.length - 1; i++) {
+    const bigram = `${words[i]} ${words[i + 1]}`.toLowerCase();
+    if (lower.includes(bigram)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function relevanceScore(file: RawFileHits, rootDir: string, query: string): number {
   return (
     file.distinctTermCount * 1000 +
     Math.min(file.idfDensity, 100) * 10 +
     (file.topicsMatch ? 800 : 0) +
     file.filenameTermCount * 200 +
-    (file.phraseMatch ? 300 : 0) -
+    (file.phraseMatch ? 300 : 0) +
+    (file.partialPhraseMatch ? 150 : 0) -
     // Strong enough to lose to real notes with similar distinct-term coverage
     // (meta dumps / search dogfood often win on raw hit density alone).
     searchMetaPenalty(rootDir, file.filePath, query) * 5000
@@ -371,6 +389,7 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
         idfDensity: 0,
         filenameTermCount: countFilenameTermMatches(options.rootDir, filePath, terms),
         phraseMatch: contentHasPhrase(content, options.query),
+        partialPhraseMatch: contentHasPartialPhrase(content, options.query),
         perTermHits,
       });
     }
