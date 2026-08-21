@@ -59,7 +59,7 @@ Vault notes discuss …
 
 ## Steps
 
-1. **Query and terms (private)** — classify, then build argv. Classification is silent (no chat text). The CLI line-scans `--terms`. `query` is a scan term only when it is 1–2 words; longer queries only boost a file if that **exact** phrase appears (rare). Rank is dominated by how many distinct terms hit the **same** file — complementary vault words beat extra English synonyms and source module names.
+1. **Query and terms (private)** — classify, then build argv. Classification is silent (no chat text). The CLI always line-scans `query` plus `--terms`. Multi-word queries only match lines that contain that phrase verbatim. Rank is dominated by how many distinct terms hit the **same** file — complementary vault words beat extra English synonyms and source module names.
 
    **Classify** after stripping retrieval wrappers (`find`, `search for`, `documents discussing`, `notes about`, `look up`). Then pick one:
 

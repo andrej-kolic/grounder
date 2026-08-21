@@ -20,7 +20,7 @@ That is slow, model-dependent, and mixes two different trees (source vs vault). 
 | Layer | Job | Must not |
 | --- | --- | --- |
 | `vault/search.ts` + `commands/search.ts` | Scan `*.md` under the **linked project vault root**, score, print | Guess user intent, paraphrase queries, synthesize prose |
-| `/grounder-search` templates | Classify exact / request / topic leftover, turn that into `query` + `--terms`, run CLI, full-read top hits, write the hybrid answer | Re-rank, grep the vault, explore `packages/…` |
+| `/grounder-search` templates | Classify lookup / request / topic leftover, turn that into `query` + `--terms` (hybrid) or `--markdown` (lookup), run CLI, full-read top hits when hybrid, write the hybrid answer | Re-rank, grep the vault, explore `packages/…` |
 
 **`--terms` is the only model-dependent input that changes ranking.** Protocol (two rounds, `--json`, numbered `file://` links) is compatible across models. File order is not, unless terms match.
 
@@ -49,10 +49,10 @@ Pure filesystem scan. No index, no extra deps.
 Inputs: positional `query` + optional `--terms` CSV (comma-split, trimmed).
 
 - Dedup case-insensitively.
-- **Long query (3+ words) is not a line-scan term.** It only contributes `phraseMatch` (substring of the whole file). Short queries (1–2 words) are also scanned as a term.
+- **Always include `query` as a line-scan term** (any length), then append `--terms`. Multi-word queries use substring matching, so they only hit lines that contain the phrase verbatim — useful for lookup / quoted spans without inventing synonyms.
 - Overlapping single-token stems: if both `version` and `versioning` are present, drop the shorter **unless it is the query**. Phrases with spaces are never pruned this way.
 
-Why long queries are not scanned: a sentence like `handling migrations of slash commands` almost never appears verbatim except in **search dogfood** (`discussions/search/Search Results.md`). Scanning it as a term made those meta notes win on hit density.
+Whole-file `phraseMatch` / `partialPhraseMatch` still apply on top of line scans (see score). Dogfood notes that quote probe queries are demoted via `searchMetaPenalty`, not by omitting the query from the term list.
 
 ### 2. Match lines
 
@@ -135,8 +135,8 @@ After **any** template edit, run `grounder migrate` (hash-safe if the on-disk fi
 
 ### Modes
 
-- **Hybrid (default):** one `search … --json`, full-read CLI hits **1–4** in one parallel batch, synthesize.
-- **Lookup:** user asked for an exact mention / line → relay `--markdown` as-is (no full reads).
+- **Hybrid (default):** one `search … --json` with `--terms`, full-read CLI hits **1–4** in one parallel batch, synthesize.
+- **Lookup:** explicit lookup wording (`exact phrase`, `this line`, `the wording`) **or** leftover is a bare `"quoted span"` → relay `--markdown` as-is (one search, no `--terms`, no full reads).
 
 ### Query and terms (the ranking contract)
 
@@ -144,14 +144,13 @@ The CLI does not guess intent. The slash command **classifies** after stripping 
 
 | Class | Signal | `query` |
 | --- | --- | --- |
-| **Lookup** | Explicit lookup wording (`exact phrase`, `this line`, `the wording`) | Relay `--markdown`; no reads. |
-| **Exact** | `"quoted span"` | That span, unmodified; `--terms` as normal. Do not paraphrase. |
-| **Request** | Leftover still has request syntax: `that mention` / `that discuss` / `that talk about`; starts with `plans that` / `notes that` / `docs that` / `documents that`; trailing `both in` / `either in` / `in CLI and` | The **primary noun or named command** from the topic (one tight phrase). Multiple nouns → pick the most specific; put others in `--terms`. Never the leftover sentence. |
+| **Lookup** | Explicit lookup wording (`exact phrase`, `this line`, `the wording`), **or** leftover is a bare `"quoted span"` | Quoted text (bare `"…"`) or leftover after wrappers, unmodified. Relay `--markdown`; no `--terms`, no reads. |
+| **Request** | Leftover still has request syntax: `that mention` / `that discuss` / `that talk about`; starts with `plans that` / `notes that` / `docs that` / `documents that`; trailing `both in` / `either in` / `in CLI and` | One primary noun or named command from the topic (tight phrase; do not prefix a product name). Extra nouns go in `--terms`. Never the leftover sentence. |
 | **Topic leftover** | Otherwise — leftover is already a topic noun-phrase | Leftover, same words, same order. Do **not** paraphrase. |
 
 Do not recycle the query as a `--terms` item. Template counterexamples use a **different** topic than the eval probes (retry queue / charge+refund).
 
-**Terms** — fill 3–5 slots, then stop (same recipe for all three classes, unless lookup):
+**Terms** — fill 3–5 slots, then stop (request and topic leftover only; lookup skips `--terms`):
 
 1. Product noun/phrase (`slash commands`) — skip if it would duplicate the query
 2. Product verb or CLI name (`grounder migrate` — never lone `migrate`)
@@ -205,7 +204,7 @@ You may list a design/archive authority first **among the four full-reads**. Do 
 | --- | --- | --- |
 | Recency-first + substring match (`cb6fedb`) | Newest mention of `migrate` beat the schema-versioning plan; `version` hit `versioning` | Dropped |
 | Distinct-term score + word boundaries + archive penalty (`b51359b`) | Design docs with several product tokens rise; active files beat archive on ties | **Keep** |
-| Scan the full NL query as a term | Dogfood notes that quote the probe query ranked #1 | Dropped (`f25d1d2`: scan query only if 1–2 words) |
+| Scan the full NL query as a term | Dogfood notes that quote the probe query ranked #1 | Dropped briefly (`f25d1d2`: scan only if 1–2 words); **restored** — always include query; multi-word = verbatim substring; dogfood demoted via `searchMetaPenalty` |
 | `--max-hits` abort mid-walk | `totalFileCount` / rank depended on `readdir` order | Dropped (always finish the tree). Flag kept as a per-file snippet store cap |
 | 3 snippets per file in agent output | Noisy; ranking already has counts | Show 1; store up to 50 for scoring |
 | Raw hit-count density | Common tokens (`grounder`) swamped rare identifiers | **Keep** IDF-lite (`idfDensity`) |
