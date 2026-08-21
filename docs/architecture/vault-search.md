@@ -20,7 +20,7 @@ That is slow, model-dependent, and mixes two different trees (source vs vault). 
 | Layer | Job | Must not |
 | --- | --- | --- |
 | `vault/search.ts` + `commands/search.ts` | Scan `*.md` under the **linked project vault root**, score, print | Guess user intent, paraphrase queries, synthesize prose |
-| `/grounder-search` templates | Turn a user utterance into `query` + `--terms`, run CLI, full-read top hits, write the hybrid answer | Re-rank, grep the vault, explore `packages/…` |
+| `/grounder-search` templates | Classify exact / request / topic leftover, turn that into `query` + `--terms`, run CLI, full-read top hits, write the hybrid answer | Re-rank, grep the vault, explore `packages/…` |
 
 **`--terms` is the only model-dependent input that changes ranking.** Protocol (two rounds, `--json`, numbered `file://` links) is compatible across models. File order is not, unless terms match.
 
@@ -140,16 +140,25 @@ After **any** template edit, run `grounder migrate` (hash-safe if the on-disk fi
 
 ### Query and terms (the ranking contract)
 
-**Query** = leftover topic after stripping retrieval wrappers (`find`, `search for`, `documents discussing`, `notes about`, `look up`). Same words, same order. Do **not** paraphrase (`slash command migrations` is wrong if the leftover is `handling migrations of slash commands`). Do not recycle the query as a `--terms` item.
+The CLI does not guess intent. The slash command **classifies** after stripping retrieval wrappers (`find`, `search for`, `documents discussing`, `notes about`, `look up`), then builds argv.
 
-**Terms** — fill 3–5 slots, then stop:
+| Class | Signal | `query` |
+| --- | --- | --- |
+| **Lookup** | Explicit lookup wording (`exact phrase`, `this line`, `the wording`) | Relay `--markdown`; no reads. |
+| **Exact** | `"quoted span"` | That span, unmodified; `--terms` as normal. Do not paraphrase. |
+| **Request** | Leftover still has request syntax: `that mention` / `that discuss` / `that talk about`; starts with `plans that` / `notes that` / `docs that` / `documents that`; trailing `both in` / `either in` / `in CLI and` | The **primary noun or named command** from the topic (one tight phrase). Multiple nouns → pick the most specific; put others in `--terms`. Never the leftover sentence. |
+| **Topic leftover** | Otherwise — leftover is already a topic noun-phrase | Leftover, same words, same order. Do **not** paraphrase. |
 
-1. Product noun/phrase (`slash commands`)
+Do not recycle the query as a `--terms` item. Template counterexamples use a **different** topic than the eval probes (retry queue / setup+link).
+
+**Terms** — fill 3–5 slots, then stop (same recipe for all three classes, unless lookup):
+
+1. Product noun/phrase (`slash commands`) — skip if it would duplicate the query
 2. Product verb or CLI name (`grounder migrate` — never lone `migrate`)
 3. One on-disk identifier (`commandsSchema`, `state.json`, `hash drift`, …)
 4–5. Another vault/product token
 
-**Never as terms** (unless the user asked about code layout): repo paths, `packages/…`, source module / file stems (`install-command`, `apply-agent-installs`, `hook-runtime`, `vault/search.ts`). Those match code-ish plan checklists and **reorder the head**.
+**Never as terms** (unless the user asked about code layout): repo paths, `packages/…`, source module / file stems (`install-command`, `apply-agent-installs`, `hook-runtime`, `vault/search.ts`). Lone high-df words (`plan`, `command`, `cli`) flatten rank. Those match code-ish plan checklists and **reorder the head**.
 
 ### Turn budget
 
@@ -209,9 +218,10 @@ Cross-model runs on the same probe (`find documents discussing handling migratio
 
 | Leak | What models did | What actually constrained them |
 | --- | --- | --- |
-| Priming | Worked example **was** the probe, so every model copied the terms CSV | Terms example is a **different** topic (session hooks). Probe may appear only as a query-strip counterexample |
+| Priming | Worked example **was** the probe, so every model copied the terms CSV | Terms example is a **different** topic (retry queue / setup+link). Probe terms CSV must not appear in the template |
 | Module names as terms | `install-command`, then `apply-agent-installs` — pulled doctor/checklists to #1 | Name **both** stems in the never-list; “source modules” alone was too abstract |
-| Query rewrite | Composer shortened to `slash command migrations` | Explicit wrong query next to the leftover-topic rule |
+| Query rewrite | Composer shortened to `slash command migrations` | Explicit wrong query next to the leftover-topic rule; canonical probe is **topic leftover**, not a request |
+| Request leftover as query | `find plans that mention…` kept as `query` (request English never appears in the vault) | Classify **request**; primary noun as `query`; explicit wrong leftover-as-query |
 | Parent-vault titles | Gemini used `10-Projects/grounder/plans/…` | Wrong-title example with that prefix |
 | `%20` in link text | Sonnet encoded the visible title | Correct vs wrong markdown pair |
 | Extra tools | Glob, `UpdateCurrentStep`, duplicate Shell, third turn | Allowlist: Shell then Read only |
@@ -223,7 +233,7 @@ Cross-model runs on the same probe (`find documents discussing handling migratio
 
 ## Canonical probe (for the next change)
 
-Use this utterance, **without** putting its terms CSV back as the worked example:
+Use this utterance, **without** putting its terms CSV back as the worked example. It is **topic leftover** (`documents discussing` is a wrapper), not a request — do not shorten it to keywords.
 
 ```text
 find documents discussing handling migrations of slash commands
@@ -232,8 +242,22 @@ find documents discussing handling migrations of slash commands
 Healthy `query` / `--terms`:
 
 ```text
+class: topic leftover
 query: handling migrations of slash commands
 terms: slash commands,grounder migrate,hash drift,commandsSchema,state.json
+```
+
+Second probe (request-shaped; **do not** put this utterance or its terms CSV in the template):
+
+```text
+find plans that mention altering doctor or status command, both in CLI and slash command
+```
+
+```text
+class: request
+query: doctor
+terms: grounder status,slash command,grounder doctor,status.ts
+wrong query: plans that mention altering doctor or status command, both in CLI and slash command
 ```
 
 Healthy CLI head (this vault, 2026-08-20):
@@ -250,7 +274,7 @@ Evaluate **one change at a time** (CLI xor template). Migrating templates mid-ex
 ## Open (known, not “just prompt harder”)
 
 - **Silence** is still violated by chatty models; Composer may put the real answer on `UpdateCurrentStep` and stub the user-visible message. Prompt text has diminishing returns.
-- **`--terms` quality** remains the ranking incompatibility. The recipe + never-list + `termHitCounts` zero-hit broaden is the v1 mitigation.
+- **`--terms` quality** remains the ranking incompatibility. The recipe + never-list + `termHitCounts` zero-hit broaden is the v1 mitigation. Request vs leftover classification is the v1 mitigation for request-shaped utterances.
 - **Read order in synthesis** — some models substitute hits 1–4 despite template rules; template tests cannot catch live agent behavior.
 - Template tests are string-contains on the markdown, not live agents. They catch priming regressions and broaden protocol text; they cannot catch Gemini narration or Composer read-order swaps.
 

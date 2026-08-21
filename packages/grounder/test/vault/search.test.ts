@@ -250,6 +250,33 @@ describe("vault/search", () => {
     }
   });
 
+  it("exact long phrase (3+ words, no --terms) finds the file containing it verbatim", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "grounder-search-"));
+    try {
+      const planPath = await writeMd(
+        rootDir,
+        "plans/live-eval-harness.md",
+        [
+          "# Live eval harness",
+          "",
+          "tells the orchestrator agent to launch five subagents in parallel",
+        ].join("\n"),
+      );
+      await writeMd(rootDir, "plans/other.md", "unrelated content\n");
+
+      const outcome = await searchVault({
+        rootDir,
+        query: "launch five subagents in parallel",
+        limit: 10,
+      });
+
+      expect(outcome.files).toHaveLength(1);
+      expect(outcome.files[0]?.filePath).toBe(planPath);
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
+  });
+
   it("topics: match outranks a denser file that only hits in the body", async () => {
     const rootDir = await mkdtemp(path.join(os.tmpdir(), "grounder-search-"));
     try {

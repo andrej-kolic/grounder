@@ -99,10 +99,9 @@ function pruneOverlappingTerms(query: string, terms: readonly string[]): string[
 function normalizeTerms(query: string, extra?: readonly string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  // Long natural-language queries rarely appear verbatim except in dogfood/meta
-  // notes — keep them for phraseMatch scoring via `options.query`, not line scan.
-  const scanQuery = query.trim().split(/\s+/).filter(Boolean).length <= 2;
-  for (const raw of [...(scanQuery ? [query] : []), ...(extra ?? [])]) {
+  // Always include the query — multi-word phrases use substring matching in
+  // termMatchesLine, so exact phrases only match lines that contain them verbatim.
+  for (const raw of [query, ...(extra ?? [])]) {
     const term = raw.trim();
     if (!term) {
       continue;

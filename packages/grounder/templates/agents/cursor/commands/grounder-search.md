@@ -55,31 +55,51 @@ Vault notes discuss …
 4. [plans/…](file:///…) — one phrase
 ```
 
-**Lookup mode:** exact mention / line reference only → relay CLI `--markdown` as-is (one search, no full reads).
+**Lookup mode:** explicit lookup wording only (`exact phrase`, `this line`, `the wording`) → relay CLI `--markdown` as-is (one search, no full reads). Quoted spans are **not** lookup — they use hybrid mode.
 
 ## Steps
 
-1. **Query and terms (private)** — the CLI line-scans `--terms`. `query` is a scan term only when it is 1–2 words; longer queries only boost a file if that **exact** phrase appears (rare). Rank is dominated by how many distinct terms hit the **same** file — complementary vault words beat extra English synonyms and source module names.
+1. **Query and terms (private)** — classify, then build argv. Classification is silent (no chat text). The CLI line-scans `--terms`. `query` is a scan term only when it is 1–2 words; longer queries only boost a file if that **exact** phrase appears (rare). Rank is dominated by how many distinct terms hit the **same** file — complementary vault words beat extra English synonyms and source module names.
 
-   **Query** = leftover topic after stripping wrappers. Same words, same order:
-   - Strip only retrieval wrappers (`find`, `search for`, `documents discussing`, `notes about`, `look up`).
-   - Do not pass the whole utterance.
-   - Do not paraphrase, shorten, or coin a new phrase.
-   - Do not recycle the query as a `--terms` item.
+   **Classify** after stripping retrieval wrappers (`find`, `search for`, `documents discussing`, `notes about`, `look up`). Then pick one:
 
-   Example — user: `find documents discussing retry of expired jobs`
+   - **Lookup** — explicit lookup wording (`exact phrase`, `this line`, `the wording`). Relay CLI `--markdown` as-is; no full reads.
+   - **Exact** — any `"quoted span"`. `query` = that span, unmodified; add `--terms` normally. Do not paraphrase or invent synonyms.
+   - **Request** — leftover still has request syntax (any of): `that mention` / `that discuss` / `that talk about`; leftover starts with `plans that` / `notes that` / `docs that` / `documents that`; trailing scope `both in` / `either in` / `in CLI and`. Do **not** pass that leftover as `query`. `query` = the **primary noun or named command** from the topic (one tight phrase that appears in vault prose). When the request names multiple nouns (`setup or link`), pick the more specific one; put the other(s) in `--terms`.
+   - **Topic leftover** — leftover is already a topic noun-phrase. `query` = leftover, same words, same order. Do not paraphrase, shorten, or coin a new phrase.
+
+   Strip only retrieval wrappers. Do not pass the whole utterance. Do not recycle the query as a `--terms` item.
+
+   Example — exact. User: `find "retry of expired jobs"`
+   - class: exact
+   - query: `retry of expired jobs`
+   - terms: `retry queue,dead letter,job expiry,ttl`
+   - wrong query: `expired jobs` (unquoted / shortened)
+
+   Example — topic leftover. User: `find documents discussing retry of expired jobs`
+   - class: topic leftover
    - query: `retry of expired jobs`
    - wrong query: `expired job retries` (rewritten / shortened)
+   - wrong class: request (`documents discussing` is a wrapper; leftover is the topic)
+
+   Example — request. User: `find plans that mention updating the setup or link command, both in CLI and slash command`
+   - class: request
+   - query: `grounder setup`
+   - terms: `grounder link,slash command,.grounder.json`
+   - wrong query: `plans that mention updating the setup or link command, both in CLI and slash command`
+   - wrong query: `setup link command` (joined multiple nouns; not a vault phrase)
+   - not as terms: `plan`, `command`, `cli`
 
    **Terms** — fill 3–5 slots from *this* topic’s vault vocabulary, then stop:
-   1. Domain noun/phrase from the topic
+   1. Domain noun/phrase from the topic (skip if it would duplicate the query)
    2. Named command or product verb if the topic has one — never a lone generic verb (`migrate`, `install`)
    3. One on-disk identifier (filename, config key, schema field)
    4–5. Only another vault/product token. No paraphrase of the query.
 
-   **Never as terms** (unless the user asked about code layout): repo paths, `packages/…`, source module / file stems. Those distort CLI rank toward implementation notes. Prefer words that appear in vault notes (named commands, config files, domain identifiers).
+   **Never as terms** (unless the user asked about code layout): repo paths, `packages/…`, source module / file stems. Lone high-df words (`plan`, `command`, `cli`) flatten rank. Prefer words that appear in vault notes (named commands, config files, domain identifiers).
 
    Example — user: `look up why the retry queue must skip expired jobs`
+   - class: topic leftover
    - query: `why the retry queue must skip expired jobs`
    - terms: `retry queue,dead letter,jobs.json,RetryPolicy,ttl`
    - not: `queue-worker`, `process-jobs`, `skip`, `look up`
