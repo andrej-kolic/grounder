@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { runHandoffList, runHandoffListWithOptions } from "../../../src/commands/handoff/list.js";
 import { runLinkWithOptions } from "../../../src/commands/link.js";
 import { runSetupWithOptions } from "../../../src/commands/setup.js";
@@ -124,7 +124,17 @@ describe("commands/handoff/list", () => {
   });
 
   it("rejects --head together with --markdown", async () => {
-    expect(await runHandoffList(["--head", "--markdown"])).toBe(1);
+    const chunks: string[] = [];
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      chunks.push(String(chunk));
+      return true;
+    });
+    try {
+      expect(await runHandoffList(["--head", "--markdown"])).toBe(1);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(chunks.join("")).toContain("Use only one of --head or --markdown.");
   });
 
   it("--head prints only the newest usable path", async () => {

@@ -1,4 +1,4 @@
-import { toFileUri, vaultItemPlainTitle, vaultRelativePath } from "../util/path.js";
+import { formatMarkdownFileLink, vaultItemPlainTitle, vaultRelativePath } from "../util/path.js";
 
 /** Shared checklist/snapshot formatting for `doctor` and `status`. */
 
@@ -82,7 +82,7 @@ export function writeVaultItemListEntries(
       process.stdout.write("\n");
     }
     const title = markdown
-      ? `[${vaultRelativePath(titleRootDir as string, filePath)}](${toFileUri(filePath)})`
+      ? formatMarkdownFileLink(vaultRelativePath(titleRootDir as string, filePath), filePath)
       : vaultItemPlainTitle(filePath, titleRootDir);
     // Two trailing spaces: Markdown hard break when stdout is relayed into chat.
     process.stdout.write(`${index + 1}. ${title}  \n  ${filePath}\n`);

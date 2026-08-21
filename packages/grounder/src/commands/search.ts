@@ -4,7 +4,7 @@ import { resolveProjectVaultRoot } from "../connector/vault.js";
 import { helpExitCode } from "../help.js";
 import { fileExists } from "../util/fs.js";
 import { flagBool, flagString, parseArgs } from "../util/parse-args.js";
-import { toFileUri, vaultRelativePath } from "../util/path.js";
+import { formatMarkdownFileLink, toFileUri, vaultRelativePath } from "../util/path.js";
 import { type SearchOutcome, searchVault } from "../vault/search.js";
 import { requireLinkedProject } from "./require-linked.js";
 
@@ -181,7 +181,7 @@ function writeMarkdownOutput(outcome: SearchOutcome): void {
 
   for (const file of outcome.files) {
     const label = fileStem(file.filePath);
-    process.stdout.write(`### [${label}](${toFileUri(file.filePath)})\n\n`);
+    process.stdout.write(`### ${formatMarkdownFileLink(label, file.filePath)}\n\n`);
     for (const hit of file.hits) {
       process.stdout.write(`L${hit.line} (${hit.matchedTerm}):\n\n`);
       process.stdout.write(formatSnippetBlock(hit.snippet));

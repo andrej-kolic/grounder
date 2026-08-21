@@ -86,6 +86,19 @@ describe("writeVaultItemList", () => {
     );
   });
 
+  it("escapes special characters in markdown link titles", async () => {
+    const logsDir = "/vault/project/logs";
+    const nested = `${logsDir}/weird\u005b\u005d(name).md`;
+    const uri = pathToFileURL(nested).href.replace(/\(/g, "%28").replace(/\)/g, "%29");
+
+    const { out } = await captureStdout(async () => {
+      writeVaultItemListEntries([nested], { markdown: true, titleRootDir: logsDir });
+      return 0;
+    });
+
+    expect(out).toBe(`1. [weird\\[\\](name).md](${uri})  \n  ${nested}\n`);
+  });
+
   it("uses bucket-relative plain titles when titleRootDir is set", async () => {
     const logsDir = "/vault/project/logs";
     const nested = `${logsDir}/feature/2026-06-26-1600.md`;

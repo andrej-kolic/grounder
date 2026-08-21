@@ -63,6 +63,23 @@ export function toFileUri(filePath: string): string {
 }
 
 /**
+ * Escape text for a Markdown link label (`[label](...)`) so `\`, `[`, and `]`
+ * do not break the link syntax.
+ */
+export function escapeMarkdownLinkLabel(text: string): string {
+  return text.replace(/\\/g, "\\\\").replace(/\[/g, "\\[").replace(/\]/g, "\\]");
+}
+
+/**
+ * `[label](fileUri)` for an absolute path. Escapes special chars in the label;
+ * percent-encodes `(` / `)` in the URI so they do not close the destination.
+ */
+export function formatMarkdownFileLink(label: string, filePath: string): string {
+  const uri = toFileUri(filePath).replace(/\(/g, "%28").replace(/\)/g, "%29");
+  return `[${escapeMarkdownLinkLabel(label)}](${uri})`;
+}
+
+/**
  * Path relative to a vault/project root, always with `/` separators
  * (stable for markdown links and JSON across platforms).
  */

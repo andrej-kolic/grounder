@@ -56,7 +56,7 @@ describe("vault/list-notes", () => {
     expect(await listNotes(notesDir)).toEqual([newer, mid, older]);
   });
 
-  it("breaks mtime ties by filename descending", async () => {
+  it("breaks mtime ties by vault-relative path descending", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
     const notesDir = path.join(env.vault, "notes");

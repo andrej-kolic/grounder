@@ -4,7 +4,9 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  escapeMarkdownLinkLabel,
   expandHome,
+  formatMarkdownFileLink,
   isPathInside,
   isRealPathInside,
   resolveUserPath,
@@ -108,6 +110,29 @@ describe("util/path", () => {
     it("matches pathToFileURL href", () => {
       const filePath = "/tmp/vault/plans/doc 1.md";
       expect(toFileUri(filePath)).toBe(pathToFileURL(filePath).href);
+    });
+  });
+
+  describe("escapeMarkdownLinkLabel", () => {
+    it("escapes backslashes and brackets", () => {
+      expect(escapeMarkdownLinkLabel("a[b]c\\d")).toBe("a\\[b\\]c\\\\d");
+    });
+  });
+
+  describe("formatMarkdownFileLink", () => {
+    it("builds a normal file link", () => {
+      const filePath = "/tmp/vault/plans/phase-1.md";
+      expect(formatMarkdownFileLink("phase-1.md", filePath)).toBe(
+        `[phase-1.md](${pathToFileURL(filePath).href})`,
+      );
+    });
+
+    it("escapes label brackets and encodes parentheses in the URI", () => {
+      // Use \u escapes so brackets/parens in the path are not tooling-mangled.
+      const filePath = "/tmp/vault/plans/weird\u005b\u005d(name).md";
+      const label = "weird\u005b\u005d(name).md";
+      const uri = pathToFileURL(filePath).href.replace(/\(/g, "%28").replace(/\)/g, "%29");
+      expect(formatMarkdownFileLink(label, filePath)).toBe(`[weird\\[\\](name).md](${uri})`);
     });
   });
 
