@@ -23,9 +23,15 @@ describe("templates/grounder-search", () => {
       expect(body).toContain("**Lookup**");
       expect(body).toContain("**Request**");
       expect(body).toContain("**Topic leftover**");
+      expect(body).not.toContain("**Exact**");
+      expect(body).not.toContain("Quoted spans are **not** lookup");
+      expect(body).toContain('leftover is a bare `"quoted span"`');
+      expect(body).toContain('{{GROUNDER_CLI}} search "retry of expired jobs" --markdown');
+      expect(body).toContain("no `--terms`, no full reads");
       expect(body).toContain("that mention");
       expect(body).toContain("never a lone generic verb");
       expect(body).toContain("source module / file stems");
+      expect(body).toContain("The CLI always line-scans `query` plus `--terms`");
       expect(body).toContain("retry queue,dead letter,jobs.json,RetryPolicy,ttl");
       expect(body).toContain("wrong query: `expired job retries`");
       expect(body).toContain("wrong class: request");
@@ -41,6 +47,7 @@ describe("templates/grounder-search", () => {
       expect(body).not.toContain("commandsSchema");
       expect(body).not.toContain("install-command");
       expect(body).not.toContain("`grounder migrate`");
+      expect(body).not.toContain("scan term only when it is 1–2 words");
       expect(body).toContain("leftover top-10 **in CLI order**");
       expect(body).toContain("Unread hits must not grow new facts");
       expect(body).toContain("matches[].term");

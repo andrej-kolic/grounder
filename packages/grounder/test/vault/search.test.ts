@@ -253,25 +253,26 @@ describe("vault/search", () => {
   it("exact long phrase (3+ words, no --terms) finds the file containing it verbatim", async () => {
     const rootDir = await mkdtemp(path.join(os.tmpdir(), "grounder-search-"));
     try {
+      const phrase = "launch five subagents in parallel";
       const planPath = await writeMd(
         rootDir,
         "plans/live-eval-harness.md",
-        [
-          "# Live eval harness",
-          "",
-          "tells the orchestrator agent to launch five subagents in parallel",
-        ].join("\n"),
+        ["# Live eval harness", "", `tells the orchestrator agent to ${phrase}`].join("\n"),
       );
       await writeMd(rootDir, "plans/other.md", "unrelated content\n");
 
       const outcome = await searchVault({
         rootDir,
-        query: "launch five subagents in parallel",
+        query: phrase,
         limit: 10,
       });
 
+      expect(outcome.terms).toEqual([phrase]);
+      expect(outcome.termHitCounts[phrase]).toBe(1);
       expect(outcome.files).toHaveLength(1);
       expect(outcome.files[0]?.filePath).toBe(planPath);
+      expect(outcome.files[0]?.matchedTerms).toContain(phrase);
+      expect(outcome.files[0]?.hits.some((hit) => hit.matchedTerm === phrase)).toBe(true);
     } finally {
       await rm(rootDir, { recursive: true, force: true });
     }
