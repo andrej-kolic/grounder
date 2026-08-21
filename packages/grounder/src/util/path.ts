@@ -1,6 +1,7 @@
 import { realpath } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 /**
  * Expand a leading `~` / `~/…` to the user home directory.
@@ -54,4 +55,47 @@ export async function isRealPathInside(parent: string, child: string): Promise<b
   } catch {
     return null;
   }
+}
+
+/** `file://` href for an absolute filesystem path (spaces percent-encoded). */
+export function toFileUri(filePath: string): string {
+  return pathToFileURL(filePath).href;
+}
+
+/**
+ * Escape text for a Markdown link label (`[label](...)`) so `\`, `[`, and `]`
+ * do not break the link syntax.
+ */
+export function escapeMarkdownLinkLabel(text: string): string {
+  return text.replace(/\\/g, "\\\\").replace(/\[/g, "\\[").replace(/\]/g, "\\]");
+}
+
+/**
+ * `[label](fileUri)` for an absolute path. Escapes special chars in the label;
+ * percent-encodes `(` / `)` in the URI so they do not close the destination.
+ */
+export function formatMarkdownFileLink(label: string, filePath: string): string {
+  const uri = toFileUri(filePath).replace(/\(/g, "%28").replace(/\)/g, "%29");
+  return `[${escapeMarkdownLinkLabel(label)}](${uri})`;
+}
+
+/**
+ * Path relative to a vault/project root, always with `/` separators
+ * (stable for markdown links and JSON across platforms).
+ */
+export function vaultRelativePath(rootDir: string, filePath: string): string {
+  return path.relative(rootDir, filePath).split(path.sep).join("/");
+}
+
+/**
+ * Plain list title: path relative to `rootDir` with a trailing `.md` stripped
+ * (e.g. `migration/phase-1`). Falls back to the filename stem when `rootDir`
+ * is omitted.
+ */
+export function vaultItemPlainTitle(filePath: string, rootDir?: string): string {
+  if (rootDir === undefined) {
+    return path.basename(filePath, ".md");
+  }
+  const rel = vaultRelativePath(rootDir, filePath);
+  return rel.endsWith(".md") ? rel.slice(0, -3) : rel;
 }

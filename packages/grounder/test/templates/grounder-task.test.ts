@@ -16,13 +16,15 @@ describe("templates/grounder-task", () => {
   it("documents the list-and-stop special case and named-session lookup wording", async () => {
     for (const filePath of taskTemplates) {
       const body = await readFile(filePath, "utf8");
-      expect(body).toContain("handoff list --limit <N>");
+      expect(body).toContain("handoff list --limit <N> --markdown");
       expect(body).toContain("never resort or relabel it");
       expect(body).toContain("stop — no hydrate");
       expect(body).toContain("Relay the CLI stdout as-is");
-      expect(body).toContain("handoff list --limit 5");
-      expect(body).toContain("indented path in *this* listing (positional, not a stable id)");
-      expect(body).toContain("once with `--limit 50` (*that* listing only)");
+      expect(body).toContain("handoff list --limit 5 --markdown");
+      expect(body).toContain(
+        "indented absolute path in *this* listing (positional, not a stable id)",
+      );
+      expect(body).toContain("once with `--limit 50 --markdown` (*that* listing only)");
       expect(body).toContain("no guessed hydrate");
     }
   });

@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdir, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runLinkWithOptions } from "../../../src/commands/link.js";
 import { runPlanList, runPlanListWithOptions } from "../../../src/commands/plan/list.js";
@@ -153,5 +153,57 @@ describe("commands/plan/list", () => {
 
     expect(code).toBe(0);
     expect(out).toBe(`All 1 plan:\n\n1. phase-1  \n  ${planPath}\n`);
+  });
+
+  it("prints markdown link title lines with --markdown", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
+    const planPath = path.join(plansDir, "phase-1.md");
+    await writeFile(planPath, "x", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runPlanListWithOptions({ cwd: env.repo, homeDir: env.home, markdown: true }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe(
+      `All 1 plan:\n\n1. [phase-1.md](${pathToFileURL(planPath).href})  \n  ${planPath}\n`,
+    );
+  });
+
+  it("lists nested plans with bucket-relative titles", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
+    const nestedDir = path.join(plansDir, "migration");
+    await mkdir(nestedDir, { recursive: true });
+    const nestedPath = path.join(nestedDir, "cutover.md");
+    await writeFile(nestedPath, "x", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runPlanListWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe(`All 1 plan:\n\n1. migration/cutover  \n  ${nestedPath}\n`);
+
+    const { code: mdCode, out: mdOut } = await captureStdout(() =>
+      runPlanListWithOptions({ cwd: env.repo, homeDir: env.home, markdown: true }),
+    );
+    expect(mdCode).toBe(0);
+    expect(mdOut).toBe(
+      `All 1 plan:\n\n1. [migration/cutover.md](${pathToFileURL(nestedPath).href})  \n  ${nestedPath}\n`,
+    );
   });
 });

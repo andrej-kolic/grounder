@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   formatVaultItemListHeader,
@@ -43,6 +44,78 @@ describe("writeVaultItemList", () => {
 
     expect(out).toBe(
       `All 2 handoffs:\n\n1. 2026-06-26-1500-newer  \n  ${newer}\n\n2. 2026-06-26-1430  \n  ${older}\n`,
+    );
+  });
+
+  it("writes markdown link title lines when markdown is set", async () => {
+    const logsDir = "/vault/project/logs";
+    const newer = `${logsDir}/2026-06-26-1500-newer.md`;
+    const older = `${logsDir}/2026-06-26-1430.md`;
+
+    const { out } = await captureStdout(async () => {
+      writeVaultItemList(
+        [newer, older],
+        5,
+        { singular: "handoff", plural: "handoffs" },
+        {
+          markdown: true,
+          titleRootDir: logsDir,
+        },
+      );
+      return 0;
+    });
+
+    expect(out).toBe(
+      `All 2 handoffs:\n\n` +
+        `1. [2026-06-26-1500-newer.md](${pathToFileURL(newer).href})  \n  ${newer}\n\n` +
+        `2. [2026-06-26-1430.md](${pathToFileURL(older).href})  \n  ${older}\n`,
+    );
+  });
+
+  it("keeps nested bucket-relative markdown titles without the bucket prefix", async () => {
+    const logsDir = "/vault/project/logs";
+    const nested = `${logsDir}/feature/2026-06-26-1600.md`;
+
+    const { out } = await captureStdout(async () => {
+      writeVaultItemListEntries([nested], { markdown: true, titleRootDir: logsDir });
+      return 0;
+    });
+
+    expect(out).toBe(
+      `1. [feature/2026-06-26-1600.md](${pathToFileURL(nested).href})  \n  ${nested}\n`,
+    );
+  });
+
+  it("escapes special characters in markdown link titles", async () => {
+    const logsDir = "/vault/project/logs";
+    const nested = `${logsDir}/weird\u005b\u005d(name).md`;
+    const uri = pathToFileURL(nested).href.replace(/\(/g, "%28").replace(/\)/g, "%29");
+
+    const { out } = await captureStdout(async () => {
+      writeVaultItemListEntries([nested], { markdown: true, titleRootDir: logsDir });
+      return 0;
+    });
+
+    expect(out).toBe(`1. [weird\\[\\](name).md](${uri})  \n  ${nested}\n`);
+  });
+
+  it("uses bucket-relative plain titles when titleRootDir is set", async () => {
+    const logsDir = "/vault/project/logs";
+    const nested = `${logsDir}/feature/2026-06-26-1600.md`;
+    const root = `${logsDir}/2026-06-26-1500.md`;
+
+    const { out } = await captureStdout(async () => {
+      writeVaultItemList(
+        [nested, root],
+        5,
+        { singular: "handoff", plural: "handoffs" },
+        { titleRootDir: logsDir },
+      );
+      return 0;
+    });
+
+    expect(out).toBe(
+      `All 2 handoffs:\n\n1. feature/2026-06-26-1600  \n  ${nested}\n\n2. 2026-06-26-1500  \n  ${root}\n`,
     );
   });
 

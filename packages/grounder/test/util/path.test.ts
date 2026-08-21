@@ -1,12 +1,18 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  escapeMarkdownLinkLabel,
   expandHome,
+  formatMarkdownFileLink,
   isPathInside,
   isRealPathInside,
   resolveUserPath,
+  toFileUri,
+  vaultItemPlainTitle,
+  vaultRelativePath,
 } from "../../src/util/path.js";
 
 describe("util/path", () => {
@@ -97,6 +103,58 @@ describe("util/path", () => {
       await mkdir(parent);
 
       expect(await isRealPathInside(parent, path.join(parent, "missing.md"))).toBe(null);
+    });
+  });
+
+  describe("toFileUri", () => {
+    it("matches pathToFileURL href", () => {
+      const filePath = "/tmp/vault/plans/doc 1.md";
+      expect(toFileUri(filePath)).toBe(pathToFileURL(filePath).href);
+    });
+  });
+
+  describe("escapeMarkdownLinkLabel", () => {
+    it("escapes backslashes and brackets", () => {
+      expect(escapeMarkdownLinkLabel("a[b]c\\d")).toBe("a\\[b\\]c\\\\d");
+    });
+  });
+
+  describe("formatMarkdownFileLink", () => {
+    it("builds a normal file link", () => {
+      const filePath = "/tmp/vault/plans/phase-1.md";
+      expect(formatMarkdownFileLink("phase-1.md", filePath)).toBe(
+        `[phase-1.md](${pathToFileURL(filePath).href})`,
+      );
+    });
+
+    it("escapes label brackets and encodes parentheses in the URI", () => {
+      // Use \u escapes so brackets/parens in the path are not tooling-mangled.
+      const filePath = "/tmp/vault/plans/weird\u005b\u005d(name).md";
+      const label = "weird\u005b\u005d(name).md";
+      const uri = pathToFileURL(filePath).href.replace(/\(/g, "%28").replace(/\)/g, "%29");
+      expect(formatMarkdownFileLink(label, filePath)).toBe(`[weird\\[\\](name).md](${uri})`);
+    });
+  });
+
+  describe("vaultRelativePath", () => {
+    it("uses forward slashes relative to the root", () => {
+      expect(vaultRelativePath("/vault/project", "/vault/project/plans/a.md")).toBe("plans/a.md");
+    });
+  });
+
+  describe("vaultItemPlainTitle", () => {
+    it("uses the filename stem when no root is given", () => {
+      expect(vaultItemPlainTitle("/vault/plans/phase-1.md")).toBe("phase-1");
+    });
+
+    it("keeps nested folders under the title root", () => {
+      expect(vaultItemPlainTitle("/vault/plans/migration/phase-1.md", "/vault/plans")).toBe(
+        "migration/phase-1",
+      );
+    });
+
+    it("matches basename for top-level files under the title root", () => {
+      expect(vaultItemPlainTitle("/vault/plans/phase-1.md", "/vault/plans")).toBe("phase-1");
     });
   });
 });

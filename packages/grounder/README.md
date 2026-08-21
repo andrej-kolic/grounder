@@ -155,13 +155,13 @@ Nothing is written into the repo except the small `.grounder.json` marker. Agent
 grounder setup <path>        Connect to a markdown vault (once per machine)
 grounder link                Link this project inside the markdown vault (once per project)
 grounder note <text>         Write a note to the vault
-grounder note list           Print recent notes (count header + numbered title/path, newest first)
+grounder note list           Print recent notes under notes/** (bucket-relative titles, newest first)
 grounder handoff <text>      Write a session handoff to vault logs/
-grounder handoff list        Print recent handoffs (count header + numbered title/path, newest first)
+grounder handoff list        Print recent handoffs under logs/** (bucket-relative titles, newest first)
 grounder handoff list --head Print only the newest usable handoff path
 grounder handoff peek        One-line latest-handoff teaser (used by session hooks)
 grounder plan <text>         Write/update a named plan under vault plans/
-grounder plan list           Print recent plans (count header + numbered title/path, newest first)
+grounder plan list           Print recent plans under plans/** (bucket-relative titles, newest first)
 grounder search <query>      Search linked project vault (scoped keyword retrieval)
 grounder path notes          Print resolved notes directory
 grounder path logs           Print resolved logs directory
@@ -211,7 +211,7 @@ See [Upgrading](#upgrading) for the usual post-package-upgrade flow. Untouched c
 | `--topics <list>` | `note`, `handoff`          | Comma-separated keywords written to `topics:` frontmatter for search (e.g. `auth,jwt,session`)         |
 | `--limit <n>`    | `note list`                 | Max notes to print (default: 5)                                                                         |
 | `--limit <n>`    | `handoff list`              | Max handoffs to print (default: 5)                                                                      |
-| `--limit <n>`    | `plan list`                 | Max plans to print (default: 5)                                                                         |
+| `--markdown`     | `note list`, `handoff list` | Agent relay: `[bucketRelativePath](fileUri)` title lines (nested e.g. `feature/name.md`; absolute path indented beneath) |
 | `--head`         | `handoff list`              | Print only the newest *usable* handoff path — skips empty/unreadable files, same pick as `handoff peek` |
 
 
@@ -220,12 +220,14 @@ See [Upgrading](#upgrading) for the usual post-package-upgrade flow. Untouched c
 ### Plan flags
 
 
-| Flag             | Commands | Description                                                                                                                                                |
-| ---------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--title <name>` | `plan`   | Filename stem when creating/updating by name (trailing `.md` ok; sanitized, max 80 chars; no auto-slug). Mutually exclusive with `--path`.                 |
-| `--path <file>`  | `plan`   | Update an existing plan by path (must resolve under this project's `plans/`; no title sanitization; always overwrites). Mutually exclusive with `--title`. |
-| `--topics <list>` | `plan`  | Comma-separated keywords written to `topics:` frontmatter for search (e.g. `caching,redis,api`). On update, omitting `--topics` keeps existing topics. |
-| `--force`        | `plan`   | With `--title`: overwrite an existing plan (preserves original `created`, sets `updated`). Not used with `--path`.                                         |
+| Flag             | Commands    | Description                                                                                                                                                |
+| ---------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--title <name>` | `plan`      | Filename stem when creating/updating by name (trailing `.md` ok; sanitized, max 80 chars; no auto-slug). Mutually exclusive with `--path`.                 |
+| `--path <file>`  | `plan`      | Update an existing plan by path (must resolve under this project's `plans/`; no title sanitization; always overwrites). Mutually exclusive with `--title`. |
+| `--topics <list>` | `plan`     | Comma-separated keywords written to `topics:` frontmatter for search (e.g. `caching,redis,api`). On update, omitting `--topics` keeps existing topics. |
+| `--force`        | `plan`      | With `--title`: overwrite an existing plan (preserves original `created`, sets `updated`). Not used with `--path`.                                         |
+| `--limit <n>`    | `plan list` | Max plans to print (default: 5)                                                                                                                            |
+| `--markdown`     | `plan list` | Agent relay: `[bucketRelativePath](fileUri)` title lines (nested e.g. `migration/cutover.md`; absolute path indented beneath)                               |
 
 
 Unlike `note` / `handoff` (always a new dated file), `plan` is living: create or collide by `--title` (use `--force` to overwrite), or update an existing file in place with `--path`.

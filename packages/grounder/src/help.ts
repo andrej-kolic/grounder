@@ -72,16 +72,18 @@ export const COMMANDS: readonly CommandMeta[] = [
   --topics <list> Comma-separated keywords for search (e.g. "auth,jwt,session")
 
 Subcommands:
-  note list   Print recent notes (count header + numbered title/path, newest first)`,
+  note list   Print recent notes under notes/** (bucket-relative titles, newest first)`,
   },
   {
     id: "note list",
     group: "Write",
-    summary: "Print recent notes (count header + numbered title/path, newest first)",
+    summary: "Print recent notes under notes/** (bucket-relative titles, newest first)",
     listUsage: "note list",
-    usage: "grounder note list [--limit <n>]",
+    usage: "grounder note list [--limit <n>] [--markdown]",
     flags: `Flags:
-  --limit <n>  Max notes to print (default: 5)`,
+  --limit <n>  Max notes to print (default: 5)
+  --markdown   Agent relay: [bucketRelativePath](fileUri) title lines
+               (lists notes/**; nested e.g. feature/name.md)`,
   },
   {
     id: "handoff",
@@ -94,19 +96,21 @@ Subcommands:
   --topics <list> Comma-separated keywords for search (e.g. "auth,jwt,session")
 
 Subcommands:
-  handoff list   Print recent handoffs (count header + numbered title/path, newest first)
+  handoff list   Print recent handoffs under logs/** (bucket-relative titles, newest first)
   handoff peek   One-line latest-handoff teaser (session hooks)`,
   },
   {
     id: "handoff list",
     group: "Write",
-    summary: "Print recent handoffs (count header + numbered title/path, newest first)",
+    summary: "Print recent handoffs under logs/** (bucket-relative titles, newest first)",
     listUsage: "handoff list",
-    usage: "grounder handoff list [--limit <n>] [--head]",
+    usage: "grounder handoff list [--limit <n>] [--head] [--markdown]",
     flags: `Flags:
   --limit <n>  Max handoffs to print (default: 5)
   --head       Print only the newest usable path
-               (skips empty/unreadable files; same pick as handoff peek)`,
+               (skips empty/unreadable files; same pick as handoff peek)
+  --markdown   Agent relay: [bucketRelativePath](fileUri) title lines
+               (lists logs/**; nested e.g. feature/name.md; not with --head)`,
   },
   {
     id: "plan",
@@ -124,16 +128,18 @@ Subcommands:
                   On update, omit to keep existing topics.
 
 Subcommands:
-  plan list   Print recent plans (count header + numbered title/path, newest first)`,
+  plan list   Print recent plans under plans/** (bucket-relative titles, newest first)`,
   },
   {
     id: "plan list",
     group: "Write",
-    summary: "Print recent plans (count header + numbered title/path, newest first)",
+    summary: "Print recent plans under plans/** (bucket-relative titles, newest first)",
     listUsage: "plan list",
-    usage: "grounder plan list [--limit <n>]",
+    usage: "grounder plan list [--limit <n>] [--markdown]",
     flags: `Flags:
-  --limit <n>  Max plans to print (default: 5)`,
+  --limit <n>  Max plans to print (default: 5)
+  --markdown   Agent relay: [bucketRelativePath](fileUri) title lines
+               (lists plans/**; nested e.g. migration/cutover.md)`,
   },
   {
     id: "search",

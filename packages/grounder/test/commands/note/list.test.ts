@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdir, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runLinkWithOptions } from "../../../src/commands/link.js";
 import { runNoteList, runNoteListWithOptions } from "../../../src/commands/note/list.js";
@@ -155,5 +155,27 @@ describe("commands/note/list", () => {
 
     expect(code).toBe(0);
     expect(out).toBe(`All 1 note:\n\n1. phase-1  \n  ${notePath}\n`);
+  });
+
+  it("prints markdown link title lines with --markdown", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
+    const notePath = path.join(notesDir, "phase-1.md");
+    await writeFile(notePath, "x", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runNoteListWithOptions({ cwd: env.repo, homeDir: env.home, markdown: true }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe(
+      `All 1 note:\n\n1. [phase-1.md](${pathToFileURL(notePath).href})  \n  ${notePath}\n`,
+    );
   });
 });

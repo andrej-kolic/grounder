@@ -16,9 +16,10 @@ describe("templates/grounder-note", () => {
   it("documents list-and-stop before write flow", async () => {
     for (const filePath of noteTemplates) {
       const body = await readFile(filePath, "utf8");
-      expect(body).toContain("note list --limit <N>");
+      expect(body).toContain("note list --limit <N> --markdown");
       expect(body).toContain("Relay the CLI stdout as-is");
       expect(body).toContain("count header");
+      expect(body).toContain("[relativePath](fileUri)");
       expect(body).toContain("newest-first");
       expect(body).toContain("stop — no note write");
       expect(body).toContain('{{GROUNDER_CLI}} note "<body>"');

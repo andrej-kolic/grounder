@@ -89,4 +89,18 @@ describe("vault/list-handoffs", () => {
     expect(await listHandoffs(logsDir, { limit: 0 })).toEqual([]);
     expect(await listHandoffs(logsDir, { limit: -1 })).toEqual([]);
   });
+
+  it("includes markdown files in subfolders, sorted by basename", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const logsDir = path.join(env.vault, "logs");
+    const nestedDir = path.join(logsDir, "feature");
+    await mkdir(nestedDir, { recursive: true });
+    const nested = path.join(nestedDir, "2026-06-26-160000-nested.md");
+    const root = path.join(logsDir, "2026-06-26-150000-root.md");
+    await writeFile(nested, "nested", "utf8");
+    await writeFile(root, "root", "utf8");
+
+    expect(await listHandoffs(logsDir)).toEqual([nested, root]);
+  });
 });

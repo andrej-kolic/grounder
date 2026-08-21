@@ -3,7 +3,7 @@ Save a note to the markdown vault for this project.
 Distill the instruction after `/grounder-note` into a clean note body — not a chat transcript.
 Do not dump tool traces, full conversation, or false starts.
 
-**Special case: the instruction asks to view existing notes, not write one** (`list`, `list 3 oldest`, `show notes`, etc.) → run `{{GROUNDER_CLI}} note list --limit <N>` (N = count named, else 5; ignore order words like "oldest" — output is always newest-first, never resort or relabel it) and stop — no note write. Relay the CLI stdout as-is (it already includes the count header).
+**Special case: the instruction asks to view existing notes, not write one** (`list`, `list 3 oldest`, `show notes`, etc.) → run `{{GROUNDER_CLI}} note list --limit <N> --markdown` (N = count named, else 5; ignore order words like "oldest" — output is always newest-first, never resort or relabel it) and stop — no note write. Relay the CLI stdout as-is (it already includes the count header; title lines are clickable `[relativePath](fileUri)` links).
 
 Rules:
 - Default → distill the args into a clean note body
