@@ -149,7 +149,7 @@ The CLI does not guess intent. The slash command **classifies** after stripping 
 | **Request** | Leftover still has request syntax: `that mention` / `that discuss` / `that talk about`; starts with `plans that` / `notes that` / `docs that` / `documents that`; trailing `both in` / `either in` / `in CLI and` | The **primary noun or named command** from the topic (one tight phrase). Multiple nouns → pick the most specific; put others in `--terms`. Never the leftover sentence. |
 | **Topic leftover** | Otherwise — leftover is already a topic noun-phrase | Leftover, same words, same order. Do **not** paraphrase. |
 
-Do not recycle the query as a `--terms` item. Template counterexamples use a **different** topic than the eval probes (retry queue / setup+link).
+Do not recycle the query as a `--terms` item. Template counterexamples use a **different** topic than the eval probes (retry queue / charge+refund).
 
 **Terms** — fill 3–5 slots, then stop (same recipe for all three classes, unless lookup):
 
@@ -218,7 +218,7 @@ Cross-model runs on the same probe (`find documents discussing handling migratio
 
 | Leak | What models did | What actually constrained them |
 | --- | --- | --- |
-| Priming | Worked example **was** the probe, so every model copied the terms CSV | Terms example is a **different** topic (retry queue / setup+link). Probe terms CSV must not appear in the template |
+| Priming | Worked example **was** the probe, so every model copied the terms CSV | Terms example is a **different** topic (retry queue / charge+refund). Probe terms CSV must not appear in the template |
 | Module names as terms | `install-command`, then `apply-agent-installs` — pulled doctor/checklists to #1 | Name **both** stems in the never-list; “source modules” alone was too abstract |
 | Query rewrite | Composer shortened to `slash command migrations` | Explicit wrong query next to the leftover-topic rule; canonical probe is **topic leftover**, not a request |
 | Request leftover as query | `find plans that mention…` kept as `query` (request English never appears in the vault) | Classify **request**; primary noun as `query`; explicit wrong leftover-as-query |

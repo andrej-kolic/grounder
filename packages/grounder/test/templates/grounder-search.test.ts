@@ -21,23 +21,23 @@ describe("templates/grounder-search", () => {
       );
       expect(body).toContain("Strip only retrieval wrappers");
       expect(body).toContain("**Lookup**");
-      expect(body).toContain("**Exact**");
       expect(body).toContain("**Request**");
       expect(body).toContain("**Topic leftover**");
-      expect(body).toContain("Quoted spans are **not** lookup");
       expect(body).toContain("that mention");
       expect(body).toContain("never a lone generic verb");
       expect(body).toContain("source module / file stems");
       expect(body).toContain("retry queue,dead letter,jobs.json,RetryPolicy,ttl");
       expect(body).toContain("wrong query: `expired job retries`");
       expect(body).toContain("wrong class: request");
-      expect(body).toContain("setup or link");
-      expect(body).toContain("query: `grounder setup`");
+      expect(body).toContain("charge or refund");
+      expect(body).toContain("query: `charge`");
       expect(body).toContain(
-        "wrong query: `plans that mention updating the setup or link command, both in CLI and slash command`",
+        "wrong query: `plans that mention updating the charge or refund command, both in worker and API`",
       );
-      expect(body).toContain("wrong query: `setup link command`");
-      expect(body).toContain("`plan`, `command`, `cli`");
+      expect(body).toContain("wrong query: `charge refund command`");
+      expect(body).toContain("`plan`, `command`, `api`");
+      expect(body).toContain("from leftover:");
+      expect(body).toContain("invented:");
       expect(body).not.toContain("commandsSchema");
       expect(body).not.toContain("install-command");
       expect(body).not.toContain("`grounder migrate`");
@@ -72,8 +72,12 @@ describe("templates/grounder-search", () => {
     for (const filePath of searchTemplates) {
       const body = await readFile(filePath, "utf8");
       expect(body).toContain("look up why the retry queue must skip expired jobs");
+      expect(body).toContain("fictional");
       expect(body).not.toContain("session start hooks");
       expect(body).not.toContain("altering doctor or status");
+      expect(body).not.toContain("query: `grounder setup`");
+      expect(body).not.toContain("grounder link");
+      expect(body).not.toContain(".grounder.json");
       expect(body).not.toContain(
         "terms: `slash commands,grounder migrate,hash drift,commandsSchema,state.json`",
       );
