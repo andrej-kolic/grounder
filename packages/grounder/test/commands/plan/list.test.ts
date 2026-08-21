@@ -173,7 +173,7 @@ describe("commands/plan/list", () => {
 
     expect(code).toBe(0);
     expect(out).toBe(
-      `All 1 plan:\n\n1. [plans/phase-1.md](${pathToFileURL(planPath).href})  \n  ${planPath}\n`,
+      `All 1 plan:\n\n1. [phase-1.md](${pathToFileURL(planPath).href})  \n  ${planPath}\n`,
     );
   });
 
@@ -203,7 +203,7 @@ describe("commands/plan/list", () => {
     );
     expect(mdCode).toBe(0);
     expect(mdOut).toBe(
-      `All 1 plan:\n\n1. [plans/migration/cutover.md](${pathToFileURL(nestedPath).href})  \n  ${nestedPath}\n`,
+      `All 1 plan:\n\n1. [migration/cutover.md](${pathToFileURL(nestedPath).href})  \n  ${nestedPath}\n`,
     );
   });
 });

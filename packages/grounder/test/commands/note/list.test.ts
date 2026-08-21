@@ -175,7 +175,7 @@ describe("commands/note/list", () => {
 
     expect(code).toBe(0);
     expect(out).toBe(
-      `All 1 note:\n\n1. [notes/phase-1.md](${pathToFileURL(notePath).href})  \n  ${notePath}\n`,
+      `All 1 note:\n\n1. [phase-1.md](${pathToFileURL(notePath).href})  \n  ${notePath}\n`,
     );
   });
 });

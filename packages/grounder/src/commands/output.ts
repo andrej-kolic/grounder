@@ -20,15 +20,15 @@ export type VaultItemListNoun = {
 /** Options for {@link writeVaultItemList} / {@link writeVaultItemListEntries}. */
 export type VaultItemListFormatOptions = {
   /**
-   * Agent relay: first line is `[relativePath](fileUri)`; absolute path stays
-   * indented beneath for `--path` / Read matching. Requires `rootDir`.
+   * Agent relay: first line is `[bucketRelativePath](fileUri)` (keeps `.md`);
+   * absolute path stays indented beneath for `--path` / Read matching.
+   * Requires `titleRootDir`.
    */
   markdown?: boolean;
-  /** Project vault root used to compute `relativePath` when `markdown` is set. */
-  rootDir?: string;
   /**
-   * Bucket dir (`notes/` / `logs/` / `plans/`) for plain titles — nested files
-   * show as `subdir/stem` instead of a colliding bare stem.
+   * Bucket dir (`notes/` / `logs/` / `plans/`) for titles — nested files show
+   * as `subdir/stem` (plain) or `subdir/name.md` (markdown) instead of a
+   * colliding bare name. Required when `markdown` is set.
    */
   titleRootDir?: string;
 };
@@ -62,18 +62,19 @@ export function formatVaultItemListHeader(
  * so agents can relay stdout into chat and keep title and path on separate
  * rendered lines.
  *
- * With `markdown: true`, the title line is `[relativePath](fileUri)` under
- * `rootDir` instead of the plain title. Plain titles use `titleRootDir` when
- * set (bucket-relative stem path) so nested files stay unambiguous.
+ * Titles are bucket-relative under `titleRootDir` when set (nested files keep
+ * subfolders; no `notes/` / `logs/` / `plans/` prefix). With `markdown: true`,
+ * the title line is `[bucketRelativePath](fileUri)` (`.md` kept); plain mode
+ * strips the extension.
  */
 export function writeVaultItemListEntries(
   paths: readonly string[],
   options: VaultItemListFormatOptions = {},
 ): void {
   const markdown = options.markdown === true;
-  const rootDir = options.rootDir;
-  if (markdown && rootDir === undefined) {
-    throw new Error("rootDir is required when markdown is true");
+  const titleRootDir = options.titleRootDir;
+  if (markdown && titleRootDir === undefined) {
+    throw new Error("titleRootDir is required when markdown is true");
   }
 
   paths.forEach((filePath, index) => {
@@ -81,8 +82,8 @@ export function writeVaultItemListEntries(
       process.stdout.write("\n");
     }
     const title = markdown
-      ? `[${vaultRelativePath(rootDir as string, filePath)}](${toFileUri(filePath)})`
-      : vaultItemPlainTitle(filePath, options.titleRootDir);
+      ? `[${vaultRelativePath(titleRootDir as string, filePath)}](${toFileUri(filePath)})`
+      : vaultItemPlainTitle(filePath, titleRootDir);
     // Two trailing spaces: Markdown hard break when stdout is relayed into chat.
     process.stdout.write(`${index + 1}. ${title}  \n  ${filePath}\n`);
   });

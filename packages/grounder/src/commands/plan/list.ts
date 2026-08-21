@@ -1,5 +1,5 @@
 import { withHomeDir } from "../../connector/home.js";
-import { resolvePlansDir, resolveProjectVaultRoot } from "../../connector/vault.js";
+import { resolvePlansDir } from "../../connector/vault.js";
 import { helpExitCode } from "../../help.js";
 import { flagBool, parseArgs } from "../../util/parse-args.js";
 import { listPlans } from "../../vault/list-plans.js";
@@ -15,8 +15,9 @@ export interface PlanListOptions {
   /** Max plans to print, newest first (default: 5). */
   limit?: number;
   /**
-   * Agent relay: `[relativePath](fileUri)` on the title line (default: plain
-   * bucket-relative stem path). Absolute path stays indented beneath either way.
+   * Agent relay: `[bucketRelativePath](fileUri)` on the title line (default:
+   * plain bucket-relative stem path). Absolute path stays indented beneath
+   * either way.
    */
   markdown?: boolean;
   /** Override home dir / `GROUNDER_HOME` (tests). */
@@ -75,14 +76,14 @@ export async function runPlanList(argv: string[]): Promise<number> {
  * each plan as a numbered two-line block — `N. ` + bucket-relative stem path
  * (nested files include subfolders), then the indented absolute path —
  * separated by a blank line. With `markdown: true`, the title line is
- * `[relativePath](fileUri)` under the project vault root. The title line ends
- * with two trailing spaces (a Markdown hard line break) so agents can relay
- * stdout into chat and keep title and path on separate rendered lines. When
- * `plans/` is empty, prints `No plans.` only. The number is positional within
- * this listing only (not a stable identifier — a later `plan list` call may
- * renumber if plans change) and exists purely so a human or agent can refer to
- * "plan 2" in the same conversation without retyping the path. Same vault/link
- * prerequisites as `grounder plan`.
+ * `[bucketRelativePath](fileUri)` under `plans/` (`.md` kept; no `plans/`
+ * prefix). The title line ends with two trailing spaces (a Markdown hard line
+ * break) so agents can relay stdout into chat and keep title and path on
+ * separate rendered lines. When `plans/` is empty, prints `No plans.` only. The
+ * number is positional within this listing only (not a stable identifier — a
+ * later `plan list` call may renumber if plans change) and exists purely so a
+ * human or agent can refer to "plan 2" in the same conversation without
+ * retyping the path. Same vault/link prerequisites as `grounder plan`.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runPlanListWithOptions(options: PlanListOptions = {}): Promise<number> {
@@ -95,14 +96,12 @@ export async function runPlanListWithOptions(options: PlanListOptions = {}): Pro
     const limit = options.limit ?? DEFAULT_LIMIT;
     const plansDir = resolvePlansDir(linked.home, linked.repo);
     const paths = await listPlans(plansDir, { limit });
-    const rootDir = resolveProjectVaultRoot(linked.home, linked.repo);
     writeVaultItemList(
       paths,
       limit,
       { singular: "plan", plural: "plans" },
       {
         markdown: options.markdown === true,
-        rootDir,
         titleRootDir: plansDir,
       },
     );

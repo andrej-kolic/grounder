@@ -82,7 +82,7 @@ Subcommands:
     usage: "grounder note list [--limit <n>] [--markdown]",
     flags: `Flags:
   --limit <n>  Max notes to print (default: 5)
-  --markdown   Agent relay: [relativePath](fileUri) title lines`,
+  --markdown   Agent relay: [bucketRelativePath](fileUri) title lines`,
   },
   {
     id: "handoff",
@@ -108,7 +108,7 @@ Subcommands:
   --limit <n>  Max handoffs to print (default: 5)
   --head       Print only the newest usable path
                (skips empty/unreadable files; same pick as handoff peek)
-  --markdown   Agent relay: [relativePath](fileUri) title lines
+  --markdown   Agent relay: [bucketRelativePath](fileUri) title lines
                (not with --head)`,
   },
   {
@@ -137,7 +137,7 @@ Subcommands:
     usage: "grounder plan list [--limit <n>] [--markdown]",
     flags: `Flags:
   --limit <n>  Max plans to print (default: 5)
-  --markdown   Agent relay: [relativePath](fileUri) title lines`,
+  --markdown   Agent relay: [bucketRelativePath](fileUri) title lines`,
   },
   {
     id: "search",

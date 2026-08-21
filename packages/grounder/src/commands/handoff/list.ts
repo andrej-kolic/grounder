@@ -1,5 +1,5 @@
 import { withHomeDir } from "../../connector/home.js";
-import { resolveLogsDir, resolveProjectVaultRoot } from "../../connector/vault.js";
+import { resolveLogsDir } from "../../connector/vault.js";
 import { helpExitCode } from "../../help.js";
 import { flagBool, parseArgs } from "../../util/parse-args.js";
 import { findUsableHandoff } from "../../vault/find-usable-handoff.js";
@@ -26,9 +26,9 @@ export interface HandoffListOptions {
    */
   head?: boolean;
   /**
-   * Agent relay: `[relativePath](fileUri)` on the title line (default: plain
-   * bucket-relative stem path). Absolute path stays indented beneath either
-   * way. Not used with `head`.
+   * Agent relay: `[bucketRelativePath](fileUri)` on the title line (default:
+   * plain bucket-relative stem path). Absolute path stays indented beneath
+   * either way. Not used with `head`.
    */
   markdown?: boolean;
   /** Override home dir / `GROUNDER_HOME` (tests). */
@@ -94,14 +94,15 @@ export async function runHandoffList(argv: string[]): Promise<number> {
  * non-empty), then each handoff as a numbered two-line block — `N. ` +
  * bucket-relative stem path (nested files include subfolders; timestamp
  * prefixes included), then the indented absolute path — separated by a blank
- * line. With `markdown: true`, the title line is `[relativePath](fileUri)`
- * under the project vault root. The title line ends with two trailing spaces
- * (a Markdown hard line break) so agents can relay stdout into chat and keep
- * title and path on separate rendered lines. When `logs/` is empty, prints
- * `No handoffs.` only. The number is positional within this listing only (not
- * a stable identifier). With `head: true`, prints only the single newest
- * *usable* handoff path (or empty stdout) — see {@link findUsableHandoff}.
- * Same vault/link prerequisites as `grounder handoff`.
+ * line. With `markdown: true`, the title line is `[bucketRelativePath](fileUri)`
+ * under `logs/` (`.md` kept; no `logs/` prefix). The title line ends with two
+ * trailing spaces (a Markdown hard line break) so agents can relay stdout into
+ * chat and keep title and path on separate rendered lines. When `logs/` is
+ * empty, prints `No handoffs.` only. The number is positional within this
+ * listing only (not a stable identifier). With `head: true`, prints only the
+ * single newest *usable* handoff path (or empty stdout) — see
+ * {@link findUsableHandoff}. Same vault/link prerequisites as
+ * `grounder handoff`.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runHandoffListWithOptions(options: HandoffListOptions = {}): Promise<number> {
@@ -123,14 +124,12 @@ export async function runHandoffListWithOptions(options: HandoffListOptions = {}
     }
 
     const paths = await listHandoffs(logsDir, { limit });
-    const rootDir = resolveProjectVaultRoot(linked.home, linked.repo);
     writeVaultItemList(
       paths,
       limit,
       { singular: "handoff", plural: "handoffs" },
       {
         markdown: options.markdown === true,
-        rootDir,
         titleRootDir: logsDir,
       },
     );

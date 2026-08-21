@@ -48,9 +48,9 @@ describe("writeVaultItemList", () => {
   });
 
   it("writes markdown link title lines when markdown is set", async () => {
-    const rootDir = "/vault/project";
-    const newer = `${rootDir}/logs/2026-06-26-1500-newer.md`;
-    const older = `${rootDir}/logs/2026-06-26-1430.md`;
+    const logsDir = "/vault/project/logs";
+    const newer = `${logsDir}/2026-06-26-1500-newer.md`;
+    const older = `${logsDir}/2026-06-26-1430.md`;
 
     const { out } = await captureStdout(async () => {
       writeVaultItemList(
@@ -59,7 +59,7 @@ describe("writeVaultItemList", () => {
         { singular: "handoff", plural: "handoffs" },
         {
           markdown: true,
-          rootDir,
+          titleRootDir: logsDir,
         },
       );
       return 0;
@@ -67,8 +67,22 @@ describe("writeVaultItemList", () => {
 
     expect(out).toBe(
       `All 2 handoffs:\n\n` +
-        `1. [logs/2026-06-26-1500-newer.md](${pathToFileURL(newer).href})  \n  ${newer}\n\n` +
-        `2. [logs/2026-06-26-1430.md](${pathToFileURL(older).href})  \n  ${older}\n`,
+        `1. [2026-06-26-1500-newer.md](${pathToFileURL(newer).href})  \n  ${newer}\n\n` +
+        `2. [2026-06-26-1430.md](${pathToFileURL(older).href})  \n  ${older}\n`,
+    );
+  });
+
+  it("keeps nested bucket-relative markdown titles without the bucket prefix", async () => {
+    const logsDir = "/vault/project/logs";
+    const nested = `${logsDir}/feature/2026-06-26-1600.md`;
+
+    const { out } = await captureStdout(async () => {
+      writeVaultItemListEntries([nested], { markdown: true, titleRootDir: logsDir });
+      return 0;
+    });
+
+    expect(out).toBe(
+      `1. [feature/2026-06-26-1600.md](${pathToFileURL(nested).href})  \n  ${nested}\n`,
     );
   });
 

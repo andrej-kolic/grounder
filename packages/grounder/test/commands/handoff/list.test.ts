@@ -245,7 +245,7 @@ describe("commands/handoff/list", () => {
 
     expect(code).toBe(0);
     expect(out).toBe(
-      `All 1 handoff:\n\n1. [logs/2026-06-26-1500.md](${pathToFileURL(handoffPath).href})  \n  ${handoffPath}\n`,
+      `All 1 handoff:\n\n1. [2026-06-26-1500.md](${pathToFileURL(handoffPath).href})  \n  ${handoffPath}\n`,
     );
   });
 });
