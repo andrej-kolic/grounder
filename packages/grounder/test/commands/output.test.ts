@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   formatVaultItemListHeader,
@@ -43,6 +44,31 @@ describe("writeVaultItemList", () => {
 
     expect(out).toBe(
       `All 2 handoffs:\n\n1. 2026-06-26-1500-newer  \n  ${newer}\n\n2. 2026-06-26-1430  \n  ${older}\n`,
+    );
+  });
+
+  it("writes markdown link title lines when markdown is set", async () => {
+    const rootDir = "/vault/project";
+    const newer = `${rootDir}/logs/2026-06-26-1500-newer.md`;
+    const older = `${rootDir}/logs/2026-06-26-1430.md`;
+
+    const { out } = await captureStdout(async () => {
+      writeVaultItemList(
+        [newer, older],
+        5,
+        { singular: "handoff", plural: "handoffs" },
+        {
+          markdown: true,
+          rootDir,
+        },
+      );
+      return 0;
+    });
+
+    expect(out).toBe(
+      `All 2 handoffs:\n\n` +
+        `1. [logs/2026-06-26-1500-newer.md](${pathToFileURL(newer).href})  \n  ${newer}\n\n` +
+        `2. [logs/2026-06-26-1430.md](${pathToFileURL(older).href})  \n  ${older}\n`,
     );
   });
 

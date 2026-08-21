@@ -1,12 +1,15 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   expandHome,
   isPathInside,
   isRealPathInside,
   resolveUserPath,
+  toFileUri,
+  vaultRelativePath,
 } from "../../src/util/path.js";
 
 describe("util/path", () => {
@@ -97,6 +100,19 @@ describe("util/path", () => {
       await mkdir(parent);
 
       expect(await isRealPathInside(parent, path.join(parent, "missing.md"))).toBe(null);
+    });
+  });
+
+  describe("toFileUri", () => {
+    it("matches pathToFileURL href", () => {
+      const filePath = "/tmp/vault/plans/doc 1.md";
+      expect(toFileUri(filePath)).toBe(pathToFileURL(filePath).href);
+    });
+  });
+
+  describe("vaultRelativePath", () => {
+    it("uses forward slashes relative to the root", () => {
+      expect(vaultRelativePath("/vault/project", "/vault/project/plans/a.md")).toBe("plans/a.md");
     });
   });
 });

@@ -211,7 +211,7 @@ See [Upgrading](#upgrading) for the usual post-package-upgrade flow. Untouched c
 | `--topics <list>` | `note`, `handoff`          | Comma-separated keywords written to `topics:` frontmatter for search (e.g. `auth,jwt,session`)         |
 | `--limit <n>`    | `note list`                 | Max notes to print (default: 5)                                                                         |
 | `--limit <n>`    | `handoff list`              | Max handoffs to print (default: 5)                                                                      |
-| `--limit <n>`    | `plan list`                 | Max plans to print (default: 5)                                                                         |
+| `--markdown`     | `note list`, `handoff list` | Agent relay: `[relativePath](fileUri)` title lines (absolute path still indented beneath)               |
 | `--head`         | `handoff list`              | Print only the newest *usable* handoff path — skips empty/unreadable files, same pick as `handoff peek` |
 
 
@@ -220,12 +220,14 @@ See [Upgrading](#upgrading) for the usual post-package-upgrade flow. Untouched c
 ### Plan flags
 
 
-| Flag             | Commands | Description                                                                                                                                                |
-| ---------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--title <name>` | `plan`   | Filename stem when creating/updating by name (trailing `.md` ok; sanitized, max 80 chars; no auto-slug). Mutually exclusive with `--path`.                 |
-| `--path <file>`  | `plan`   | Update an existing plan by path (must resolve under this project's `plans/`; no title sanitization; always overwrites). Mutually exclusive with `--title`. |
-| `--topics <list>` | `plan`  | Comma-separated keywords written to `topics:` frontmatter for search (e.g. `caching,redis,api`). On update, omitting `--topics` keeps existing topics. |
-| `--force`        | `plan`   | With `--title`: overwrite an existing plan (preserves original `created`, sets `updated`). Not used with `--path`.                                         |
+| Flag             | Commands    | Description                                                                                                                                                |
+| ---------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--title <name>` | `plan`      | Filename stem when creating/updating by name (trailing `.md` ok; sanitized, max 80 chars; no auto-slug). Mutually exclusive with `--path`.                 |
+| `--path <file>`  | `plan`      | Update an existing plan by path (must resolve under this project's `plans/`; no title sanitization; always overwrites). Mutually exclusive with `--title`. |
+| `--topics <list>` | `plan`     | Comma-separated keywords written to `topics:` frontmatter for search (e.g. `caching,redis,api`). On update, omitting `--topics` keeps existing topics. |
+| `--force`        | `plan`      | With `--title`: overwrite an existing plan (preserves original `created`, sets `updated`). Not used with `--path`.                                         |
+| `--limit <n>`    | `plan list` | Max plans to print (default: 5)                                                                                                                            |
+| `--markdown`     | `plan list` | Agent relay: `[relativePath](fileUri)` title lines (absolute path still indented beneath)                                                                  |
 
 
 Unlike `note` / `handoff` (always a new dated file), `plan` is living: create or collide by `--title` (use `--force` to overwrite), or update an existing file in place with `--path`.

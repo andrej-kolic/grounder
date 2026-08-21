@@ -1,10 +1,10 @@
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { withHomeDir } from "../connector/home.js";
 import { resolveProjectVaultRoot } from "../connector/vault.js";
 import { helpExitCode } from "../help.js";
 import { fileExists } from "../util/fs.js";
 import { flagBool, flagString, parseArgs } from "../util/parse-args.js";
+import { toFileUri, vaultRelativePath } from "../util/path.js";
 import { type SearchOutcome, searchVault } from "../vault/search.js";
 import { requireLinkedProject } from "./require-linked.js";
 
@@ -157,10 +157,6 @@ function writePlainOutput(outcome: SearchOutcome): void {
   });
 }
 
-function fileUri(filePath: string): string {
-  return pathToFileURL(filePath).href;
-}
-
 function formatSnippetBlock(snippet: string): string {
   let fence = "```";
   while (snippet.includes(fence)) {
@@ -185,17 +181,13 @@ function writeMarkdownOutput(outcome: SearchOutcome): void {
 
   for (const file of outcome.files) {
     const label = fileStem(file.filePath);
-    process.stdout.write(`### [${label}](${fileUri(file.filePath)})\n\n`);
+    process.stdout.write(`### [${label}](${toFileUri(file.filePath)})\n\n`);
     for (const hit of file.hits) {
       process.stdout.write(`L${hit.line} (${hit.matchedTerm}):\n\n`);
       process.stdout.write(formatSnippetBlock(hit.snippet));
       process.stdout.write("\n");
     }
   }
-}
-
-function vaultRelativePath(rootDir: string, filePath: string): string {
-  return path.relative(rootDir, filePath).split(path.sep).join("/");
 }
 
 function alsoMatchedHint(filePath: string, matchedTerms: readonly string[]): string {
@@ -215,7 +207,7 @@ function writeJsonOutput(outcome: SearchOutcome, rootDir: string): void {
     hits: outcome.files.map((file) => ({
       file: file.filePath,
       relativePath: vaultRelativePath(rootDir, file.filePath),
-      fileUri: fileUri(file.filePath),
+      fileUri: toFileUri(file.filePath),
       alsoMatchedHint: alsoMatchedHint(file.filePath, file.matchedTerms),
       mtimeMs: file.mtimeMs,
       topicsMatch: file.topicsMatch,

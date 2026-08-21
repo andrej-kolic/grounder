@@ -2,7 +2,7 @@ Hydrate this session from the latest vault handoff and repo truth.
 
 Read-only — do not write to the vault. Do not invent vault paths.
 
-**Special case: the instruction asks to view existing handoffs, not hydrate** (`list`, `list 3 oldest`, `show handoffs`, etc.) → run `{{GROUNDER_CLI}} handoff list --limit <N>` (N = count named, else 5; ignore order words like "oldest" — output is always newest-first, never resort or relabel it) and stop — no hydrate, no `AGENTS.md`, no “start work.” Relay the CLI stdout as-is (it already includes the count header).
+**Special case: the instruction asks to view existing handoffs, not hydrate** (`list`, `list 3 oldest`, `show handoffs`, etc.) → run `{{GROUNDER_CLI}} handoff list --limit <N> --markdown` (N = count named, else 5; ignore order words like "oldest" — output is always newest-first, never resort or relabel it) and stop — no hydrate, no `AGENTS.md`, no “start work.” Relay the CLI stdout as-is (it already includes the count header; title lines are clickable `[relativePath](fileUri)` links).
 
 Otherwise, from the linked project folder or any subdirectory beneath it:
 
@@ -12,7 +12,7 @@ Otherwise, from the linked project folder or any subdirectory beneath it:
 
 2. If empty: tell the user there are no handoffs yet, then read repo `AGENTS.md` only and proceed.
 
-3. Otherwise, read that file. If the user names a specific session instead: `{{GROUNDER_CLI}} handoff list --limit 5` → match name/index to the indented path in *this* listing (positional, not a stable id). Miss → once with `--limit 50` (*that* listing only). Still miss → tell the user and stop — no guessed hydrate.
+3. Otherwise, read that file. If the user names a specific session instead: `{{GROUNDER_CLI}} handoff list --limit 5 --markdown` → match name/index to the indented absolute path in *this* listing (positional, not a stable id). Miss → once with `--limit 50 --markdown` (*that* listing only). Still miss → tell the user and stop — no guessed hydrate.
 
 4. Read repo `AGENTS.md` (project conventions and constraints).
 

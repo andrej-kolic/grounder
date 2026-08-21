@@ -79,9 +79,10 @@ Subcommands:
     group: "Write",
     summary: "Print recent notes (count header + numbered title/path, newest first)",
     listUsage: "note list",
-    usage: "grounder note list [--limit <n>]",
+    usage: "grounder note list [--limit <n>] [--markdown]",
     flags: `Flags:
-  --limit <n>  Max notes to print (default: 5)`,
+  --limit <n>  Max notes to print (default: 5)
+  --markdown   Agent relay: [relativePath](fileUri) title lines`,
   },
   {
     id: "handoff",
@@ -102,11 +103,13 @@ Subcommands:
     group: "Write",
     summary: "Print recent handoffs (count header + numbered title/path, newest first)",
     listUsage: "handoff list",
-    usage: "grounder handoff list [--limit <n>] [--head]",
+    usage: "grounder handoff list [--limit <n>] [--head] [--markdown]",
     flags: `Flags:
   --limit <n>  Max handoffs to print (default: 5)
   --head       Print only the newest usable path
-               (skips empty/unreadable files; same pick as handoff peek)`,
+               (skips empty/unreadable files; same pick as handoff peek)
+  --markdown   Agent relay: [relativePath](fileUri) title lines
+               (not with --head)`,
   },
   {
     id: "plan",
@@ -131,9 +134,10 @@ Subcommands:
     group: "Write",
     summary: "Print recent plans (count header + numbered title/path, newest first)",
     listUsage: "plan list",
-    usage: "grounder plan list [--limit <n>]",
+    usage: "grounder plan list [--limit <n>] [--markdown]",
     flags: `Flags:
-  --limit <n>  Max plans to print (default: 5)`,
+  --limit <n>  Max plans to print (default: 5)
+  --markdown   Agent relay: [relativePath](fileUri) title lines`,
   },
   {
     id: "search",

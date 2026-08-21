@@ -1,4 +1,5 @@
 import path from "node:path";
+import { toFileUri, vaultRelativePath } from "../util/path.js";
 
 /** Shared checklist/snapshot formatting for `doctor` and `status`. */
 
@@ -15,6 +16,17 @@ export function fixArrow(fix?: string): string {
 export type VaultItemListNoun = {
   singular: string;
   plural: string;
+};
+
+/** Options for {@link writeVaultItemList} / {@link writeVaultItemListEntries}. */
+export type VaultItemListFormatOptions = {
+  /**
+   * Agent relay: first line is `[relativePath](fileUri)`; absolute path stays
+   * indented beneath for `--path` / Read matching. Requires `rootDir`.
+   */
+  markdown?: boolean;
+  /** Project vault root used to compute `relativePath` when `markdown` is set. */
+  rootDir?: string;
 };
 
 function vaultItemNoun(count: number, noun: VaultItemListNoun): string {
@@ -45,15 +57,29 @@ export function formatVaultItemListHeader(
  * Each title line ends with two trailing spaces (a Markdown hard line break)
  * so agents can relay stdout into chat and keep title and path on separate
  * rendered lines.
+ *
+ * With `markdown: true`, the title line is `[relativePath](fileUri)` under
+ * `rootDir` instead of the filename stem.
  */
-export function writeVaultItemListEntries(paths: readonly string[]): void {
+export function writeVaultItemListEntries(
+  paths: readonly string[],
+  options: VaultItemListFormatOptions = {},
+): void {
+  const markdown = options.markdown === true;
+  const rootDir = options.rootDir;
+  if (markdown && rootDir === undefined) {
+    throw new Error("rootDir is required when markdown is true");
+  }
+
   paths.forEach((filePath, index) => {
     if (index > 0) {
       process.stdout.write("\n");
     }
-    const stem = path.basename(filePath, ".md");
+    const title = markdown
+      ? `[${vaultRelativePath(rootDir as string, filePath)}](${toFileUri(filePath)})`
+      : path.basename(filePath, ".md");
     // Two trailing spaces: Markdown hard break when stdout is relayed into chat.
-    process.stdout.write(`${index + 1}. ${stem}  \n  ${filePath}\n`);
+    process.stdout.write(`${index + 1}. ${title}  \n  ${filePath}\n`);
   });
 }
 
@@ -65,7 +91,8 @@ export function writeVaultItemList(
   paths: readonly string[],
   limit: number,
   noun: VaultItemListNoun,
+  options: VaultItemListFormatOptions = {},
 ): void {
   process.stdout.write(formatVaultItemListHeader(paths.length, limit, noun));
-  writeVaultItemListEntries(paths);
+  writeVaultItemListEntries(paths, options);
 }

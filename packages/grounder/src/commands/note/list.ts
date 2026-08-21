@@ -1,7 +1,7 @@
 import { withHomeDir } from "../../connector/home.js";
-import { resolveNotesDir } from "../../connector/vault.js";
+import { resolveNotesDir, resolveProjectVaultRoot } from "../../connector/vault.js";
 import { helpExitCode } from "../../help.js";
-import { parseArgs } from "../../util/parse-args.js";
+import { flagBool, parseArgs } from "../../util/parse-args.js";
 import { listNotes } from "../../vault/list-notes.js";
 import { writeVaultItemList } from "../output.js";
 import { requireLinkedProject } from "../require-linked.js";
@@ -14,11 +14,16 @@ export interface NoteListOptions {
   cwd?: string;
   /** Max notes to print, newest first (default: 5). */
   limit?: number;
+  /**
+   * Agent relay: `[relativePath](fileUri)` on the title line (default: plain
+   * filename stem). Absolute path stays indented beneath either way.
+   */
+  markdown?: boolean;
   /** Override home dir / `GROUNDER_HOME` (tests). */
   homeDir?: string;
 }
 
-const USAGE = "Usage: grounder note list [--limit <n>]\n";
+const USAGE = "Usage: grounder note list [--limit <n>] [--markdown]\n";
 
 function usageError(): number {
   process.stderr.write(USAGE);
@@ -26,7 +31,7 @@ function usageError(): number {
 }
 
 /**
- * CLI entry for `grounder note list [--limit <n>]`.
+ * CLI entry for `grounder note list [--limit <n>] [--markdown]`.
  * `--limit` must be a positive integer when provided.
  * @returns Exit code (`0` on success, `1` on usage or config errors).
  */
@@ -42,7 +47,7 @@ export async function runNoteList(argv: string[]): Promise<number> {
   }
 
   for (const key of flags.keys()) {
-    if (key !== "limit") {
+    if (key !== "limit" && key !== "markdown") {
       return usageError();
     }
   }
@@ -61,18 +66,19 @@ export async function runNoteList(argv: string[]): Promise<number> {
     limit = parsed;
   }
 
-  return runNoteListWithOptions({ limit });
+  return runNoteListWithOptions({ limit, markdown: flagBool(flags, "markdown") });
 }
 
 /**
  * Resolves the linked project, lists recent notes under `notes/` (newest first).
  * Prints a count header (blank line after when non-empty), then each note as a
  * numbered two-line block — `N. ` + full filename stem (including any date
- * prefix), then the indented absolute path — separated by a blank line. The
- * title line ends with two trailing spaces (a Markdown hard line break) so
- * agents can relay stdout into chat and keep title and path on separate
- * rendered lines. When `notes/` is empty, prints `No notes.` only. Same
- * vault/link prerequisites as `grounder note`.
+ * prefix), then the indented absolute path — separated by a blank line. With
+ * `markdown: true`, the title line is `[relativePath](fileUri)` under the
+ * project vault root. The title line ends with two trailing spaces (a Markdown
+ * hard line break) so agents can relay stdout into chat and keep title and
+ * path on separate rendered lines. When `notes/` is empty, prints `No notes.`
+ * only. Same vault/link prerequisites as `grounder note`.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runNoteListWithOptions(options: NoteListOptions = {}): Promise<number> {
@@ -85,7 +91,16 @@ export async function runNoteListWithOptions(options: NoteListOptions = {}): Pro
     const limit = options.limit ?? DEFAULT_LIMIT;
     const notesDir = resolveNotesDir(linked.home, linked.repo);
     const paths = await listNotes(notesDir, { limit });
-    writeVaultItemList(paths, limit, { singular: "note", plural: "notes" });
+    const rootDir = resolveProjectVaultRoot(linked.home, linked.repo);
+    writeVaultItemList(
+      paths,
+      limit,
+      { singular: "note", plural: "notes" },
+      {
+        markdown: options.markdown === true,
+        rootDir,
+      },
+    );
     return 0;
   });
 }

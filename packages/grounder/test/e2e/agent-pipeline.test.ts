@@ -146,12 +146,15 @@ describe("e2e/agent-pipeline", () => {
     expect(note.stdout).toMatch(/^Wrote .*e2e-smoke-note\.md\n$/);
 
     const noteList = runShell(
-      renderedInvocation(noteContent, env.home, "note list --limit <N>", { "<N>": "5" }),
+      renderedInvocation(noteContent, env.home, "note list --limit <N> --markdown", {
+        "<N>": "5",
+      }),
       grounded,
       env.repo,
     );
     assertOk(noteList, "note list");
     expect(noteList.stdout).toContain("e2e-smoke-note");
+    expect(noteList.stdout).toContain("](file://");
 
     const handoffWriteContent = await readFile(cursorHandoffCommandPath(env.home), "utf8");
     const handoff = runShell(
@@ -175,12 +178,13 @@ describe("e2e/agent-pipeline", () => {
     expect(handoffHead.stdout.trim()).toMatch(/e2e-smoke-handoff\.md$/);
 
     const handoffList = runShell(
-      renderedInvocation(taskContent, env.home, "handoff list --limit 5"),
+      renderedInvocation(taskContent, env.home, "handoff list --limit 5 --markdown"),
       grounded,
       env.repo,
     );
     assertOk(handoffList, "handoff list --limit");
     expect(handoffList.stdout).toContain("e2e-smoke-handoff");
+    expect(handoffList.stdout).toContain("](file://");
 
     const planContent = await readFile(cursorPlanCommandPath(env.home), "utf8");
     const plan = runShell(
@@ -212,12 +216,13 @@ describe("e2e/agent-pipeline", () => {
     expect(planUpdate.stdout).toBe(`Updated ${planPath}\n`);
 
     const planList = runShell(
-      renderedInvocation(planContent, env.home, "plan list --limit 5"),
+      renderedInvocation(planContent, env.home, "plan list --limit 5 --markdown"),
       grounded,
       env.repo,
     );
     assertOk(planList, "plan list");
     expect(planList.stdout).toContain("e2e-smoke-plan");
+    expect(planList.stdout).toContain("](file://");
   });
 
   it("runs the session-start hooks exactly as each host app invokes them", async () => {

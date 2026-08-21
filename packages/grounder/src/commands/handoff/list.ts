@@ -1,5 +1,5 @@
 import { withHomeDir } from "../../connector/home.js";
-import { resolveLogsDir } from "../../connector/vault.js";
+import { resolveLogsDir, resolveProjectVaultRoot } from "../../connector/vault.js";
 import { helpExitCode } from "../../help.js";
 import { flagBool, parseArgs } from "../../util/parse-args.js";
 import { findUsableHandoff } from "../../vault/find-usable-handoff.js";
@@ -21,14 +21,21 @@ export interface HandoffListOptions {
   /**
    * Print only the single newest *usable* handoff path (skips empty/unreadable
    * files), same selection `grounder handoff peek` uses. Ignores `limit` for
-   * output count but still bounds the fallback scan.
+   * output count but still bounds the fallback scan. Incompatible with
+   * `markdown`.
    */
   head?: boolean;
+  /**
+   * Agent relay: `[relativePath](fileUri)` on the title line (default: plain
+   * filename stem). Absolute path stays indented beneath either way. Not used
+   * with `head`.
+   */
+  markdown?: boolean;
   /** Override home dir / `GROUNDER_HOME` (tests). */
   homeDir?: string;
 }
 
-const USAGE = "Usage: grounder handoff list [--limit <n>] [--head]\n";
+const USAGE = "Usage: grounder handoff list [--limit <n>] [--head] [--markdown]\n";
 
 function usageError(): number {
   process.stderr.write(USAGE);
@@ -36,7 +43,7 @@ function usageError(): number {
 }
 
 /**
- * CLI entry for `grounder handoff list [--limit <n>]`.
+ * CLI entry for `grounder handoff list [--limit <n>] [--head] [--markdown]`.
  * `--limit` must be a positive integer when provided.
  * @returns Exit code (`0` on success, `1` on usage or config errors).
  */
@@ -52,7 +59,7 @@ export async function runHandoffList(argv: string[]): Promise<number> {
   }
 
   for (const key of flags.keys()) {
-    if (key !== "limit" && key !== "head") {
+    if (key !== "limit" && key !== "head" && key !== "markdown") {
       return usageError();
     }
   }
@@ -71,7 +78,14 @@ export async function runHandoffList(argv: string[]): Promise<number> {
     limit = parsed;
   }
 
-  return runHandoffListWithOptions({ limit, head: flagBool(flags, "head") });
+  const head = flagBool(flags, "head");
+  const markdown = flagBool(flags, "markdown");
+  if (head && markdown) {
+    process.stderr.write("Use only one of --head or --markdown.\n");
+    return 1;
+  }
+
+  return runHandoffListWithOptions({ limit, head, markdown });
 }
 
 /**
@@ -79,13 +93,14 @@ export async function runHandoffList(argv: string[]): Promise<number> {
  * Default: prints a count header (blank line after when non-empty), then each
  * handoff as a numbered two-line block — `N. ` + full filename stem (including
  * timestamp prefix), then the indented absolute path — separated by a blank
- * line. The title line ends with two trailing spaces (a Markdown hard line
- * break) so agents can relay stdout into chat and keep title and path on
- * separate rendered lines. When `logs/` is empty, prints `No handoffs.` only.
- * The number is positional within this listing only (not a stable identifier).
- * With `head: true`, prints only the single newest *usable* handoff path (or
- * empty stdout) — see {@link findUsableHandoff}. Same vault/link prerequisites
- * as `grounder handoff`.
+ * line. With `markdown: true`, the title line is `[relativePath](fileUri)`
+ * under the project vault root. The title line ends with two trailing spaces
+ * (a Markdown hard line break) so agents can relay stdout into chat and keep
+ * title and path on separate rendered lines. When `logs/` is empty, prints
+ * `No handoffs.` only. The number is positional within this listing only (not
+ * a stable identifier). With `head: true`, prints only the single newest
+ * *usable* handoff path (or empty stdout) — see {@link findUsableHandoff}.
+ * Same vault/link prerequisites as `grounder handoff`.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runHandoffListWithOptions(options: HandoffListOptions = {}): Promise<number> {
@@ -107,7 +122,16 @@ export async function runHandoffListWithOptions(options: HandoffListOptions = {}
     }
 
     const paths = await listHandoffs(logsDir, { limit });
-    writeVaultItemList(paths, limit, { singular: "handoff", plural: "handoffs" });
+    const rootDir = resolveProjectVaultRoot(linked.home, linked.repo);
+    writeVaultItemList(
+      paths,
+      limit,
+      { singular: "handoff", plural: "handoffs" },
+      {
+        markdown: options.markdown === true,
+        rootDir,
+      },
+    );
     return 0;
   });
 }

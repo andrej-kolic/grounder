@@ -19,9 +19,10 @@ describe("templates/grounder-plan", () => {
       expect(body).toContain("state it plainly before writing");
       expect(body).toContain("not a blocking confirmation");
       expect(body).toContain("printed by an earlier `grounder plan` this conversation");
-      expect(body).toContain("plan list --limit 5");
+      expect(body).toContain("plan list --limit 5 --markdown");
       expect(body).toContain("Relay the CLI stdout as-is");
       expect(body).toContain("count header");
+      expect(body).toContain("[relativePath](fileUri)");
       expect(body).not.toContain("Lead with");
       expect(body).toContain('not just "it\'s the only plan in the project."');
       expect(body).toContain("never guess");

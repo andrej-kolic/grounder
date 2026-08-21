@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runHandoffList, runHandoffListWithOptions } from "../../../src/commands/handoff/list.js";
 import { runLinkWithOptions } from "../../../src/commands/link.js";
@@ -123,6 +123,10 @@ describe("commands/handoff/list", () => {
     expect(await runHandoffList(["--unknown"])).toBe(1);
   });
 
+  it("rejects --head together with --markdown", async () => {
+    expect(await runHandoffList(["--head", "--markdown"])).toBe(1);
+  });
+
   it("--head prints only the newest usable path", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
@@ -221,5 +225,27 @@ describe("commands/handoff/list", () => {
 
     expect(code).toBe(0);
     expect(out).toBe(`All 1 handoff:\n\n1. 2026-06-26-1500  \n  ${handoffPath}\n`);
+  });
+
+  it("prints markdown link title lines with --markdown", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
+    const handoffPath = path.join(logsDir, "2026-06-26-1500.md");
+    await writeFile(handoffPath, "x", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runHandoffListWithOptions({ cwd: env.repo, homeDir: env.home, markdown: true }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe(
+      `All 1 handoff:\n\n1. [logs/2026-06-26-1500.md](${pathToFileURL(handoffPath).href})  \n  ${handoffPath}\n`,
+    );
   });
 });

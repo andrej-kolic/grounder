@@ -1,6 +1,7 @@
 import { realpath } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 /**
  * Expand a leading `~` / `~/…` to the user home directory.
@@ -54,4 +55,17 @@ export async function isRealPathInside(parent: string, child: string): Promise<b
   } catch {
     return null;
   }
+}
+
+/** `file://` href for an absolute filesystem path (spaces percent-encoded). */
+export function toFileUri(filePath: string): string {
+  return pathToFileURL(filePath).href;
+}
+
+/**
+ * Path relative to a vault/project root, always with `/` separators
+ * (stable for markdown links and JSON across platforms).
+ */
+export function vaultRelativePath(rootDir: string, filePath: string): string {
+  return path.relative(rootDir, filePath).split(path.sep).join("/");
 }
