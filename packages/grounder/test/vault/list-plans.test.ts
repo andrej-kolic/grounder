@@ -102,4 +102,21 @@ describe("vault/list-plans", () => {
     expect(await listPlans(plansDir, { limit: 0 })).toEqual([]);
     expect(await listPlans(plansDir, { limit: -1 })).toEqual([]);
   });
+
+  it("includes markdown files in subfolders", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const plansDir = path.join(env.vault, "plans");
+    const nestedDir = path.join(plansDir, "migration");
+    await mkdir(nestedDir, { recursive: true });
+
+    const rootPlan = path.join(plansDir, "overview.md");
+    const nestedPlan = path.join(nestedDir, "cutover.md");
+    await writeFile(rootPlan, "root", "utf8");
+    await writeFile(nestedPlan, "nested", "utf8");
+    await touch(rootPlan, new Date("2026-06-26T13:00:00.000Z"));
+    await touch(nestedPlan, new Date("2026-06-26T15:00:00.000Z"));
+
+    expect(await listPlans(plansDir)).toEqual([nestedPlan, rootPlan]);
+  });
 });

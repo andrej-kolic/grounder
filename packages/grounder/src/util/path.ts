@@ -69,3 +69,16 @@ export function toFileUri(filePath: string): string {
 export function vaultRelativePath(rootDir: string, filePath: string): string {
   return path.relative(rootDir, filePath).split(path.sep).join("/");
 }
+
+/**
+ * Plain list title: path relative to `rootDir` with a trailing `.md` stripped
+ * (e.g. `migration/phase-1`). Falls back to the filename stem when `rootDir`
+ * is omitted.
+ */
+export function vaultItemPlainTitle(filePath: string, rootDir?: string): string {
+  if (rootDir === undefined) {
+    return path.basename(filePath, ".md");
+  }
+  const rel = vaultRelativePath(rootDir, filePath);
+  return rel.endsWith(".md") ? rel.slice(0, -3) : rel;
+}

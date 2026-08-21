@@ -1,5 +1,6 @@
-import { readdir } from "node:fs/promises";
 import path from "node:path";
+import { vaultRelativePath } from "../util/path.js";
+import { listMarkdownFiles } from "./list-markdown.js";
 
 export interface ListHandoffsOptions {
   /** Max paths to return (newest first). Omit to return all. */
@@ -7,27 +8,30 @@ export interface ListHandoffsOptions {
 }
 
 /**
- * Lists handoff markdown files under `logsDir`, newest filename first.
+ * Lists handoff markdown files under `logsDir` recursively, newest basename
+ * first (timestamp-prefixed names sort correctly). Same basename in different
+ * subfolders ties break by vault-relative path descending.
  * Returns absolute paths. Missing or empty dirs yield `[]`.
  */
 export async function listHandoffs(
   logsDir: string,
   options: ListHandoffsOptions = {},
 ): Promise<string[]> {
-  let entries: string[];
-  try {
-    entries = await readdir(logsDir);
-  } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return [];
-    }
-    throw error;
-  }
+  const mdPaths = await listMarkdownFiles(logsDir);
+  const ranked = mdPaths.map((filePath) => ({
+    filePath,
+    name: path.basename(filePath),
+    rel: vaultRelativePath(logsDir, filePath),
+  }));
 
-  const paths = entries
-    .filter((name) => name.endsWith(".md"))
-    .sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
-    .map((name) => path.join(logsDir, name));
+  ranked.sort((a, b) => {
+    if (a.name !== b.name) {
+      return a.name < b.name ? 1 : -1;
+    }
+    return a.rel < b.rel ? 1 : a.rel > b.rel ? -1 : 0;
+  });
+
+  const paths = ranked.map((entry) => entry.filePath);
 
   if (options.limit === undefined) {
     return paths;

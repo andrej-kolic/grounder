@@ -102,4 +102,21 @@ describe("vault/list-notes", () => {
     expect(await listNotes(notesDir, { limit: 0 })).toEqual([]);
     expect(await listNotes(notesDir, { limit: -1 })).toEqual([]);
   });
+
+  it("includes markdown files in subfolders", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const notesDir = path.join(env.vault, "notes");
+    const nestedDir = path.join(notesDir, "research");
+    await mkdir(nestedDir, { recursive: true });
+
+    const rootNote = path.join(notesDir, "overview.md");
+    const nestedNote = path.join(nestedDir, "findings.md");
+    await writeFile(rootNote, "root", "utf8");
+    await writeFile(nestedNote, "nested", "utf8");
+    await touch(rootNote, new Date("2026-06-26T13:00:00.000Z"));
+    await touch(nestedNote, new Date("2026-06-26T15:00:00.000Z"));
+
+    expect(await listNotes(notesDir)).toEqual([nestedNote, rootNote]);
+  });
 });

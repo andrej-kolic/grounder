@@ -72,6 +72,26 @@ describe("writeVaultItemList", () => {
     );
   });
 
+  it("uses bucket-relative plain titles when titleRootDir is set", async () => {
+    const logsDir = "/vault/project/logs";
+    const nested = `${logsDir}/feature/2026-06-26-1600.md`;
+    const root = `${logsDir}/2026-06-26-1500.md`;
+
+    const { out } = await captureStdout(async () => {
+      writeVaultItemList(
+        [nested, root],
+        5,
+        { singular: "handoff", plural: "handoffs" },
+        { titleRootDir: logsDir },
+      );
+      return 0;
+    });
+
+    expect(out).toBe(
+      `All 2 handoffs:\n\n1. feature/2026-06-26-1600  \n  ${nested}\n\n2. 2026-06-26-1500  \n  ${root}\n`,
+    );
+  });
+
   it("writes only the empty notice when there are no paths", async () => {
     const { out } = await captureStdout(async () => {
       writeVaultItemList([], 5, notes);

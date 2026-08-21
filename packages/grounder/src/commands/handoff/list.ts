@@ -27,8 +27,8 @@ export interface HandoffListOptions {
   head?: boolean;
   /**
    * Agent relay: `[relativePath](fileUri)` on the title line (default: plain
-   * filename stem). Absolute path stays indented beneath either way. Not used
-   * with `head`.
+   * bucket-relative stem path). Absolute path stays indented beneath either
+   * way. Not used with `head`.
    */
   markdown?: boolean;
   /** Override home dir / `GROUNDER_HOME` (tests). */
@@ -89,10 +89,11 @@ export async function runHandoffList(argv: string[]): Promise<number> {
 }
 
 /**
- * Resolves the linked project, lists recent handoffs under `logs/` (newest first).
- * Default: prints a count header (blank line after when non-empty), then each
- * handoff as a numbered two-line block — `N. ` + full filename stem (including
- * timestamp prefix), then the indented absolute path — separated by a blank
+ * Resolves the linked project, lists recent handoffs under `logs/` recursively
+ * (newest first). Default: prints a count header (blank line after when
+ * non-empty), then each handoff as a numbered two-line block — `N. ` +
+ * bucket-relative stem path (nested files include subfolders; timestamp
+ * prefixes included), then the indented absolute path — separated by a blank
  * line. With `markdown: true`, the title line is `[relativePath](fileUri)`
  * under the project vault root. The title line ends with two trailing spaces
  * (a Markdown hard line break) so agents can relay stdout into chat and keep
@@ -130,6 +131,7 @@ export async function runHandoffListWithOptions(options: HandoffListOptions = {}
       {
         markdown: options.markdown === true,
         rootDir,
+        titleRootDir: logsDir,
       },
     );
     return 0;

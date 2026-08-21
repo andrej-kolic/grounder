@@ -9,6 +9,7 @@ import {
   isRealPathInside,
   resolveUserPath,
   toFileUri,
+  vaultItemPlainTitle,
   vaultRelativePath,
 } from "../../src/util/path.js";
 
@@ -113,6 +114,22 @@ describe("util/path", () => {
   describe("vaultRelativePath", () => {
     it("uses forward slashes relative to the root", () => {
       expect(vaultRelativePath("/vault/project", "/vault/project/plans/a.md")).toBe("plans/a.md");
+    });
+  });
+
+  describe("vaultItemPlainTitle", () => {
+    it("uses the filename stem when no root is given", () => {
+      expect(vaultItemPlainTitle("/vault/plans/phase-1.md")).toBe("phase-1");
+    });
+
+    it("keeps nested folders under the title root", () => {
+      expect(vaultItemPlainTitle("/vault/plans/migration/phase-1.md", "/vault/plans")).toBe(
+        "migration/phase-1",
+      );
+    });
+
+    it("matches basename for top-level files under the title root", () => {
+      expect(vaultItemPlainTitle("/vault/plans/phase-1.md", "/vault/plans")).toBe("phase-1");
     });
   });
 });

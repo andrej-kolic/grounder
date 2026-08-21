@@ -16,7 +16,7 @@ export interface PlanListOptions {
   limit?: number;
   /**
    * Agent relay: `[relativePath](fileUri)` on the title line (default: plain
-   * filename stem). Absolute path stays indented beneath either way.
+   * bucket-relative stem path). Absolute path stays indented beneath either way.
    */
   markdown?: boolean;
   /** Override home dir / `GROUNDER_HOME` (tests). */
@@ -70,18 +70,19 @@ export async function runPlanList(argv: string[]): Promise<number> {
 }
 
 /**
- * Resolves the linked project, lists recent plans under `plans/` (newest first).
- * Prints a count header (blank line after when non-empty), then each plan as a
- * numbered two-line block — `N. ` + filename stem (title), then the indented
- * absolute path — separated by a blank line. With `markdown: true`, the title
- * line is `[relativePath](fileUri)` under the project vault root. The title
- * line ends with two trailing spaces (a Markdown hard line break) so agents
- * can relay stdout into chat and keep title and path on separate rendered
- * lines. When `plans/` is empty, prints `No plans.` only. The number is
- * positional within this listing only (not a stable identifier — a later
- * `plan list` call may renumber if plans change) and exists purely so a human
- * or agent can refer to "plan 2" in the same conversation without retyping
- * the path. Same vault/link prerequisites as `grounder plan`.
+ * Resolves the linked project, lists recent plans under `plans/` recursively
+ * (newest first). Prints a count header (blank line after when non-empty), then
+ * each plan as a numbered two-line block — `N. ` + bucket-relative stem path
+ * (nested files include subfolders), then the indented absolute path —
+ * separated by a blank line. With `markdown: true`, the title line is
+ * `[relativePath](fileUri)` under the project vault root. The title line ends
+ * with two trailing spaces (a Markdown hard line break) so agents can relay
+ * stdout into chat and keep title and path on separate rendered lines. When
+ * `plans/` is empty, prints `No plans.` only. The number is positional within
+ * this listing only (not a stable identifier — a later `plan list` call may
+ * renumber if plans change) and exists purely so a human or agent can refer to
+ * "plan 2" in the same conversation without retyping the path. Same vault/link
+ * prerequisites as `grounder plan`.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runPlanListWithOptions(options: PlanListOptions = {}): Promise<number> {
@@ -102,6 +103,7 @@ export async function runPlanListWithOptions(options: PlanListOptions = {}): Pro
       {
         markdown: options.markdown === true,
         rootDir,
+        titleRootDir: plansDir,
       },
     );
     return 0;

@@ -1,5 +1,4 @@
-import path from "node:path";
-import { toFileUri, vaultRelativePath } from "../util/path.js";
+import { toFileUri, vaultItemPlainTitle, vaultRelativePath } from "../util/path.js";
 
 /** Shared checklist/snapshot formatting for `doctor` and `status`. */
 
@@ -27,6 +26,11 @@ export type VaultItemListFormatOptions = {
   markdown?: boolean;
   /** Project vault root used to compute `relativePath` when `markdown` is set. */
   rootDir?: string;
+  /**
+   * Bucket dir (`notes/` / `logs/` / `plans/`) for plain titles — nested files
+   * show as `subdir/stem` instead of a colliding bare stem.
+   */
+  titleRootDir?: string;
 };
 
 function vaultItemNoun(count: number, noun: VaultItemListNoun): string {
@@ -59,7 +63,8 @@ export function formatVaultItemListHeader(
  * rendered lines.
  *
  * With `markdown: true`, the title line is `[relativePath](fileUri)` under
- * `rootDir` instead of the filename stem.
+ * `rootDir` instead of the plain title. Plain titles use `titleRootDir` when
+ * set (bucket-relative stem path) so nested files stay unambiguous.
  */
 export function writeVaultItemListEntries(
   paths: readonly string[],
@@ -77,7 +82,7 @@ export function writeVaultItemListEntries(
     }
     const title = markdown
       ? `[${vaultRelativePath(rootDir as string, filePath)}](${toFileUri(filePath)})`
-      : path.basename(filePath, ".md");
+      : vaultItemPlainTitle(filePath, options.titleRootDir);
     // Two trailing spaces: Markdown hard break when stdout is relayed into chat.
     process.stdout.write(`${index + 1}. ${title}  \n  ${filePath}\n`);
   });

@@ -16,7 +16,7 @@ export interface NoteListOptions {
   limit?: number;
   /**
    * Agent relay: `[relativePath](fileUri)` on the title line (default: plain
-   * filename stem). Absolute path stays indented beneath either way.
+   * bucket-relative stem path). Absolute path stays indented beneath either way.
    */
   markdown?: boolean;
   /** Override home dir / `GROUNDER_HOME` (tests). */
@@ -70,15 +70,16 @@ export async function runNoteList(argv: string[]): Promise<number> {
 }
 
 /**
- * Resolves the linked project, lists recent notes under `notes/` (newest first).
- * Prints a count header (blank line after when non-empty), then each note as a
- * numbered two-line block — `N. ` + full filename stem (including any date
- * prefix), then the indented absolute path — separated by a blank line. With
- * `markdown: true`, the title line is `[relativePath](fileUri)` under the
- * project vault root. The title line ends with two trailing spaces (a Markdown
- * hard line break) so agents can relay stdout into chat and keep title and
- * path on separate rendered lines. When `notes/` is empty, prints `No notes.`
- * only. Same vault/link prerequisites as `grounder note`.
+ * Resolves the linked project, lists recent notes under `notes/` recursively
+ * (newest first). Prints a count header (blank line after when non-empty), then
+ * each note as a numbered two-line block — `N. ` + bucket-relative stem path
+ * (nested files include subfolders), then the indented absolute path —
+ * separated by a blank line. With `markdown: true`, the title line is
+ * `[relativePath](fileUri)` under the project vault root. The title line ends
+ * with two trailing spaces (a Markdown hard line break) so agents can relay
+ * stdout into chat and keep title and path on separate rendered lines. When
+ * `notes/` is empty, prints `No notes.` only. Same vault/link prerequisites as
+ * `grounder note`.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runNoteListWithOptions(options: NoteListOptions = {}): Promise<number> {
@@ -99,6 +100,7 @@ export async function runNoteListWithOptions(options: NoteListOptions = {}): Pro
       {
         markdown: options.markdown === true,
         rootDir,
+        titleRootDir: notesDir,
       },
     );
     return 0;
