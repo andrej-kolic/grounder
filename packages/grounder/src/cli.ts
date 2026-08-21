@@ -16,6 +16,7 @@ import { runPathNotes } from "./commands/path/notes.js";
 import { runPathPlans } from "./commands/path/plans.js";
 import { runPlanList } from "./commands/plan/list.js";
 import { runPlan } from "./commands/plan.js";
+import { runSearch } from "./commands/search.js";
 import { runSetup } from "./commands/setup.js";
 import { runStatus } from "./commands/status.js";
 import { notifyUpgradeIfNeeded } from "./commands/upgrade-banner.js";
@@ -110,6 +111,10 @@ async function main(): Promise<void> {
 
   if (command === "plan") {
     process.exit(await runPlan(rest));
+  }
+
+  if (command === "search") {
+    process.exit(await runSearch(rest));
   }
 
   if (command === "path") {

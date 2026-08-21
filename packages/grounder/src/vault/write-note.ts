@@ -1,10 +1,19 @@
 import { mkdir } from "node:fs/promises";
 import { writeUniqueMarkdown } from "../util/fs.js";
 import { timestampedBasename } from "../util/timestamp-slug.js";
+import { yamlDoubleQuoted } from "../util/yaml.js";
 
 export interface WriteNoteOptions {
   title?: string;
+  /** 3-5 topic keywords for search (flat list, omitted when empty/unset). */
+  topics?: string[];
   now?: Date;
+}
+
+function buildNoteContent(text: string, topics?: string[]): string {
+  if (!topics || topics.length === 0) return text;
+  const items = topics.map((t) => yamlDoubleQuoted(t)).join(", ");
+  return `---\ntopics: [${items}]\n---\n\n${text}`;
 }
 
 /**
@@ -21,5 +30,6 @@ export async function writeNote(
   await mkdir(notesDir, { recursive: true });
 
   const basename = timestampedBasename(text, { title: options.title, now });
-  return writeUniqueMarkdown(notesDir, basename, text);
+  const content = buildNoteContent(text, options.topics);
+  return writeUniqueMarkdown(notesDir, basename, content);
 }

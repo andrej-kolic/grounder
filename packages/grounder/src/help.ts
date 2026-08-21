@@ -1,6 +1,6 @@
 /** Help tiers and command metadata for the grounder CLI. */
 
-export type HelpGroup = "Setup" | "Write" | "Paths" | "Maintain" | "Advanced";
+export type HelpGroup = "Setup" | "Write" | "Retrieve" | "Paths" | "Maintain" | "Advanced";
 
 export interface CommandMeta {
   /** Canonical id (`note`, `handoff list`, `setup`, …). */
@@ -18,7 +18,7 @@ export interface CommandMeta {
   list?: boolean;
 }
 
-const GROUP_ORDER: HelpGroup[] = ["Setup", "Write", "Paths", "Maintain", "Advanced"];
+const GROUP_ORDER: HelpGroup[] = ["Setup", "Write", "Retrieve", "Paths", "Maintain", "Advanced"];
 
 const QUICKSTART = `Quickstart:
   grounder setup <path-to-your-vault>
@@ -66,9 +66,10 @@ export const COMMANDS: readonly CommandMeta[] = [
     group: "Write",
     summary: "Write a note to the vault",
     listUsage: "note <text>",
-    usage: "grounder note <text> [--title <slug>]",
+    usage: "grounder note <text> [--title <slug>] [--topics <list>]",
     flags: `Flags:
-  --title <slug> Short slug in filename (default: slugified first line)
+  --title <slug>  Short slug in filename (default: slugified first line)
+  --topics <list> Comma-separated keywords for search (e.g. "auth,jwt,session")
 
 Subcommands:
   note list   Print recent notes (count header + numbered title/path, newest first)`,
@@ -87,9 +88,10 @@ Subcommands:
     group: "Write",
     summary: "Write a session handoff to vault logs/",
     listUsage: "handoff <text>",
-    usage: "grounder handoff <text> [--title <slug>]",
+    usage: "grounder handoff <text> [--title <slug>] [--topics <list>]",
     flags: `Flags:
-  --title <slug> Short slug in filename (default: slugified first line)
+  --title <slug>  Short slug in filename (default: slugified first line)
+  --topics <list> Comma-separated keywords for search (e.g. "auth,jwt,session")
 
 Subcommands:
   handoff list   Print recent handoffs (count header + numbered title/path, newest first)
@@ -111,13 +113,15 @@ Subcommands:
     group: "Write",
     summary: "Write/update a named plan under vault plans/",
     listUsage: "plan <text>",
-    usage: "grounder plan <text> (--title <name> [--force] | --path <file>)",
+    usage: "grounder plan <text> (--title <name> [--force] | --path <file>) [--topics <list>]",
     flags: `Flags:
-  --title <name> Required filename stem when creating/updating by name
-                 (trailing .md ok; sanitized, max 80 chars)
-  --path <file>  Update an existing plan by path (must resolve under this
-                 project's plans/; no title sanitization; always overwrites)
-  --force        With --title: overwrite an existing plan (preserves created)
+  --title <name>  Required filename stem when creating/updating by name
+                  (trailing .md ok; sanitized, max 80 chars)
+  --path <file>   Update an existing plan by path (must resolve under this
+                  project's plans/; no title sanitization; always overwrites)
+  --force         With --title: overwrite an existing plan (preserves created)
+  --topics <list> Comma-separated keywords for search (e.g. "caching,redis,api").
+                  On update, omit to keep existing topics.
 
 Subcommands:
   plan list   Print recent plans (count header + numbered title/path, newest first)`,
@@ -130,6 +134,23 @@ Subcommands:
     usage: "grounder plan list [--limit <n>]",
     flags: `Flags:
   --limit <n>  Max plans to print (default: 5)`,
+  },
+  {
+    id: "search",
+    group: "Retrieve",
+    summary: "Search linked project vault for keywords (scoped retrieval)",
+    listUsage: "search <query>",
+    usage:
+      "grounder search <query> [--terms <csv>] [--limit <n>] [--max-hits <n>] [--context <n>] [--since <date>] [--markdown] [--json]",
+    flags: `Flags:
+  --terms <csv>   Extra keyword variants (comma-separated)
+  --limit <n>     Max files to print (default: 10)
+  --max-hits <n>  Max stored line snippets per file during scan (default: 50)
+  --context <n>   Context lines around each snippet (default: 1)
+  --since <date>  Only files modified on or after date (YYYY-MM-DD local midnight, or Nd, e.g. 7d)
+  --after <date>  Alias for --since
+  --markdown      Agent relay: file:// links + fenced snippets
+  --json          Structured output (relativePath, fileUri, alsoMatchedHint per hit)`,
   },
   {
     id: "path notes",
@@ -235,6 +256,7 @@ export const DISPATCHED_COMMAND_IDS = [
   "handoff peek",
   "plan",
   "plan list",
+  "search",
   "path",
   "path notes",
   "path logs",

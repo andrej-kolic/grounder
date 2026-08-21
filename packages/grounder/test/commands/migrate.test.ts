@@ -52,7 +52,7 @@ describe("commands/migrate", () => {
     expect(out).toContain(`Vault root: ${env.vault}`);
     expect(out).toContain("already current (skipped)");
     expect(await readGrounderState(env.home)).toMatchObject({
-      agents: { cursor: { commandsSchema: 2 } },
+      agents: { cursor: { commandsSchema: 3 } },
     });
   });
 
@@ -115,7 +115,7 @@ describe("commands/migrate", () => {
     );
     expect(forced.code).toBe(0);
     expect(await readGrounderState(env.home)).toMatchObject({
-      agents: { cursor: { commandsSchema: 2 } },
+      agents: { cursor: { commandsSchema: 3 } },
     });
     expect(
       Object.keys((await readGrounderState(env.home))?.agents.cursor?.files ?? {}).length,
@@ -260,7 +260,7 @@ describe("commands/migrate", () => {
 
     expect(await readGrounderState(env.home)).toMatchObject({
       agents: {
-        cursor: { commandsSchema: 2 },
+        cursor: { commandsSchema: 3 },
         windsurf: { commandsSchema: 1 },
       },
     });

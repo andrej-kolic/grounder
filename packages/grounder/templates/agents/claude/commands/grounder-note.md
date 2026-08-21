@@ -18,6 +18,10 @@ Optional short title slug (filename):
 
   {{GROUNDER_CLI}} note --title <slug> "<body>"
 
+Always include `--topics` with 3-5 comma-separated lowercase keywords that capture the note's core concepts (e.g. `--topics "schema,migration,postgres"`). Pick terms a future search would use — concrete nouns and technical terms, not verbs or filler:
+
+  {{GROUNDER_CLI}} note --topics "keyword1,keyword2,keyword3" "<body>"
+
 For multi-line bodies, prefer a shell heredoc so quoting does not break:
 
 ```bash

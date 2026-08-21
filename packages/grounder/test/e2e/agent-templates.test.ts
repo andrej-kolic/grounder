@@ -44,7 +44,7 @@ async function findTemplateFiles(): Promise<string[]> {
 }
 
 /** `{{GROUNDER_CLI}} note …` / `handoff list …` / `plan …` — a real invocation. */
-const INVOCATION = /^\s+(note|handoff|plan)(?:\s+([a-z]+))?\b/;
+const INVOCATION = /^\s+(note|handoff|plan|search)(?:\s+([a-z]+))?\b/;
 /** `Run {{GROUNDER_CLI}} with \`required_permissions…\`` — generic prose, not an invocation. */
 const PROSE_REFERENCE = /^\s+with\s+`/;
 /** Long-form flags (`--title`, `--limit`, …) mentioned within a documented invocation's own span. */
@@ -145,7 +145,15 @@ describe("e2e/agent-templates", () => {
     // Sanity check the extractor itself isn't silently matching nothing.
     expect(bySubcommand.size).toBeGreaterThan(0);
     expect([...bySubcommand.keys()]).toEqual(
-      expect.arrayContaining(["note", "note list", "handoff", "handoff list", "plan", "plan list"]),
+      expect.arrayContaining([
+        "note",
+        "note list",
+        "handoff",
+        "handoff list",
+        "plan",
+        "plan list",
+        "search",
+      ]),
     );
 
     for (const [subcommand, { file, flags }] of bySubcommand) {

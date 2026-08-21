@@ -62,6 +62,8 @@ EOF
 
 If `--title` collides with an existing plan (non-zero exit; stderr names the conflict), ask: overwrite (`--force`) or a different name. `--force` only resolves that collision — **never** use it to update a plan you meant to target with `--path`.
 
+Always include `--topics` with 3-5 comma-separated lowercase keywords that capture the plan's core concepts (e.g. `--topics "caching,redis,performance,api"`). Pick terms a future search would use — concrete nouns and technical terms, not verbs or filler.
+
 Run from the linked project folder or any subdirectory beneath it.
 Run {{GROUNDER_CLI}} with `required_permissions: ["all"]` (vault is outside the workspace).
 

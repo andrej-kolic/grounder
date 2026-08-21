@@ -42,6 +42,7 @@ describe("agents/cursor", () => {
     it("lists the same command paths install writes", () => {
       expect(cursor.expectedArtifacts("/home/user")).toEqual([
         "/home/user/.cursor/commands/grounder-note.md",
+        "/home/user/.cursor/commands/grounder-search.md",
         "/home/user/.cursor/commands/grounder-plan.md",
         "/home/user/.cursor/commands/grounder-task-handoff.md",
         "/home/user/.cursor/commands/grounder-task.md",

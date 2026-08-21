@@ -10,6 +10,8 @@ export interface WritePlanOptions {
   projectId: string;
   /** When true, overwrite an existing plan (preserving original `created`). */
   force?: boolean;
+  /** 3-5 topic keywords for search (flat list, omitted when empty/unset). */
+  topics?: string[];
   /** Timestamp for `created` / `updated` (default: now). */
   now?: Date;
 }
@@ -25,6 +27,7 @@ function buildFrontmatter(options: {
   projectId: string;
   created: string;
   updated?: string;
+  topics?: string[];
 }): string {
   const lines = [
     "---",
@@ -34,6 +37,10 @@ function buildFrontmatter(options: {
   if (options.updated) {
     lines.push(`updated: ${yamlDoubleQuoted(options.updated)}`);
   }
+  if (options.topics && options.topics.length > 0) {
+    const items = options.topics.map((t) => yamlDoubleQuoted(t)).join(", ");
+    lines.push(`topics: [${items}]`);
+  }
   lines.push("---");
   return `${lines.join("\n")}\n\n`;
 }
@@ -41,6 +48,7 @@ function buildFrontmatter(options: {
 /**
  * Overwrites an existing plan at an absolute path.
  * Preserves original `created` (falls back to `now` if missing) and sets `updated`.
+ * Omitting `topics` keeps existing frontmatter topics; passing `topics` replaces them.
  * Caller must validate the path (e.g. inside this project's `plans/` dir).
  */
 export async function updatePlanAtPath(
@@ -53,12 +61,14 @@ export async function updatePlanAtPath(
   const fm = parseHandoffFrontmatter(existing);
   const created = fm.created ?? now.toISOString();
   const updated = now.toISOString();
+  const topics = options.topics ?? fm.topics;
 
   const content =
     buildFrontmatter({
       projectId: options.projectId,
       created,
       updated,
+      topics,
     }) + body;
 
   await writeFile(filePath, content, "utf8");
@@ -70,6 +80,7 @@ export async function updatePlanAtPath(
  * Target is always `plansDir/<name>.md` — no collision suffixes.
  * Without `force`, an existing file is left untouched and status `"exists"` is returned.
  * With `force`, overwrites the body, preserves original `created`, and sets `updated`.
+ * Omitting `topics` on overwrite keeps existing frontmatter topics.
  */
 export async function writePlan(
   plansDir: string,
@@ -88,13 +99,18 @@ export async function writePlan(
   }
 
   if (exists && options.force) {
-    return updatePlanAtPath(filePath, body, { projectId: options.projectId, now });
+    return updatePlanAtPath(filePath, body, {
+      projectId: options.projectId,
+      topics: options.topics,
+      now,
+    });
   }
 
   const content =
     buildFrontmatter({
       projectId: options.projectId,
       created: now.toISOString(),
+      topics: options.topics,
     }) + body;
 
   await writeFile(filePath, content, "utf8");

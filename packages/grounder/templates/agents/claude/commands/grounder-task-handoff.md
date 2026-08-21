@@ -38,6 +38,10 @@ Optional short title slug (filename + frontmatter):
 
   {{GROUNDER_CLI}} handoff --title <slug> "<body>"
 
+Always include `--topics` with 3-5 comma-separated lowercase keywords that capture the session's core concepts (e.g. `--topics "auth,middleware,jwt,session"`). Pick terms a future search would use — concrete nouns and technical terms, not verbs or filler:
+
+  {{GROUNDER_CLI}} handoff --topics "keyword1,keyword2,keyword3" "<body>"
+
 For multi-line bodies, prefer a shell heredoc so quoting does not break:
 
 ```bash

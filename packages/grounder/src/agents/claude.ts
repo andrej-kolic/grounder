@@ -23,6 +23,7 @@ const templateDir = path.join(pkgRoot, "templates", "agents", "claude", "command
 
 const COMMANDS = [
   "grounder-note.md",
+  "grounder-search.md",
   "grounder-plan.md",
   "grounder-task-handoff.md",
   "grounder-task.md",
@@ -300,7 +301,7 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
 export const claude: AgentAdapter = {
   id: "claude",
   name: "Claude Code",
-  commandsSchema: 2,
+  commandsSchema: 3,
   hooksSchema: 1,
 
   async isInstalled(): Promise<boolean> {

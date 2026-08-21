@@ -134,6 +134,7 @@ Inspect or debug setup any time with `grounder status` / `grounder doctor` — s
 | `/grounder-task-handoff` | `grounder handoff`                       | Write session checkpoint to `logs/`                        |
 | `/grounder-task`         | `grounder handoff list --head` + read it | Read-only hydrate from newest usable handoff + `AGENTS.md` |
 | `/grounder-plan`         | `grounder plan`                          | Named living plan under `plans/`                           |
+| `/grounder-search`       | `grounder search`                        | Find prior vault context by topic; CLI ranks, agent reads + synthesizes |
 
 
 The "Equivalent CLI" column is what you'd type by hand — under the hood, slash commands invoke a small runtime `setup` maintains at `~/.grounder/runtime` (see [Agents](#agents)), not whatever `grounder` binary happens to be on your `PATH`.
@@ -161,6 +162,7 @@ grounder handoff list --head Print only the newest usable handoff path
 grounder handoff peek        One-line latest-handoff teaser (used by session hooks)
 grounder plan <text>         Write/update a named plan under vault plans/
 grounder plan list           Print recent plans (count header + numbered title/path, newest first)
+grounder search <query>      Search linked project vault (scoped keyword retrieval)
 grounder path notes          Print resolved notes directory
 grounder path logs           Print resolved logs directory
 grounder path plans          Print resolved plans directory
@@ -206,6 +208,7 @@ See [Upgrading](#upgrading) for the usual post-package-upgrade flow. Untouched c
 | Flag             | Commands                    | Description                                                                                             |
 | ---------------- | --------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `--title <slug>` | `note`, `handoff`           | Filename slug (default: slugified text / first line)                                                    |
+| `--topics <list>` | `note`, `handoff`          | Comma-separated keywords written to `topics:` frontmatter for search (e.g. `auth,jwt,session`)         |
 | `--limit <n>`    | `note list`                 | Max notes to print (default: 5)                                                                         |
 | `--limit <n>`    | `handoff list`              | Max handoffs to print (default: 5)                                                                      |
 | `--limit <n>`    | `plan list`                 | Max plans to print (default: 5)                                                                         |
@@ -221,10 +224,34 @@ See [Upgrading](#upgrading) for the usual post-package-upgrade flow. Untouched c
 | ---------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--title <name>` | `plan`   | Filename stem when creating/updating by name (trailing `.md` ok; sanitized, max 80 chars; no auto-slug). Mutually exclusive with `--path`.                 |
 | `--path <file>`  | `plan`   | Update an existing plan by path (must resolve under this project's `plans/`; no title sanitization; always overwrites). Mutually exclusive with `--title`. |
+| `--topics <list>` | `plan`  | Comma-separated keywords written to `topics:` frontmatter for search (e.g. `caching,redis,api`). On update, omitting `--topics` keeps existing topics. |
 | `--force`        | `plan`   | With `--title`: overwrite an existing plan (preserves original `created`, sets `updated`). Not used with `--path`.                                         |
 
 
 Unlike `note` / `handoff` (always a new dated file), `plan` is living: create or collide by `--title` (use `--force` to overwrite), or update an existing file in place with `--path`.
+
+### Search flags
+
+Scoped to the **linked project vault** only (`<vault>/10-Projects/{projectId}/`). Searches `*.md` under that folder — not the git repo, not sibling projects.
+
+```bash
+grounder search "handling migrations of slash commands" \
+  --terms "slash commands,grounder migrate,commandsSchema,state.json,hash drift" \
+  --json
+```
+
+| Flag | Description |
+| --- | --- |
+| `--terms <csv>` | Extra keyword variants (comma-separated). Dominates ranking quality for agent use. |
+| `--limit <n>` | Max files to print (default: 10) |
+| `--max-hits <n>` | Max line snippets stored per file during scan (default: 50). Does not stop the tree walk. |
+| `--context <n>` | Context lines around each snippet (default: 1) |
+| `--since <date>` | Only files modified on or after date (`YYYY-MM-DD` local midnight, or `7d`, `30d`, …) |
+| `--after <date>` | Alias for `--since` |
+| `--markdown` | `file://` links + fenced snippets (lookup / exact-mention relay) |
+| `--json` | Structured hits for agents (`relativePath`, `fileUri`, `termHitCounts`, …) |
+
+`--markdown` and `--json` are mutually exclusive. `/grounder-search` uses `--json` by default, full-reads the top four hits, and synthesizes a short answer — see [vault search architecture](https://github.com/andrej-kolic/grounder/blob/main/docs/architecture/vault-search.md) in the monorepo for contributor details.
 
 ### Doctor flags
 
@@ -267,7 +294,7 @@ Written by `grounder setup`. Holds the vault path for this machine only.
 
 Written by `grounder link` in the **current working directory**. Project id detection (when `--id` is omitted): `package.json` name in that folder → git `origin` remote (if inside a git repo) → folder basename.
 
-`grounder note`, `grounder handoff`, `grounder plan`, and `grounder path *` walk up from the current directory to find the nearest `.grounder.json`, stopping at the git root when one exists (or at the filesystem root otherwise).
+`grounder note`, `grounder handoff`, `grounder plan`, `grounder search`, and `grounder path *` walk up from the current directory to find the nearest `.grounder.json`, stopping at the git root when one exists (or at the filesystem root otherwise).
 
 **Environment variables**
 
@@ -287,8 +314,8 @@ The vault layout is agent-agnostic. `grounder setup` installs thin glue artifact
 
 | Agent       | Detection          | Artifacts                                                      |
 | ----------- | ------------------ | -------------------------------------------------------------- |
-| Cursor      | `~/.cursor` exists | `~/.cursor/commands/grounder-{note,task,task-handoff,plan}.md` |
-| Claude Code | `~/.claude` exists | `~/.claude/commands/grounder-{note,task,task-handoff,plan}.md` |
+| Cursor      | `~/.cursor` exists | `~/.cursor/commands/grounder-{note,search,task,task-handoff,plan}.md` |
+| Claude Code | `~/.claude` exists | `~/.claude/commands/grounder-{note,search,task,task-handoff,plan}.md` |
 
 
 No `--agent` flag: auto-detect installed agents. Explicit install:
