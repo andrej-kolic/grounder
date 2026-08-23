@@ -36,6 +36,38 @@ A full session loop, one step at a time:
 
 Dim lines are the actual `grounder` CLI call each slash command runs under the hood.
 
+### In your vault
+
+```text
+10-Projects/your-project/
+├── notes/
+│   └── 2026-07-21-auth-investigation.md
+├── logs/
+│   ├── 2026-07-21-091500-auth-middleware.md
+│   └── 2026-08-14-103000-auth-middleware.md   ← second session
+└── plans/
+    └── auth-rewrite.md                        ← living plan
+```
+
+```markdown
+---
+project: "your-project"
+created: "2026-07-21T09:15:00Z"
+updated: "2026-08-14T10:30:00Z"
+topics: ["auth", "middleware", "jwt"]
+---
+
+## Goal
+Ship the auth rewrite before Q3 cutover.
+
+## Steps
+- [x] Map current middleware order
+- [ ] Add tests for 401 path
+- [ ] Swap in new token validator
+```
+
+*`created` and `updated` are different dates — the plan survived a second session. Obsidian renders this frontmatter as Properties.*
+
 ## Get started
 
 ### npm
