@@ -238,6 +238,7 @@ for (d, fill) in svgPaths(for: title, origin: titleOrigin)
 
 let svg = """
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <title>Grounder — Obsidian vault memory for Cursor and Claude Code</title>
   <defs>
     <radialGradient id="glow" cx="640" cy="320" r="480" gradientUnits="userSpaceOnUse" color-interpolation="sRGB">
       <stop offset="0" stop-color="#03322F"/>
