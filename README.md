@@ -6,7 +6,7 @@
 
 > **Obsidian vault memory for Cursor and Claude Code.**
 
-**Grounder** connects projects to an Obsidian vault for AI agent memory — session handoffs, plans, and notes in files you own (plain markdown; Obsidian is never required). Markdown-native and local-first, context survives session ends, agent switches, and machine migrations.
+**Grounder** connects projects to an Obsidian vault for AI agent memory — session handoffs, plans, and notes in files you own (plain markdown; Obsidian is never required). Markdown-native and local-first, context survives session ends, agent switches, and machine migrations. No vectors. No background indexing. Just markdown files, your agents, and your vault.
 
 ### What it is
 
@@ -19,7 +19,7 @@ AI-first CLI and agent command set that:
 
 ### What it is not
 
-Grounder is **not** an auto-capture or RAG tool, nor does it attempt to record every interaction. There is no vector database, no background indexing, and zero context injection unless explicitly requested. One small, deliberate checkpoint replaces an agent re-deriving context from scratch — using a fraction of the tokens in a file you can diff, edit, or delete.
+Grounder is **not** an auto-capture or RAG tool, nor does it attempt to record every interaction. Nothing enters context unless you ask. One small, deliberate checkpoint replaces an agent re-deriving context from scratch — using a fraction of the tokens in a file you can diff, edit, or delete.
 
 ### Demo
 
