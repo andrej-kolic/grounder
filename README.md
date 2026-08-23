@@ -4,9 +4,9 @@
 [![CI](https://github.com/andrej-kolic/grounder/actions/workflows/ci.yml/badge.svg)](https://github.com/andrej-kolic/grounder/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/grounder.svg)](LICENSE)
 
-> **Markdown-native memory shared across AI agents, sessions, and machines.**
+> **Obsidian vault memory for Cursor and Claude Code.**
 
-AI agents forget everything between sessions and can't share context with each other. **Grounder** fixes this by externalizing agent memory into local files you control (Obsidian-compatible, but never required). Context survives session ends, agent switches, and machine migrations.
+**Grounder** connects projects to an Obsidian vault for AI agent memory — session handoffs, plans, and notes in files you own (plain markdown; Obsidian is never required). Markdown-native and local-first, context survives session ends, agent switches, and machine migrations.
 
 ### What it is
 
@@ -15,7 +15,7 @@ AI-first CLI and agent command set that:
 - **Links any project** — git repositories or standard folders — to your local vault (multi-project support).
 - **Captures state deliberately** — converts a discussion into a living plan, checkpoints a session for handoff, or saves arbitrary notes.
 - **Hydrates on demand** — allows you or any agent to resume exactly where a prior session left off without re-deriving context.
-- **Works natively today** with Cursor, Claude Code, and standard CLI workflows.
+- **Works natively** with Cursor and Claude Code — more agents on the roadmap.
 
 ### What it is not
 

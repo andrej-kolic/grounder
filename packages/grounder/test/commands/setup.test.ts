@@ -136,13 +136,15 @@ describe("commands/setup", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain("Connect to a markdown vault (once per machine).");
+    expect(out).toContain(
+      "Connect to your Obsidian vault (or markdown folder) — once per machine.",
+    );
     expect(out).toContain("Would write:");
     expect(out).not.toContain("Dry run");
     expect(out).not.toContain("Will write:");
-    expect(out.indexOf("Connect to a markdown vault (once per machine).")).toBeLessThan(
-      out.indexOf("Would write:"),
-    );
+    expect(
+      out.indexOf("Connect to your Obsidian vault (or markdown folder) — once per machine."),
+    ).toBeLessThan(out.indexOf("Would write:"));
     expect(out).toContain(`home   ${homeConfigPath(env.home)}`);
     expect(out).toContain("vault  10-Projects/ (if missing)");
     expect(out).toContain(`grounder runtime ${runtimeCliPath(env.home)}`);

@@ -109,7 +109,7 @@ Then paste `--dry-run` stdout as-is. Then: `Approve this and I’ll apply it. Af
 Resolution order:
 
 1. Path in the triggering message (e.g. “set up Grounder with ~/Documents/obsidian/dev”). Do not depend on host `$ARGUMENTS` being real.
-2. Otherwise ask once, then wait. Do not proceed: "What's the path to your markdown vault?"
+2. Otherwise ask once, then wait. Do not proceed: "What's the path to your Obsidian vault (or markdown folder)?"
 3. **Never guess** `~/Documents/Obsidian`, `~/obsidian`, or the current repo. A wrong `vaultRoot` is sticky machine state.
 
 If the resolved path is missing: **warn** that `setup` will create that directory (`mkdir` of `10-Projects/` is recursive) and **ask how to proceed** — continue (create it), pick a different path, or abort.

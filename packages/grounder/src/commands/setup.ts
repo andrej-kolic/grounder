@@ -109,7 +109,9 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
       );
     }
     process.stdout.write(`Vault root: ${vaultRoot}\n`);
-    process.stdout.write("Connect to a markdown vault (once per machine).\n");
+    process.stdout.write(
+      "Connect to your Obsidian vault (or markdown folder) — once per machine.\n",
+    );
     process.stdout.write(dryRun ? "Would write:\n" : "Will write:\n");
     process.stdout.write(`  home   ${homeConfigPath(homeDir)}\n`);
     process.stdout.write("  vault  10-Projects/ (if missing)\n");

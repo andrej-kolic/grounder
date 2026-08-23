@@ -95,11 +95,10 @@ describe("skills/grounder-setup", () => {
     expect(content).not.toContain("`init` writes:");
   });
 
-  it("asks for a markdown vault path, not an Obsidian vault or notes folder", async () => {
+  it("asks for an Obsidian vault or markdown folder path, not a notes folder", async () => {
     const content = await readFile(skillPath, "utf8");
-    expect(content).toContain(`"What's the path to your markdown vault?"`);
-    expect(content).not.toContain("What's the path to your Obsidian vault?");
-    expect(content).not.toContain("Obsidian vault");
+    expect(content).toContain(`"What's the path to your Obsidian vault (or markdown folder)?"`);
+    expect(content).not.toContain(`"What's the path to your markdown vault?"`);
     expect(content).not.toContain("notes folder");
   });
 
