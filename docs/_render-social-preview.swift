@@ -35,20 +35,23 @@ ctx.setFillColor(bg)
 ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
 
 let glowCenter = CGPoint(x: Double(width) / 2, y: Double(height) / 2)
-let glowColors = [
-    CGColor(red: 0.024, green: 0.148, blue: 0.138, alpha: 1),
-    CGColor(red: 0.022, green: 0.125, blue: 0.122, alpha: 1),
-    CGColor(red: 0.022, green: 0.078, blue: 0.090, alpha: 1),
-    CGColor(red: 0.024, green: 0.027, blue: 0.043, alpha: 1),
-] as CFArray
-let locations: [CGFloat] = [0, 0.32, 0.62, 1]
+// Raster keeps the wide mathematical radius; grain + JPEG hide the outer wash.
+let glowRadius: CGFloat = 480
+let glowKeys: [(CGFloat, (CGFloat, CGFloat, CGFloat))] = [
+    (0, (0.024, 0.148, 0.138)),
+    (0.32, (0.022, 0.125, 0.122)),
+    (0.62, (0.022, 0.078, 0.090)),
+    (1, (0.024, 0.027, 0.043)),
+]
+let glowColors = glowKeys.map { CGColor(red: $0.1.0, green: $0.1.1, blue: $0.1.2, alpha: 1) } as CFArray
+let locations = glowKeys.map(\.0)
 if let gradient = CGGradient(colorsSpace: colorSpace, colors: glowColors, locations: locations) {
     ctx.drawRadialGradient(
         gradient,
         startCenter: glowCenter,
         startRadius: 0,
         endCenter: glowCenter,
-        endRadius: 480,
+        endRadius: glowRadius,
         options: [.drawsAfterEndLocation]
     )
 }
@@ -82,6 +85,64 @@ func font(named file: String, size: CGFloat, weight: CGFloat = 400) -> NSFont {
         ],
     ])
     return NSFont(descriptor: desc, size: size) ?? base
+}
+
+func svgPath(from cgPath: CGPath) -> String {
+    var d = ""
+    cgPath.applyWithBlock { elem in
+        let e = elem.pointee
+        let pts = e.points
+        switch e.type {
+        case .moveToPoint:
+            d += String(format: "M%.2f %.2f", pts[0].x, pts[0].y)
+        case .addLineToPoint:
+            d += String(format: "L%.2f %.2f", pts[0].x, pts[0].y)
+        case .addQuadCurveToPoint:
+            d += String(format: "Q%.2f %.2f %.2f %.2f", pts[0].x, pts[0].y, pts[1].x, pts[1].y)
+        case .addCurveToPoint:
+            d += String(format: "C%.2f %.2f %.2f %.2f %.2f %.2f", pts[0].x, pts[0].y, pts[1].x, pts[1].y, pts[2].x, pts[2].y)
+        case .closeSubpath:
+            d += "Z"
+        @unknown default:
+            break
+        }
+    }
+    return d
+}
+
+func svgPaths(for attr: NSAttributedString, origin: CGPoint) -> [(d: String, fill: String)] {
+    let line = CTLineCreateWithAttributedString(attr)
+    let runs = CTLineGetGlyphRuns(line) as! [CTRun]
+    var out: [(d: String, fill: String)] = []
+    for run in runs {
+        let count = CTRunGetGlyphCount(run)
+        var glyphs = [CGGlyph](repeating: 0, count: count)
+        var positions = [CGPoint](repeating: .zero, count: count)
+        CTRunGetGlyphs(run, CFRange(), &glyphs)
+        CTRunGetPositions(run, CFRange(), &positions)
+        let attrs = CTRunGetAttributes(run) as! [NSAttributedString.Key: Any]
+        let ctFont = attrs[.font] as! CTFont
+        let nsColor = (attrs[.foregroundColor] as? NSColor)?.usingColorSpace(.deviceRGB) ?? .white
+        let fill = String(
+            format: "#%02X%02X%02X",
+            Int(nsColor.redComponent * 255),
+            Int(nsColor.greenComponent * 255),
+            Int(nsColor.blueComponent * 255)
+        )
+        var combined = ""
+        for i in 0 ..< count {
+            guard let glyphPath = CTFontCreatePathForGlyph(ctFont, glyphs[i], nil) else { continue }
+            var t = CGAffineTransform(translationX: origin.x + positions[i].x, y: origin.y)
+                .scaledBy(x: 1, y: -1)
+            if let flipped = glyphPath.copy(using: &t) {
+                combined += svgPath(from: flipped)
+            }
+        }
+        if !combined.isEmpty {
+            out.append((combined, fill))
+        }
+    }
+    return out
 }
 
 func attributed(_ text: String, font: NSFont, color: NSColor, tracking: CGFloat) -> NSAttributedString {
@@ -153,3 +214,55 @@ if !CGImageDestinationFinalize(dest) {
     fputs("failed to write png\n", stderr)
     exit(1)
 }
+
+var svgY = (CGFloat(height) - blockHeight) / 2 + 8
+func lineOrigin(_ s: NSAttributedString, size: NSSize, top: CGFloat) -> CGPoint {
+    let f = s.attribute(.font, at: 0, effectiveRange: nil) as! NSFont
+    let x = (CGFloat(width) - size.width) / 2
+    return CGPoint(x: x, y: top + f.ascender)
+}
+
+let titleOrigin = lineOrigin(title, size: titleSize, top: svgY)
+svgY += titleSize.height + gapTitle
+let subtitleOrigin = lineOrigin(subtitle, size: subtitleSize, top: svgY)
+svgY += subtitleSize.height + gapSub
+let taglineOrigin = lineOrigin(tagline, size: taglineSize, top: svgY)
+
+var pathMarkup = ""
+for (d, fill) in svgPaths(for: title, origin: titleOrigin)
+    + svgPaths(for: subtitle, origin: subtitleOrigin)
+    + svgPaths(for: tagline, origin: taglineOrigin)
+{
+    pathMarkup += "  <path fill=\"\(fill)\" d=\"\(d)\"/>\n"
+}
+
+let svg = """
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <radialGradient id="glow" cx="640" cy="320" r="480" gradientUnits="userSpaceOnUse" color-interpolation="sRGB">
+      <stop offset="0" stop-color="#03322F"/>
+      <stop offset="0.08" stop-color="#03302E"/>
+      <stop offset="0.16" stop-color="#032E2D"/>
+      <stop offset="0.24" stop-color="#022C2B"/>
+      <stop offset="0.32" stop-color="#022929"/>
+      <stop offset="0.40" stop-color="#032627"/>
+      <stop offset="0.50" stop-color="#032023"/>
+      <stop offset="0.62" stop-color="#041A1E"/>
+      <stop offset="0.75" stop-color="#041318"/>
+      <stop offset="0.88" stop-color="#050C11"/>
+      <stop offset="1" stop-color="#05060C"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="640" fill="#05060C"/>
+  <circle cx="640" cy="320" r="480" fill="url(#glow)"/>
+\(pathMarkup)</svg>
+"""
+
+let svgURL = outURL.deletingPathExtension().appendingPathExtension("svg")
+do {
+    try svg.write(to: svgURL, atomically: true, encoding: .utf8)
+} catch {
+    fputs("failed to write svg: \(error)\n", stderr)
+    exit(1)
+}
+
