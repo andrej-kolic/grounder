@@ -5,33 +5,16 @@
 
 > **Obsidian vault memory for Cursor and Claude Code.**
 
-**Grounder** connects projects to an Obsidian vault for AI agent memory — session handoffs, plans, and notes in files you own (plain markdown; Obsidian is never required). Markdown-native and local-first, context survives session ends, agent switches, and machine migrations. No vectors. No background indexing. Just markdown files, your agents, and your vault.
-
-### What it is
-
-AI-first CLI and agent command set that:
-
-- **Links any project** — git repositories or standard folders — to your local vault (multi-project support).
-- **Captures state deliberately** — converts a discussion into a living plan, checkpoints a session for handoff, or saves arbitrary notes.
-- **Hydrates on demand** — allows you or any agent to resume exactly where a prior session left off without re-deriving context.
-- **Works natively** with Cursor and Claude Code — more agents on the roadmap.
-
-### What it is not
-
-Grounder is **not** an auto-capture or RAG tool, nor does it attempt to record every interaction. Nothing enters context unless you ask. One small, deliberate checkpoint replaces an agent re-deriving context from scratch — using a fraction of the tokens in a file you can diff, edit, or delete.
+**Grounder** connects projects to an Obsidian vault for AI agent memory — session handoffs, plans, and notes in files you own (plain markdown; Obsidian is never required). Context survives session ends, agent switches, and machine migrations. No vectors. No background indexing. Just markdown files, your agents, and your vault.
 
 ### Demo
 
 ![A session loop: peek teaser, /grounder-task resume, /grounder-plan list, continuing a plan, /grounder-note, /grounder-task-handoff — each with the real grounder CLI call it runs and the vault path it touches](../demo-casts/out/readme.gif)
 
-A full session loop, one step at a time:
+**Link** (once per project) — `notes/`, `plans/`, and `logs/` in your vault.
 
-- **Peek hook** resumes a prior handoff automatically at session start
-- **`/grounder-task`** picks up the next step from that handoff
-- **`/grounder-plan list`** shows the real plans already sitting in the vault
-- Continuing a plan by name — plain chat works too, not just slash commands
-- **`/grounder-note`** captures a quick mid-session insight
-- **`/grounder-task-handoff`** checkpoints the session on close
+1. **Store** — `/grounder-plan` writes a living file and keeps it current; `/grounder-note` for a one-off; `/grounder-task-handoff` to checkpoint a session.
+2. **Recall** — `/grounder-task` for the last handoff, `/grounder-plan list` to pick a plan into context, `/grounder-search` for anything in the vault. Nothing enters context unless you ask.
 
 Dim lines are the actual `grounder` CLI call each slash command runs under the hood. Regenerated with `pnpm demo:cast` from [`@grounder/demo-casts`](../demo-casts/).
 
@@ -68,6 +51,16 @@ Ship the auth rewrite before Q3 cutover.
 ```
 
 *`created` and `updated` are different dates — the plan survived a second session. Obsidian renders this frontmatter as Properties.*
+
+### What it is
+
+AI-first CLI and agent command set that:
+
+- **Links any project** — git repositories or standard folders — to your local vault (multi-project support).
+- **Captures state deliberately** — converts a discussion into a living plan, checkpoints a session for handoff, or saves arbitrary notes.
+- **Resume exactly where you left off** — the agent reads the last checkpoint instead of re-deriving context from scratch.
+- **Works natively** with Cursor and Claude Code — more agents on the roadmap.
+- **Deliberate, not automatic** — nothing enters context unless you ask. No auto-capture, no RAG.
 
 **Requirements:** Node.js 18+ and a markdown vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
 
