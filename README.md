@@ -49,6 +49,8 @@ Dim lines are the actual `grounder` CLI call each slash command runs under the h
     └── auth-rewrite.md                        ← living plan
 ```
 
+The living plan — `plans/auth-rewrite.md`:
+
 ```markdown
 ---
 project: "your-project"
