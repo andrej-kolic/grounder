@@ -147,9 +147,11 @@ grounder handoff list                                 # newest handoffs, for man
 grounder plan $'# Goal\n\nShip it' --title phase-1    # named living plan
 ```
 
-Notes land in `<vault>/10-Projects/{projectId}/notes/`.  
-Handoffs land in `<vault>/10-Projects/{projectId}/logs/` (one file per close; newest *usable* file wins — an empty or unreadable newest file falls back to the next one).  
-Plans land in `<vault>/10-Projects/{projectId}/plans/` (one file per `--title`; overwrite only with `--force`).
+- Notes land in `<vault>/10-Projects/{projectId}/notes/`.
+- Handoffs land in `<vault>/10-Projects/{projectId}/logs/` (one file per close; newest *usable* file wins — an empty or unreadable newest file falls back to the next one).
+- Plans land in `<vault>/10-Projects/{projectId}/plans/` (one file per `--title`; overwrite only with `--force`).
+
+Handoffs and plans include YAML frontmatter (`project`, `created`, `branch`, `topics`) that Obsidian renders as Properties — browsable, searchable, and queryable without plugins.
 
 Unlike `note` (one-off) and `handoff` (per-session checkpoint), `plan` is for anything spanning multiple sessions — write it once with the goal + steps, then re-run with `--force` as the work progresses to keep one file current instead of scattering updates across handoffs.
 
