@@ -25,13 +25,13 @@ The daily loop is five slash commands — [examples](#examples) show what you ty
 
 ## The problem
 
-- **Sessions start cold.** Every new chat re-derives what the last one already worked out.
-- **Tools don't share memory.** What you figured out in Claude Code is invisible to Cursor, and the other way around.
+- **Every new chat starts from scratch.** Close the window and the next session has no idea what you just decided.
+- **Cursor and Claude Code don't share context.** Decisions from one stay trapped in that tool's chat history.
 - **You can't find the plan.** Implementation plans and decisions end up buried in a chat transcript, or in whatever directory some tool chose for you.
 
 ## What you get
 
-- **Files, not a service** — no database, no vectors, no MCP server, no daemon, no background indexing. Read them, diff them, delete them.
+- **Files, not a service** — plain markdown on disk: open it, diff it, delete it. No database or background process.
 - **One vault, every project** — each linked project gets its own folder. A git repo or a plain folder both work.
 - **Plans live, sessions accumulate** — a plan updates in place across sessions; notes and handoffs are dated files you can always go back to. `search` ranks across all of them.
 - **Deliberate** — nothing is read or written until you run a command. No auto-capture, no RAG, no tokens spent otherwise.
