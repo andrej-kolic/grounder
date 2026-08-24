@@ -2,10 +2,11 @@
 name: grounder-setup
 description: >-
   Sets up, verifies, upgrades, or repairs Grounder — the CLI that links a
-  project to a local markdown vault for agent memory. Use when the user asks
-  to install Grounder, set up, upgrade, or repair Grounder, run grounder setup,
-  link this project to their vault, or when Grounder slash commands,
-  handoffs, or session memory are missing.
+  project to a local markdown vault for agent memory (Obsidian-compatible).
+  Use when the user asks to install Grounder, set up, upgrade, or repair
+  Grounder, run grounder setup, link this project to their vault or Obsidian
+  vault, or when Grounder slash commands, handoffs, or session memory are
+  missing.
 ---
 
 # Grounder setup

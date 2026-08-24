@@ -1,7 +1,7 @@
 {
   "name": "grounder",
   "version": "0.4.4",
-  "description": "Markdown-native memory for Cursor and Claude Code — session handoffs and plans in a vault you own",
+  "description": "Connect projects to an Obsidian vault (or any markdown folder) for AI agent memory — session handoffs, plans, and notes in files you own",
   "type": "module",
   "bin": {
     "grounder": "./dist/cli.js"
@@ -32,7 +32,9 @@
     "local-first",
     "vault",
     "session-handoff",
-    "context-management"
+    "context-management",
+    "second-brain",
+    "pkm"
   ],
   "license": "MIT",
   "repository": {

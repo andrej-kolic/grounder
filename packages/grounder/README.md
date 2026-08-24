@@ -1,386 +1,223 @@
+<div align="center">
+
 # Grounder
 
+**Obsidian vault memory for Cursor and Claude Code.**  
+Session summaries, plans, and notes in files you own.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/andrej-kolic/grounder/main/docs/assets/what-dark.svg">
+  <img alt="Grounder connects Cursor, Claude Code, and more agents to one markdown vault through slash commands and the CLI. The vault is a folder tree: 10-Projects/your-project/ containing plans (updated across sessions), notes (always a new file), and logs (saved session summaries). Caption: Any agent. One vault. Only when you ask." src="https://raw.githubusercontent.com/andrej-kolic/grounder/main/docs/assets/what.svg">
+</picture>
+
+<div>&nbsp;</div>
+
 [![npm version](https://img.shields.io/npm/v/grounder.svg)](https://www.npmjs.com/package/grounder)
-[![license](https://img.shields.io/npm/l/grounder.svg)](../../LICENSE)
+[![license](https://img.shields.io/npm/l/grounder.svg)](https://github.com/andrej-kolic/grounder/blob/main/LICENSE)
 
-> **Markdown-native memory shared across AI agents, sessions, and machines.**
+</div>
 
-AI agents forget everything between sessions and can't share context with each other. **Grounder** fixes this by externalizing agent memory into local files you control (Obsidian-compatible, but never required). Context survives session ends, agent switches, and machine migrations.
+**Grounder** keeps agent memory in plain markdown on disk — an Obsidian vault, or any
+directory. Because it's files instead of chat history, work started in Cursor can be
+picked up in Claude Code, weeks later, on a different machine.
 
-### What it is
+The daily loop is five slash commands — [examples](#examples) show what you type.
 
-AI-first CLI and agent command set that:
+## The problem
 
-- **Links any project** — git repositories or standard folders — to your local vault (multi-project support).
-- **Captures state deliberately** — converts a discussion into a living plan, checkpoints a session for handoff, or saves arbitrary notes.
-- **Hydrates on demand** — allows you or any agent to resume exactly where a prior session left off without re-deriving context.
-- **Works natively today** with Cursor, Claude Code, and standard CLI workflows.
+- **Every new chat starts from scratch.** Close the window and the next session has no idea what you just decided.
+- **Cursor and Claude Code don't share context.** Decisions from one stay trapped in that tool's chat history.
+- **You can't find the plan.** Implementation plans and decisions end up buried in a chat transcript, or in whatever directory some tool chose for you.
 
-### What it is not
+## What you get
 
-Grounder is **not** an auto-capture or RAG tool, nor does it attempt to record every interaction. There is no vector database, no background indexing, and zero context injection unless explicitly requested. One small, deliberate checkpoint replaces an agent re-deriving context from scratch — using a fraction of the tokens in a file you can diff, edit, or delete.
+- **Files, not a service** — plain markdown on disk: open it, diff it, delete it. No database or background process.
+- **One vault, every project** — each linked project gets its own folder. A git repo or a plain folder both work.
+- **Plans live, sessions accumulate** — a plan updates in place across sessions; notes and handoffs are dated files, kept to go back to. `search` ranks across all of them.
+- **Deliberate** — nothing is read or written until you run a command. No auto-capture, no RAG, no tokens spent otherwise.
+- **Follows you across machines** — the vault is just a folder, so git (or Syncthing, or Dropbox) is all the sync you need.
+- **Cursor and Claude Code today** — slash commands for both; more agents on the [roadmap](#roadmap).
 
-### Demo
-
-![A session loop: peek teaser, /grounder-task resume, /grounder-plan list, continuing a plan, /grounder-note, /grounder-task-handoff — each with the real grounder CLI call it runs and the vault path it touches](../demo-casts/out/readme.gif)
-
-A full session loop, one step at a time:
-
-- **Peek hook** resumes a prior handoff automatically at session start
-- **`/grounder-task`** picks up the next step from that handoff
-- **`/grounder-plan list`** shows the real plans already sitting in the vault
-- Continuing a plan by name — plain chat works too, not just slash commands
-- **`/grounder-note`** captures a quick mid-session insight
-- **`/grounder-task-handoff`** checkpoints the session on close
-
-Dim lines are the actual `grounder` CLI call each slash command runs under the hood. Regenerated with `pnpm demo:cast` from [`@grounder/demo-casts`](../demo-casts/).
-
-**Requirements:** Node.js 18+ and a markdown vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
-
-**Contents:** [Install](#install) · [Upgrading](#upgrading) · [Quickstart](#quickstart) · [Setup overview](#setup-overview) · [Commands](#commands) · [Configuration](#configuration) · [Agents](#agents) · [Session-start hooks](#session-start-hooks) · [Troubleshooting](#troubleshooting) · [Roadmap](#roadmap)
+**Requirements:** Node.js 18+ and a folder to keep the files in — an existing Obsidian
+vault, or an empty directory Grounder fills over time. Git is optional.
 
 ## Install
-
-### npm
 
 ```bash
 npm install -g grounder
 ```
 
-Or run without installing: `npx grounder --help`. A global install lets `setup` symlink `~/.grounder/runtime` so it tracks upgrades; bare `npx` copies it instead, so you need `grounder migrate` after every upgrade.
-
-### Agent skill (install + setup in one shot)
+Or let an agent handle install and setup:
 
 ```bash
 npx skills add andrej-kolic/grounder --skill grounder-setup -g
 ```
 
-Adding the skill only loads instructions — it does **nothing** until you ask your agent to run it (e.g. "set up grounder").
+Adding the skill only loads instructions — it does **nothing** until you ask your agent to
+run it (e.g. "set up grounder"). Skip the global install with
+`npx grounder --help`, at the cost of re-running `grounder migrate` after each upgrade.
 
-`grounder -h` prints a short synopsis; `grounder --help` (or `grounder help`) prints the full reference; `grounder -v` prints the installed version.
-
-## Upgrading
-
-After upgrading the package, refresh agent installs:
-
-```bash
-grounder migrate
-```
-
-Run `grounder doctor` if you’re unsure — it hints when plain `migrate` is enough vs `migrate --force` (needed **once** when upgrading from Grounder before 0.3, or when command files were edited locally). Most grounder commands and session-start teasers will also tell you when a migrate is due. Flag details: [Migrate flags](#migrate-flags).
+`grounder -h` prints a short synopsis, `grounder --help` the full reference, and
+`grounder -v` the installed version.
 
 ## Quickstart
 
-**1. One-time setup:**
-
 ```bash
-# Once per machine — connect to a markdown vault + install agent slash commands
-# --hooks adds an optional one-line session-start reminder (see Session-start hooks)
+# Once per machine — connect to a vault + install agent slash commands
 grounder setup <path-to-your-vault> --hooks
 
-# Once per project folder — link project id to vault notes/ + logs/ + plans/
+# Once per project folder
 cd your-project
 grounder link
 ```
 
-Both commands preview what they'll write and ask to confirm; add `--yes` to skip the prompt (e.g. in scripts), or `--dry-run` to print the same preview without writing.
+Both commands preview what they'll write and ask to confirm. Add `--yes` to skip the
+prompt or `--dry-run` to see the preview without writing. `--hooks` is optional and adds a
+one-line reminder at session start when a saved session exists — see
+[session-start hooks](https://github.com/andrej-kolic/grounder/blob/main/docs/session-hooks.md).
 
-**2. Daily use — from your agent's chat:**
+## Daily use
+
+Work from the agent's chat. A typical loop starts by resuming the last saved session and
+ends by saving a short summary.
+
+Anything after a slash command is an instruction, not file content. The agent follows
+it — writes a plan, saves a note, or searches the vault. `/grounder-task` and
+`/grounder-task-handoff` don't need text at all.
+
+### Examples
+
+A typical session:
+
+| You type | What it does |
+| -------- | ------------ |
+| `/grounder-task` | Resume the latest saved session |
+| `/grounder-plan save insights from this session as an implementation plan with steps` | Write a named plan |
+| `/grounder-search decisions and discussions on token refresh` | Search the vault |
+| `/grounder-note explain why we rejected cookie sessions` | Save a new note |
+| `/grounder-task-handoff` | Save a short session summary |
+
+Later, update the living plan or resume a named session:
+
+| You type | What it does |
+| -------- | ------------ |
+| `/grounder-plan update the auth rewrite plan — jwt validator is done` | Update an existing plan |
+| `/grounder-task resume the auth-middleware session` | Resume a specific saved session, not the latest |
+
+### Demo
+
+![Daily-use session loop across the five slash commands](https://raw.githubusercontent.com/andrej-kolic/grounder/main/packages/demo-casts/out/readme.gif)
+
+## How it works
+
+Three things, and that's the whole model:
+
+1. **One vault per machine.** `grounder setup` records the vault path in
+   `~/.grounder/config.json`. Nothing else on the machine needs to know where it is.
+2. **One folder per project.** `grounder link` writes a two-line `.grounder.json`
+   (safe to commit) into the project and creates the matching folder in the vault. That
+   marker is how every later command knows where to read and write.
+3. **Three document types**, each with a fixed shape so agents produce consistent files:
 
 ```text
-> /grounder-task
-
-  Reading latest handoff… (logs/2026-07-21-091500-auth-middleware.md)
-  Done: mapped middleware order.
-  Next: 1. Add tests for 401 path
-  Starting on tests for the 401 path now.
-
-> ...you work with the agent...
-
-> /grounder-task-handoff
-
-  Wrote handoff → <vault>/10-Projects/your-project/logs/2026-07-28-143200-auth-middleware.md
+10-Projects/your-project/
+├── notes/
+│   └── 2026-07-21-auth-investigation.md      ← one-off, always a new file
+├── logs/
+│   ├── 2026-07-21-091500-auth-middleware.md  ← one handoff per session
+│   └── 2026-08-14-103000-auth-middleware.md
+└── plans/
+    └── auth-rewrite.md                       ← living: updated in place
 ```
 
-`/grounder-task` hydrates the agent from the newest *usable* handoff plus `AGENTS.md`; `/grounder-task-handoff` writes the next checkpoint when you close the session. Behind the scenes these run `grounder handoff list --head` and `grounder handoff <text>` for you — see [Session loop](#session-loop).
+`10-Projects/` is a common Obsidian vault convention, so Grounder slots into an existing vault instead
+of fighting it. A **handoff** is a saved session summary — what got done, what's next,
+what's blocked — and they live under `logs/` because they accumulate one per session.
+`/grounder-task` resumes the latest saved session by default, or an earlier one by name.
 
-No agent, or want to write by hand? The same actions are plain CLI commands:
+Here's the living plan, `plans/auth-rewrite.md`:
 
-```bash
-grounder note "Investigate auth middleware"           # ad-hoc note
-grounder handoff $'# Handoff: ...\n\n## Next\n1. ...' # session checkpoint
-grounder handoff list                                 # newest handoffs, for manual hydrate
-grounder plan $'# Goal\n\nShip it' --title phase-1    # named living plan
+```markdown
+---
+project: "your-project"
+created: "2026-07-21T09:15:00Z"
+updated: "2026-08-14T10:30:00Z"
+topics: ["auth", "middleware", "jwt"]
+---
+
+## Goal
+Ship the auth rewrite before Q3 cutover.
+
+## Steps
+- [x] Map current middleware order
+- [ ] Add tests for the 401 path
+- [ ] Swap in new token validator
 ```
 
-Notes land in `<vault>/10-Projects/{projectId}/notes/`.  
-Handoffs land in `<vault>/10-Projects/{projectId}/logs/` (one file per close; newest *usable* file wins — an empty or unreadable newest file falls back to the next one).  
-Plans land in `<vault>/10-Projects/{projectId}/plans/` (one file per `--title`; overwrite only with `--force`).
+`created` and `updated` are different dates — the plan survived a second session, in the
+same agent or a different one, on the same machine or another. Obsidian renders that
+frontmatter as Properties, so it's browsable and queryable without plugins.
 
-Unlike `note` (one-off) and `handoff` (per-session checkpoint), `plan` is for anything spanning multiple sessions — write it once with the goal + steps, then re-run with `--force` as the work progresses to keep one file current instead of scattering updates across handoffs.
-
-Inspect or debug setup any time with `grounder status` / `grounder doctor` — see [Troubleshooting](#troubleshooting).
-
-### Session loop
-
-```text
-(optional teaser) → /grounder-task → work → /grounder-task-handoff → next session
-```
-
-
-| Slash command            | Equivalent CLI                           | Role                                                       |
-| ------------------------ | ---------------------------------------- | ---------------------------------------------------------- |
-| `/grounder-note`         | `grounder note`                          | Ad-hoc vault note                                          |
-| `/grounder-task-handoff` | `grounder handoff`                       | Write session checkpoint to `logs/`                        |
-| `/grounder-task`         | `grounder handoff list --head` + read it | Read-only hydrate from newest usable handoff + `AGENTS.md` |
-| `/grounder-plan`         | `grounder plan`                          | Named living plan under `plans/`                           |
-| `/grounder-search`       | `grounder search`                        | Find prior vault context by topic; CLI ranks, agent reads + synthesizes |
-
-
-The "Equivalent CLI" column is what you'd type by hand — under the hood, slash commands invoke a small runtime `setup` maintains at `~/.grounder/runtime` (see [Agents](#agents)), not whatever `grounder` binary happens to be on your `PATH`.
-
-With `--hooks` on `setup`, a new Cursor/Claude session may also print a one-line teaser when a handoff exists — never the full body. See [Session-start hooks](#session-start-hooks).
-
-## Setup overview
-
-- `grounder setup <path>` (once per machine) writes `~/.grounder/config.json`, creates `<vault>/10-Projects/`, and installs slash commands for detected agents (Cursor → `~/.cursor/commands/`, Claude Code → `~/.claude/commands/`; override with `--agent=<id>`).
-- `grounder link` (once per project folder) writes `.grounder.json` (`projectId` — safe to commit) and creates `<vault>/10-Projects/{projectId}/notes/`, `logs/`, and `plans/`.
-- **Daily use** — notes, handoffs, plans, and recall via CLI or slash commands; no further install.
-
-Nothing is written into the repo except the small `.grounder.json` marker. Agent artifacts stay under the user’s home directory; vault notes stay outside the project tree.
+Machine config, the link marker, and how commands find the project:
+**[Configuration](https://github.com/andrej-kolic/grounder/blob/main/docs/configuration.md)**.
 
 ## Commands
 
-```text
-grounder setup <path>        Connect to a markdown vault (once per machine)
-grounder link                Link this project inside the markdown vault (once per project)
-grounder note <text>         Write a note to the vault
-grounder note list           Print recent notes under notes/** (bucket-relative titles, newest first)
-grounder handoff <text>      Write a session handoff to vault logs/
-grounder handoff list        Print recent handoffs under logs/** (bucket-relative titles, newest first)
-grounder handoff list --head Print only the newest usable handoff path
-grounder handoff peek        One-line latest-handoff teaser (used by session hooks)
-grounder plan <text>         Write/update a named plan under vault plans/
-grounder plan list           Print recent plans under plans/** (bucket-relative titles, newest first)
-grounder search <query>      Search linked project vault (scoped keyword retrieval)
-grounder path notes          Print resolved notes directory
-grounder path logs           Print resolved logs directory
-grounder path plans          Print resolved plans directory
-grounder status              Snapshot of machine + project link + resolved paths
-grounder doctor              Health checks with fix hints
-grounder migrate             Refresh agent install after upgrading grounder
-```
-
-
-
-### Setup / link flags
-
-
-| Flag             | Commands                        | Description                                                                                       |
-| ---------------- | ------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `--yes`          | `setup`, `link`                 | Skip confirmation prompts                                                                         |
-| `--dry-run`      | `setup`, `link`, `migrate`      | Preview without writing                                                                           |
-| `--force`        | `setup`, `link`, `migrate`      | Overwrite existing generated / locally-modified files                                             |
-| `--id <id>`      | `link`                          | Override detected project id                                                                      |
-| `--vault <path>` | `link`                          | Override home vault root for this run                                                             |
-| `--agent <id>`   | `setup`, `migrate`              | Install for a specific agent (repeatable; default: auto-detect). Supported: `cursor`, `claude`    |
-| `--hooks`        | `setup`, `migrate`              | Also install session-start teaser hooks (opt-in; see [Session-start hooks](#session-start-hooks)) |
-
-
-
-
-### Migrate flags
-
-
-| Flag           | Description                                                                                                    |
-| -------------- | -------------------------------------------------------------------------------------------------------------- |
-| `--force`      | Overwrite slash command files you edited locally; also needed **once** when upgrading from Grounder before 0.3 |
-| `--dry-run`    | Preview without writing                                                                                        |
-| `--agent <id>` | Limit to a specific agent (repeatable)                                                                         |
-| `--hooks`      | Install hooks even if they were never installed before                                                         |
-
-
-See [Upgrading](#upgrading) for the usual post-package-upgrade flow. Untouched command files update automatically; locally edited ones (and pre-0.3 installs with no ledger) are skipped unless you pass `--force`.
-
-### Note / handoff flags
-
-
-| Flag             | Commands                    | Description                                                                                             |
-| ---------------- | --------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `--title <slug>` | `note`, `handoff`           | Filename slug (default: slugified text / first line)                                                    |
-| `--topics <list>` | `note`, `handoff`          | Comma-separated keywords written to `topics:` frontmatter for search (e.g. `auth,jwt,session`)         |
-| `--limit <n>`    | `note list`                 | Max notes to print (default: 5)                                                                         |
-| `--limit <n>`    | `handoff list`              | Max handoffs to print (default: 5)                                                                      |
-| `--markdown`     | `note list`, `handoff list` | Agent relay: `[bucketRelativePath](fileUri)` title lines (nested e.g. `feature/name.md`; absolute path indented beneath) |
-| `--head`         | `handoff list`              | Print only the newest *usable* handoff path — skips empty/unreadable files, same pick as `handoff peek` |
-
-
-
-
-### Plan flags
-
-
-| Flag             | Commands    | Description                                                                                                                                                |
-| ---------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--title <name>` | `plan`      | Filename stem when creating/updating by name (trailing `.md` ok; sanitized, max 80 chars; no auto-slug). Mutually exclusive with `--path`.                 |
-| `--path <file>`  | `plan`      | Update an existing plan by path (must resolve under this project's `plans/`; no title sanitization; always overwrites). Mutually exclusive with `--title`. |
-| `--topics <list>` | `plan`     | Comma-separated keywords written to `topics:` frontmatter for search (e.g. `caching,redis,api`). On update, omitting `--topics` keeps existing topics. |
-| `--force`        | `plan`      | With `--title`: overwrite an existing plan (preserves original `created`, sets `updated`). Not used with `--path`.                                         |
-| `--limit <n>`    | `plan list` | Max plans to print (default: 5)                                                                                                                            |
-| `--markdown`     | `plan list` | Agent relay: `[bucketRelativePath](fileUri)` title lines (nested e.g. `migration/cutover.md`; absolute path indented beneath)                               |
-
-
-Unlike `note` / `handoff` (always a new dated file), `plan` is living: create or collide by `--title` (use `--force` to overwrite), or update an existing file in place with `--path`.
-
-### Search flags
-
-Scoped to the **linked project vault** only (`<vault>/10-Projects/{projectId}/`). Searches `*.md` under that folder — not the git repo, not sibling projects.
+No agent, or want to write by hand? Each slash command has a matching CLI command.
+Pass the file text (or search query) — not an instruction for the agent.
 
 ```bash
-grounder search "handling migrations of slash commands" \
-  --terms "slash commands,grounder migrate,commandsSchema,state.json,hash drift" \
-  --json
+grounder plan $'# Goal\n\nShip it' --title auth-rewrite   # named plan
+grounder note "Investigate auth middleware"               # always a new note
+grounder handoff $'# Handoff: ...\n\n## Next\n1. ...'     # saved session summary
+grounder search "token refresh"                           # find earlier documents on token refresh
+grounder plan list                                        # also: note list, handoff list
+grounder status                                           # am I wired up?
+grounder doctor                                           # why isn't this working?
 ```
 
-| Flag | Description |
-| --- | --- |
-| `--terms <csv>` | Extra keyword variants (comma-separated). Dominates ranking quality for agent use. |
-| `--limit <n>` | Max files to print (default: 10) |
-| `--max-hits <n>` | Max line snippets stored per file during scan (default: 50). Does not stop the tree walk. |
-| `--context <n>` | Context lines around each snippet (default: 1) |
-| `--since <date>` | Only files modified on or after date (`YYYY-MM-DD` local midnight, or `7d`, `30d`, …) |
-| `--after <date>` | Alias for `--since` |
-| `--markdown` | `file://` links + fenced snippets (lookup / exact-mention relay) |
-| `--json` | Structured hits for agents (`relativePath`, `fileUri`, `termHitCounts`, …) |
+Full flags and behavior: **[CLI reference](https://github.com/andrej-kolic/grounder/blob/main/docs/cli-reference.md)**.
 
-`--markdown` and `--json` are mutually exclusive. `/grounder-search` uses `--json` by default, full-reads the top four hits, and synthesizes a short answer — see [vault search architecture](https://github.com/andrej-kolic/grounder/blob/main/docs/architecture/vault-search.md) in the monorepo for contributor details.
+## FAQ
 
-### Doctor flags
+### How is this different from `AGENTS.md` or `CLAUDE.md`?
 
+Those are instructions written once: stable rules about the project. Grounder stores
+what accumulates: what happened last session, what's next, the plan currently in flight.
+They're complements — `/grounder-task` reads the latest saved session *and* `AGENTS.md`.
 
-| Flag       | Description                                    |
-| ---------- | ---------------------------------------------- |
-| `--global` | Machine-only checks (skip project/link checks) |
+### Is this an MCP server?
 
+No. It's a CLI plus slash command files. Nothing is registered with the agent, nothing
+runs in the background, and no tokens are spent until you type a command.
 
-Run `grounder --help` for the full reference.
+### Do I need Obsidian?
 
-### Status vs doctor
+No — any directory works. Obsidian is just a nice reader for it: frontmatter shows up as
+Properties, and search and backlinks come for free.
 
+### Does it work across machines?
 
-| Command           | Job                                                                                          | When to use                                |
-| ----------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| `grounder status` | Snapshot of Machine (home config + vault path) and Project (link, id, notes/logs/plans, git) | “Am I wired?” — see paths and link state   |
-| `grounder doctor` | Health checklist (`ok` / `fail` / `warn`) with fix hints; exit `1` on any fail               | “Why isn’t memory working?” — verify setup |
+Yes, if the vault does. Make the vault a git repo (or use Syncthing, Dropbox, iCloud) and
+agent memory follows. `grounder setup` is per machine; `.grounder.json` travels
+with the project.
 
+### What does it put in my repo?
 
-Both are read-only. `status` exits `0` even when unlinked; `doctor` fails when checks fail. Use `doctor --global` to check the machine without a project link.
+Only `.grounder.json` — two lines, safe to commit. Slash commands go under `~/.cursor` and
+`~/.claude`; vault content stays outside the project tree entirely.
 
-`status` only reads the install ledger (`Schemas: current` / `Schemas: ledger stale` — it does not open agent command/hook files). `doctor` checks on-disk drift via migrate dry-run, and also warns when files already match but the ledger schema is still behind, so both point at `grounder migrate` in that case.
+### Does it capture my conversations automatically?
 
-## Configuration
+No. Nothing is written or loaded unless you ask. That's the point.
 
-**Machine config** — `~/.grounder/config.json`:
+## Docs
 
-```json
-{ "vaultRoot": "/path/to/your/vault" }
-```
-
-Written by `grounder setup`. Holds the vault path for this machine only.
-
-**Link marker** — `.grounder.json` in the folder where you run `grounder link` (safe to commit):
-
-```json
-{ "version": 1, "projectId": "your-project" }
-```
-
-Written by `grounder link` in the **current working directory**. Project id detection (when `--id` is omitted): `package.json` name in that folder → git `origin` remote (if inside a git repo) → folder basename.
-
-`grounder note`, `grounder handoff`, `grounder plan`, `grounder search`, and `grounder path *` walk up from the current directory to find the nearest `.grounder.json`, stopping at the git root when one exists (or at the filesystem root otherwise).
-
-**Environment variables**
-
-
-| Variable         | Description                                                  |
-| ---------------- | ------------------------------------------------------------ |
-| `GROUNDER_VAULT` | Override vault root for the current session                  |
-| `GROUNDER_HOME`  | Override home directory (default: `~`) for config resolution |
-
-
-
-
-## Agents
-
-The vault layout is agent-agnostic. `grounder setup` installs thin glue artifacts per detected agent via a pluggable adapter registry (`src/agents/`).
-
-
-| Agent       | Detection          | Artifacts                                                      |
-| ----------- | ------------------ | -------------------------------------------------------------- |
-| Cursor      | `~/.cursor` exists | `~/.cursor/commands/grounder-{note,search,task,task-handoff,plan}.md` |
-| Claude Code | `~/.claude` exists | `~/.claude/commands/grounder-{note,search,task,task-handoff,plan}.md` |
-
-
-No `--agent` flag: auto-detect installed agents. Explicit install:
-
-```bash
-grounder setup <path-to-your-vault> --agent=cursor --agent=claude
-```
-
-Slash commands invoke `~/.grounder/runtime/dist/cli.js` directly (not `npx`) — see [Session-start hooks](#session-start-hooks) for how that runtime stays current. Command files that still match what Grounder last wrote are refreshed by `grounder migrate` without `--force`. Locally edited files are left alone unless you pass `--force`.
-
-After upgrading the package, see [Upgrading](#upgrading). `setup --force` still works for scripts that already use it; it shares the same install path as `migrate`.
-
-Templates live under `templates/agents/{id}/`. Adding another agent means one adapter file + one template directory — `setup` stays agent-blind.
-
-## Session-start hooks
-
-Opt-in safety net for the session loop: when a Cursor or Claude Code session starts in a linked project that already has a handoff, Grounder prints **one line** reminding you it exists. You (or the agent) still decide whether to run `/grounder-task`.
-
-```bash
-grounder setup <path-to-your-vault> --hooks
-```
-
-Example teaser:
-
-```text
-[grounder] Latest handoff: "auth middleware" (2026-07-28). Run /grounder-task to load it, or ignore if unrelated.
-```
-
-What hooks do **not** do:
-
-- They never auto-load the full handoff body into context
-- They never block or delay a session from starting
-- Unlinked folders and projects with no handoffs print nothing (exit 0, silent)
-
-`doctor` reports a `warn` (never a `fail`) when a detected agent has no Grounder hook installed, and when `~/.grounder/runtime` is stale or missing.
-
-Hooks *and* slash commands both run `~/.grounder/runtime/dist/cli.js` directly (never `npx`) — `setup` materializes it, regardless of whether `--hooks` is passed:
-
-- **Real install** (`npm i -g grounder`, `pnpm add -g grounder`, or a monorepo checkout) → symlinked. Upgrading overwrites the same path in place, so both stay current with **no re-run needed**.
-- **Bare** `npx grounder setup …` (nothing installed) → copied, since each `npx` invocation resolves to a disposable, version-pinned cache dir that can't be symlinked durably. Re-run `grounder migrate` (or `setup`) after upgrading grounder to refresh (no `--force` needed).
-
-If you want the runtime to stay current with zero maintenance, install grounder rather than using bare `npx` for this step.
-
-That refresh only touches the shared runtime, not installed command files — see [Upgrading](#upgrading) if `doctor` flags command drift.
-
-## Troubleshooting
-
-
-| Symptom                                                                                | Try                                                                                                                                                  |
-| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Not sure if this folder is linked                                                      | `grounder status` — check Project `Linked:` and paths                                                                                                |
-| Notes / handoffs / plans fail or slash commands missing                                | `grounder doctor` — follow fix hints                                                                                                                 |
-| Machine setup only (no project yet)                                                    | `grounder doctor --global`                                                                                                                           |
-| Home config / vault missing                                                            | `grounder setup <path>`                                                                                                                              |
-| No `.grounder.json` / notes / logs / plans dirs                                        | `grounder link`                                                                                                                                      |
-| Agent slash commands drifted (`doctor` warns)                                          | Follow the hint: plain `grounder migrate` when files would auto-update; `grounder migrate --force` when locally modified (also typical once when upgrading from before 0.3) |
-| Session-start teaser missing (optional)                                                | `grounder migrate --hooks` — `doctor` warns when absent                                                                                              |
-| Shared runtime stale after upgrade (bare npx install)                                  | `grounder migrate` — `doctor` warns when `hook-runtime` is stale                                                                                     |
-| Migrate skips all commands as locally modified (first run after upgrade)               | `grounder migrate --force` once, then plain `migrate` on later upgrades                                                                              |
-| Node binary gone / not executable (`doctor` fails on hook or command interpreter path) | `grounder migrate` (add `--force` if command files were edited or you’re still on a pre-0.3 install)                                                 |
-
-
-
+- [CLI reference](https://github.com/andrej-kolic/grounder/blob/main/docs/cli-reference.md) — every command and flag
+- [Configuration](https://github.com/andrej-kolic/grounder/blob/main/docs/configuration.md) — machine config, `.grounder.json`, env vars, agent adapters
+- [Upgrading](https://github.com/andrej-kolic/grounder/blob/main/docs/upgrading.md) — run `grounder migrate` after a package upgrade
+- [Session-start hooks](https://github.com/andrej-kolic/grounder/blob/main/docs/session-hooks.md) — the opt-in saved-session reminder
+- [Troubleshooting](https://github.com/andrej-kolic/grounder/blob/main/docs/troubleshooting.md) — symptom → fix
 
 ## Roadmap
 
@@ -389,4 +226,9 @@ That refresh only touches the shared runtime, not installed command files — se
 
 ## Development
 
-Source, tests, and contribution workflow live in the [Grounder monorepo](https://github.com/andrej-kolic/grounder).
+Source, tests, and contribution workflow live in the
+[Grounder monorepo](https://github.com/andrej-kolic/grounder).
+
+## License
+
+[MIT](https://github.com/andrej-kolic/grounder/blob/main/LICENSE)
