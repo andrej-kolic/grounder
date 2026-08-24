@@ -1,9 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="474" viewBox="0 0 1024 474" role="img" aria-labelledby="what-title what-desc" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" text-rendering="geometricPrecision">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="426.6" viewBox="0 0 1024 426.6" role="img" aria-labelledby="what-title what-desc" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" text-rendering="geometricPrecision">
   <title id="what-title">Grounder — Obsidian vault memory for Cursor and Claude Code</title>
-  <desc id="what-desc">Cursor, Claude Code, and more agents on the left are connected by a two-way arrow to the vault on the right, labelled slash commands above and CLI below. The vault is a folder tree: 10-Projects, your-project, and inside it plans, notes, and logs. Caption: any agent, one vault, only when you ask.</desc>
+  <desc id="what-desc">Cursor, Claude Code, and more agents on the left are connected by a two-way arrow to the vault on the right, labelled slash commands above and CLI below. The vault is a folder tree: 10-Projects, your-project, and inside it plans (updated across sessions), notes (always a new file), and logs (saved session summaries). Caption: any agent, one vault, only when you ask.</desc>
 
   <defs>
-    <radialGradient id="glow" cx="512" cy="237" r="620" gradientUnits="userSpaceOnUse">
+    <radialGradient id="glow" cx="512" cy="213.3" r="558" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#EDF8F6"/>
       <stop offset="0.35" stop-color="#F2FAF9"/>
       <stop offset="0.62" stop-color="#F8FCFB"/>
@@ -14,79 +14,75 @@
     </symbol>
   </defs>
 
-  <!-- type scale: 13 / 16 / 20 / 25 (1.25 ratio) -->
+  <!-- 90% of 20 / 25, then gutter stretched to fill 1024 -->
   <style>
     .bg { fill: #FFFFFF; }
     .glow { fill: url(#glow); }
-    .frame { fill: none; stroke: #DFEAE8; stroke-width: 1.5; }
-    .card { fill: #FFFFFF; stroke: #BFD4D1; stroke-width: 1.5; }
-    .card-dash { fill: none; stroke: #BFD4D1; stroke-width: 1.5; stroke-dasharray: 6 7; }
-    .panel { fill: #FFFFFF; stroke: #BFD4D1; stroke-width: 1.5; }
+    .frame { fill: none; stroke: #DFEAE8; stroke-width: 1.35; }
+    .card { fill: #FFFFFF; stroke: #BFD4D1; stroke-width: 1.35; }
+    .card-dash { fill: none; stroke: #BFD4D1; stroke-width: 1.35; stroke-dasharray: 5.4 6.3; }
+    .panel { fill: #FFFFFF; stroke: #BFD4D1; stroke-width: 1.35; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-    .kicker { fill: #0F766E; font-size: 25px; font-weight: 600; letter-spacing: 3.4px; }
-    .name { fill: #05060C; font-size: 20px; font-weight: 600; }
-    .more { fill: #6B7A79; font-size: 20px; font-weight: 500; }
-    .caption { fill: #3E4B4A; font-size: 20px; font-weight: 500; }
-    .file { fill: #05060C; font-size: 16px; }
-    .note { fill: #6B7A79; font-size: 13px; }
+    .kicker { fill: #0F766E; font-size: 22.5px; font-weight: 600; letter-spacing: 3.06px; }
+    .name { fill: #05060C; font-size: 18px; font-weight: 600; }
+    .more { fill: #6B7A79; font-size: 18px; font-weight: 500; }
+    .caption { fill: #3E4B4A; font-size: 18px; font-weight: 500; }
+    .file { fill: #05060C; font-size: 18px; }
+    .note { fill: #6B7A79; font-size: 18px; font-weight: 500; }
 
-    .arrow { fill: none; stroke: #3E4B4A; stroke-width: 2; stroke-linecap: round; }
-    .head { fill: #3E4B4A; }
-    .tree { fill: none; stroke: #A9C2BF; stroke-width: 1.4; }
-    .folder { fill: none; stroke: #0F766E; stroke-width: 1.2; }
-    .rule { fill: none; stroke: #E3EDEB; stroke-width: 1; }
+    .arrow { fill: none; stroke: #3E4B4A; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .tree { fill: none; stroke: #A9C2BF; stroke-width: 1.26; }
+    .folder { fill: none; stroke: #0F766E; stroke-width: 1.08; }
+    .rule { fill: none; stroke: #E3EDEB; stroke-width: 0.9; }
   </style>
 
-  <rect class="bg" width="1024" height="474" rx="20"/>
-  <rect class="glow" width="1024" height="474" rx="20"/>
-  <rect class="frame" x="0.75" y="0.75" width="1022.5" height="472.5" rx="19.5"/>
+  <rect class="bg" width="1024" height="426.6" rx="18"/>
+  <rect class="glow" width="1024" height="426.6" rx="18"/>
+  <rect class="frame" x="0.675" y="0.675" width="1022.65" height="425.25" rx="17.55"/>
 
   <!-- agents -->
-  <text class="kicker" x="204.3" y="58" text-anchor="middle">AGENTS</text>
-  <rect class="card" x="40" y="84" width="332" height="72" rx="14"/>
-  <text class="name" x="206" y="127" text-anchor="middle">Cursor</text>
-  <rect class="card" x="40" y="176" width="332" height="72" rx="14"/>
-  <text class="name" x="206" y="219" text-anchor="middle">Claude Code</text>
-  <rect class="card-dash" x="40" y="268" width="332" height="72" rx="14"/>
-  <text class="more" x="206" y="311" text-anchor="middle">+ more agents</text>
+  <text class="kicker" x="198.3" y="52.2" text-anchor="middle">AGENTS</text>
+  <rect class="card" x="36" y="75.6" width="327.6" height="64.8" rx="12.6"/>
+  <text class="name mono" x="199.8" y="114.3" text-anchor="middle">Cursor</text>
+  <rect class="card" x="36" y="158.4" width="327.6" height="64.8" rx="12.6"/>
+  <text class="name mono" x="199.8" y="197.1" text-anchor="middle">Claude Code</text>
+  <rect class="card-dash" x="36" y="241.2" width="327.6" height="64.8" rx="12.6"/>
+  <text class="more" x="199.8" y="279.9" text-anchor="middle">+ more agents</text>
 
   <!-- two-way arrow -->
-  <text class="kicker" x="510.3" y="150" text-anchor="middle">SLASH</text>
-  <text class="kicker" x="510.3" y="180" text-anchor="middle">COMMANDS</text>
-  <path class="arrow" d="M402 212h220"/>
-  <path class="head" d="M388 212l14-7v14z"/>
-  <path class="head" d="M636 212l-14-7v14z"/>
-  <text class="kicker" x="510.3" y="262" text-anchor="middle">CLI</text>
+  <text class="kicker" x="510.5" y="140.4" text-anchor="middle">SLASH</text>
+  <text class="kicker" x="510.5" y="167.4" text-anchor="middle">COMMANDS</text>
+  <path class="arrow" d="M380 190.8H644"/>
+  <path class="arrow" d="M390.6 184.5L378 190.8L390.6 196.8"/>
+  <path class="arrow" d="M633.4 184.5L646 190.8L633.4 196.8"/>
+  <text class="kicker" x="510.5" y="230.4" text-anchor="middle">CLI</text>
 
   <!-- vault -->
-  <text class="kicker" x="816.3" y="58" text-anchor="middle">VAULT</text>
-  <rect class="panel" x="652" y="84" width="332" height="256" rx="16"/>
+  <text class="kicker" x="822.7" y="52.2" text-anchor="middle">VAULT</text>
+  <rect class="panel" x="660.4" y="75.6" width="327.6" height="230.4" rx="14.4"/>
 
-  <use href="#folder" x="674" y="113" width="16" height="13"/>
-  <text class="file mono" x="700" y="124">10-Projects/</text>
+  <use href="#folder" x="680.2" y="101.7" width="14.4" height="11.7"/>
+  <text class="file mono" x="703.6" y="111.6">10-Projects/</text>
 
-  <path class="tree" d="M682 130v25h16"/>
-  <use href="#folder" x="702" y="149" width="16" height="13"/>
-  <text class="file mono" x="728" y="160">your-project/</text>
+  <path class="tree" d="M687.4 117v22.5h14.4"/>
+  <use href="#folder" x="705.4" y="134.1" width="14.4" height="11.7"/>
+  <text class="file mono" x="728.8" y="144">your-project/</text>
 
-  <path class="tree" d="M710 168v105"/>
-  <path class="tree" d="M710 197h16M710 235h16M710 273h16"/>
+  <path class="tree" d="M712.6 151.2v94.5"/>
+  <path class="tree" d="M712.6 177.3h14.4M712.6 211.5h14.4M712.6 245.7h14.4"/>
 
-  <use href="#folder" x="730" y="191" width="16" height="13"/>
-  <text class="file mono" x="756" y="202">plans/</text>
-  <text class="note" x="836" y="202">updated in place</text>
+  <use href="#folder" x="730.6" y="171.9" width="14.4" height="11.7"/>
+  <text class="file mono" x="754" y="181.8">plans/</text>
 
-  <use href="#folder" x="730" y="229" width="16" height="13"/>
-  <text class="file mono" x="756" y="240">notes/</text>
-  <text class="note" x="836" y="240">one-off notes</text>
+  <use href="#folder" x="730.6" y="206.1" width="14.4" height="11.7"/>
+  <text class="file mono" x="754" y="216">notes/</text>
 
-  <use href="#folder" x="730" y="267" width="16" height="13"/>
-  <text class="file mono" x="756" y="278">logs/</text>
-  <text class="note" x="836" y="278">session handoffs</text>
+  <use href="#folder" x="730.6" y="240.3" width="14.4" height="11.7"/>
+  <text class="file mono" x="754" y="250.2">logs/</text>
 
-  <text class="note" x="674" y="316">plain markdown &#8212; read it, diff it, delete it</text>
+  <text class="note" x="824.2" y="284.4" text-anchor="middle">plain markdown &#8212; read, diff, delete</text>
 
-  <path class="rule" d="M40 380h944"/>
-  <text class="caption" x="512" y="434" text-anchor="middle">Any agent. One vault. Only when you ask.</text>
+  <path class="rule" d="M36 342h952"/>
+  <text class="caption" x="512" y="390.6" text-anchor="middle">Any agent. One vault. Only when you ask.</text>
 </svg>
