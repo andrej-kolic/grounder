@@ -8,6 +8,13 @@ Grounder is a Node CLI (`packages/grounder`) that links project folders to perso
 - `skills/grounder-setup/` — skills.sh meta-skill (CLI driver; not in the npm tarball)
 - `fixtures/minimal-git-repo/` — stable test fixture (automated tests)
 - `fixtures/dev/` — local CLI sandbox (`pnpm fixture:setup`)
+- `docs/` — user docs (CLI reference, configuration, upgrading, hooks, troubleshooting) + `docs/architecture/` design notes
+- `CONTRIBUTING.md` — build/test/release workflow (moved out of the root README)
+
+Docs rule: the root `README.md` is the front door and is canonical. Anything past the
+first successful run — full flag tables, configuration, upgrade mechanics, troubleshooting
+— belongs in `docs/`. `packages/grounder/README.md` is the npm-facing subset and must use
+absolute URLs for images and links, since relative paths break outside the tarball.
 
 ### `packages/grounder/src/`
 

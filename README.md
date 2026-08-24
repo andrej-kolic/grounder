@@ -5,41 +5,138 @@
 [![license](https://img.shields.io/npm/l/grounder.svg)](LICENSE)
 
 > **Obsidian vault memory for Cursor and Claude Code.**
+> Session handoffs, plans, and notes in files you own.
 
-**Grounder** gives your AI agents shared memory: plans, notes, and session handoffs written as plain markdown into a folder you control — an Obsidian vault, or any directory on disk. Because that memory lives in your files instead of a chat history, work started in one agent can be picked up in another, weeks later, on a different machine. No database, no vectors, no background indexing — just files you can read, diff, and delete.
+<!-- HERO DIAGRAM — docs/assets/what.svg (+ what-dark.svg), embedded via <picture>.
+     Left: three agent boxes (Cursor, Claude Code, "+").
+     Middle: two-way arrows labelled with the commands —
+       reading left  ←  /grounder-task, /grounder-search
+       writing right →  /grounder-plan, /grounder-note, /grounder-task-handoff
+     Right: the vault, as a folder tree: 10-Projects/your-project/{plans,notes,logs}
+     Caption idea: "Any agent. One vault. Only when you ask."
+     Palette: reuse docs/social-preview.svg (dark teal → near-black, white geometric sans). -->
 
-### Demo
+**Grounder** keeps your agent's memory in plain markdown inside a folder you control — an
+Obsidian vault, or any directory on disk. Because it's files instead of chat history, work
+started in Cursor can be picked up in Claude Code, weeks later, on a different machine.
 
-![A session loop: peek teaser, /grounder-task resume, /grounder-plan list, continuing a plan, /grounder-note, /grounder-task-handoff — each with the real grounder CLI call it runs and the vault path it touches](packages/demo-casts/out/readme.gif)
+## The problem
 
-Dim lines in the GIF are the real `grounder` CLI call behind each command.
+- **Sessions start cold.** Every new chat re-derives what the last one already worked out.
+- **Tools don't share memory.** What you figured out in Claude Code is invisible to Cursor, and the other way around.
+- **You can't find the plan.** Implementation plans and decisions end up buried in a chat transcript, or in whatever directory some tool chose for you.
 
-### Slash commands
+## What you get
 
-`grounder link` once per project, then everything runs from your agent's chat:
+- **Files, not a service** — no database, no vectors, no MCP server, no daemon, no background indexing. Read them, diff them, delete them.
+- **One vault, every project** — each linked project gets its own folder. A git repo or a plain folder both work.
+- **Plans live, sessions accumulate** — a plan updates in place across sessions; notes and handoffs are dated files you can always go back to. `search` ranks across all of them.
+- **Deliberate** — nothing is read or written until you run a command. No auto-capture, no RAG, no tokens spent otherwise.
+- **Follows you across machines** — the vault is just a folder, so git (or Syncthing, or Dropbox) is all the sync you need.
+- **Cursor and Claude Code today** — slash commands for both; more agents on the [roadmap](#roadmap).
+
+**Requirements:** Node.js 18+ and a folder to keep the files in — an existing Obsidian
+vault, or an empty directory Grounder fills as you go. Git is optional.
+
+## Install
+
+```bash
+npm install -g grounder
+```
+
+Or let an agent do the whole install and setup for you:
+
+```bash
+npx skills add andrej-kolic/grounder --skill grounder-setup -g
+```
+
+Adding the skill only loads instructions — it does **nothing** until you ask your agent to
+run it (e.g. "set up grounder"). You can also skip the global install entirely with
+`npx grounder --help`, at the cost of re-running `grounder migrate` after each upgrade.
+
+## Quickstart
+
+```bash
+# Once per machine — connect to a vault + install agent slash commands
+grounder setup <path-to-your-vault> --hooks
+
+# Once per project folder
+cd your-project
+grounder link
+```
+
+Both commands preview what they'll write and ask to confirm. Add `--yes` to skip the
+prompt or `--dry-run` to see the preview without writing. `--hooks` is optional and adds a
+one-line reminder at session start when a handoff exists — see
+[session-start hooks](docs/session-hooks.md).
+
+Then work from your agent's chat. A session usually recalls first and checkpoints last;
+what happens in between is up to you. Below, `>` lines are what you type, `←` is what the
+agent read, and `→` is what it wrote:
+
+```text
+> /grounder-task
+  ← read logs/2026-07-21-091500-auth-middleware.md + AGENTS.md
+    "Last session mapped the middleware order. Next: tests for the 401 path."
+
+> /grounder-plan auth rewrite: 401 tests pass, validator swap is next
+  → wrote plans/auth-rewrite.md
+
+> /grounder-search how did we handle token refresh before
+  ← ranked the project vault, full-read the top 4 hits, answered inline
+
+> /grounder-task-handoff
+  → wrote logs/2026-07-28-143200-auth-middleware.md
+```
+
+The text after a slash command is an instruction, not file content — the agent turns it
+into the section structure Grounder expects. `/grounder-task` and `/grounder-task-handoff`
+need no text at all.
 
 | Command                  | What it does                                        | CLI it runs                    |
 | ------------------------ | --------------------------------------------------- | ------------------------------ |
 | `/grounder-task`         | Pick up where the last session stopped              | `grounder handoff list --head` |
-| `/grounder-plan`         | Write or update a living plan that spans sessions    | `grounder plan`                |
+| `/grounder-plan`         | Write or update a living plan that spans sessions   | `grounder plan`                |
 | `/grounder-search`       | Find prior context anywhere in this project's vault | `grounder search`              |
 | `/grounder-note`         | Save a one-off note                                 | `grounder note`                |
 | `/grounder-task-handoff` | Checkpoint the session before you close it          | `grounder handoff`             |
 
-### In your vault
+## How it works
+
+<!-- DIAGRAM 2 — docs/assets/how.svg (+ how-dark.svg), embedded via <picture>.
+     Left: one box labelled "Machine", containing ~/.grounder/config.json → "which vault".
+     Middle: two or three "Project" boxes, each containing .grounder.json → projectId.
+     Right: the vault, with one 10-Projects/<projectId>/ folder per project.
+     Arrows: each .grounder.json → its matching vault folder (this is what `link` does).
+     Same palette as the hero. -->
+
+Three things, and that's the whole model:
+
+1. **One vault per machine.** `grounder setup` records the vault path in
+   `~/.grounder/config.json`. Nothing else on the machine needs to know where it is.
+2. **One folder per project.** `grounder link` writes a two-line `.grounder.json`
+   (safe to commit) into the project and creates the matching folder in the vault. That
+   marker is how every later command knows where to read and write.
+3. **Three document types**, each with a fixed shape so agents produce consistent files:
 
 ```text
 10-Projects/your-project/
 ├── notes/
-│   └── 2026-07-21-auth-investigation.md
+│   └── 2026-07-21-auth-investigation.md      ← one-off, always a new file
 ├── logs/
-│   ├── 2026-07-21-091500-auth-middleware.md
-│   └── 2026-08-14-103000-auth-middleware.md   ← second session
+│   ├── 2026-07-21-091500-auth-middleware.md  ← one handoff per session
+│   └── 2026-08-14-103000-auth-middleware.md
 └── plans/
-    └── auth-rewrite.md                        ← living plan
+    └── auth-rewrite.md                       ← living: updated in place
 ```
 
-The living plan — `plans/auth-rewrite.md`:
+`10-Projects/` is PARA naming, so Grounder slots into an existing Obsidian vault instead
+of fighting it. A **handoff** is the checkpoint one session leaves for the next — what got
+done, what's next, what's blocked — and they live under `logs/` because you accumulate one
+per session. `/grounder-task` resumes the newest usable handoff by default, but you can
+name any earlier session instead.
+
+Here's the living plan, `plans/auth-rewrite.md`:
 
 ```markdown
 ---
@@ -54,101 +151,88 @@ Ship the auth rewrite before Q3 cutover.
 
 ## Steps
 - [x] Map current middleware order
-- [ ] Add tests for 401 path
+- [ ] Add tests for the 401 path
 - [ ] Swap in new token validator
 ```
 
-*`created` and `updated` are different dates — the plan survived a second session, same agent or a different one, same machine or another. Obsidian renders this frontmatter as Properties.*
+`created` and `updated` are different dates — the plan survived a second session, in the
+same agent or a different one, on the same machine or another. Obsidian renders that
+frontmatter as Properties, so it's browsable and queryable without plugins.
 
-### Good to know
+## Commands
 
-- **Any project** — a git repo or a plain folder; many projects share one vault.
-- **Deliberate, not automatic** — nothing is written or loaded unless you ask. No auto-capture, no RAG.
-- **Cursor and Claude Code today** — slash commands for both, more agents on the roadmap.
-- **Requirements** — Node.js 18+ and a folder to keep the files in: an existing Obsidian vault, or an empty directory.
-
-## Get started
-
-### npm
+No agent, or want to write by hand? Every slash command is a plain CLI command:
 
 ```bash
-npm install -g grounder
+grounder plan $'# Goal\n\nShip it' --title auth-rewrite   # living plan
+grounder note "Investigate auth middleware"               # one-off note
+grounder handoff $'# Handoff: ...\n\n## Next\n1. ...'     # session checkpoint
+grounder search "token refresh"                           # rank matching files
+grounder plan list                                        # also: note list, handoff list
+grounder status                                           # am I wired up?
+grounder doctor                                           # why isn't this working?
 ```
 
-Then follow the **[package README](packages/grounder/README.md)** for quickstart, commands, configuration, and troubleshooting.
+Full flags and behavior: **[CLI reference](docs/cli-reference.md)**.
 
-### Agent skill (install + setup in one shot)
+## Demo
 
-```bash
-npx skills add andrej-kolic/grounder --skill grounder-setup -g
-```
+![A session loop: peek teaser, /grounder-task resume, /grounder-plan list, continuing a plan, /grounder-note, /grounder-task-handoff — each with the real grounder CLI call it runs and the vault path it touches](packages/demo-casts/out/readme.gif)
 
-Adding the skill only loads instructions — it does **nothing** until you ask your agent to run it (e.g. "set up grounder").
+Dim lines in the GIF are the real `grounder` CLI call behind each slash command.
 
-Or skip the global install: `npx grounder --help`.
+## FAQ
 
-This repo is the monorepo that publishes that package.
+**How is this different from `AGENTS.md` or `CLAUDE.md`?**
 
-## Monorepo layout
+Those are instructions you write once: stable rules about the project. Grounder stores
+what accumulates: what happened last session, what's next, the plan currently in flight.
+They're complements — `/grounder-task` reads the newest handoff *and* `AGENTS.md`.
 
-```text
-grounder/
-├── packages/
-│   ├── grounder/          # publishable npm package (`grounder`)
-│   └── demo-casts/        # generate GIF for READMEs (`pnpm demo:cast`)
-├── skills/
-│   └── grounder-setup/    # skills.sh listing (`npx skills add …`; not in the npm tarball)
-├── fixtures/
-│   ├── minimal-git-repo/  # stable test fixture
-│   └── dev/               # local CLI sandbox (`pnpm fixture:setup`)
-├── docs/architecture/     # contributor design notes
-└── AGENTS.md              # repo map for agents / contributors
-```
+**Is this an MCP server?**
 
-## Development
+No. It's a CLI plus slash command files. Nothing is registered with your agent, nothing
+runs in the background, and no tokens are spent until you type a command.
 
-```bash
-pnpm install
-pnpm check                 # build + typecheck + lint + test
-pnpm grounder --version    # run local CLI (build first)
-```
+**Do I need Obsidian?**
 
-### Try the CLI locally
+No — any directory works. Obsidian is just a nice reader for it: frontmatter shows up as
+Properties, and you get search and backlinks for free.
 
-Use `fixtures/dev/` as a workspace sandbox (not the test fixture):
+**Does it work across machines?**
 
-```bash
-pnpm fixture:setup
-pnpm grounder setup <path-to-your-vault> --yes --hooks   # once per machine
-cd fixtures/dev
-pnpm grounder link --yes
-pnpm grounder note "hello from dev fixture"
-```
+Yes, if your vault does. Make the vault a git repo (or use Syncthing, Dropbox, iCloud) and
+your agent memory follows you. `grounder setup` is per machine; `.grounder.json` travels
+with the project.
 
-Session loop in the agent: (optional teaser on session start) → `/grounder-task` → work → `/grounder-task-handoff`.
+**What does it put in my repo?**
 
-More commands and dogfooding tips: [fixtures/dev/README.md](fixtures/dev/README.md).
+Only `.grounder.json` — two lines, safe to commit. Slash commands go under `~/.cursor` and
+`~/.claude`; vault content stays outside the project tree entirely.
 
-## Publish
+**Does it capture my conversations automatically?**
 
-Only `packages/grounder` is published to npm. Releases are tag-driven via GitHub Actions (OIDC trusted publishing) — do not publish from a laptop for steady-state releases.
+No. Nothing is written or loaded unless you ask. That's the point.
 
-1. Ensure `main` is green.
-2. Bump `version` in `packages/grounder/package.json` and merge to `main`.
-3. Tag and push (tag must match the package version, e.g. `0.1.0` → `v0.1.0`):
+## Docs
 
-```bash
-git tag -a v0.1.0 -m "v0.1.0"
-git push origin v0.1.0
-```
+- [CLI reference](docs/cli-reference.md) — every command and flag
+- [Configuration](docs/configuration.md) — machine config, `.grounder.json`, env vars, agent adapters
+- [Upgrading](docs/upgrading.md) — `grounder migrate` after a package upgrade
+- [Session-start hooks](docs/session-hooks.md) — the opt-in handoff teaser
+- [Troubleshooting](docs/troubleshooting.md) — symptom → fix
+- [Design notes](docs/README.md#design-notes-contributors) — for contributors
 
-4. Watch the [Release](https://github.com/andrej-kolic/grounder/actions/workflows/release.yml) workflow — it runs `pnpm check`, publishes to npm, and creates a GitHub Release.
+## Roadmap
 
-## Architecture
+- **Support for Copilot, Codex, and other popular agents** — expand beyond Cursor and Claude Code so more agent tools can use the same vault memory.
+- **Auto-draft handoff on session end** (under consideration) — a hook that has the agent write the same structured Done/Next/Blockers checkpoint automatically, instead of requiring `/grounder-task-handoff`.
 
-Agent-agnostic core (`connector/`, `vault/`, `commands/`) plus a pluggable `agents/` adapter registry for Cursor, Claude Code, and future targets. Templates: `packages/grounder/templates/agents/{id}/`.
+## Contributing
 
-Design notes for contributors (not user how-tos):
+This repo is the monorepo that publishes the [`grounder`](packages/grounder) npm package.
+Build, test, and release workflow: [CONTRIBUTING.md](CONTRIBUTING.md).
 
-- [Schema versioning and install migration](docs/architecture/schema-versioning.md) — `state.json`, hash drift, `grounder migrate`, forward-compat
-- [Runtime invocation](docs/architecture/runtime-invocation.md) — baked Node + `~/.grounder/runtime`, doctor dangling-interpreter check
+## License
+
+[MIT](LICENSE)
