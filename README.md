@@ -1,3 +1,5 @@
+<div align="center">
+
 # Grounder
 
 **Obsidian vault memory for Cursor and Claude Code.**  
@@ -13,6 +15,8 @@ Session handoffs, plans, and notes in files you own.
 [![npm version](https://img.shields.io/npm/v/grounder.svg)](https://www.npmjs.com/package/grounder)
 [![CI](https://github.com/andrej-kolic/grounder/actions/workflows/ci.yml/badge.svg)](https://github.com/andrej-kolic/grounder/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/grounder.svg)](LICENSE)
+
+</div>
 
 **Grounder** keeps your agent's memory in plain markdown inside a folder you control — an
 Obsidian vault, or any directory on disk. Because it's files instead of chat history, work
