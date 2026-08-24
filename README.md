@@ -18,9 +18,9 @@ Session summaries, plans, and notes in files you own.
 
 </div>
 
-**Grounder** keeps your agent's memory in plain markdown inside a folder you control — an
-Obsidian vault, or any directory on disk. Because it's files instead of chat history, work
-started in Cursor can be picked up in Claude Code, weeks later, on a different machine.
+**Grounder** keeps agent memory in plain markdown on disk — an Obsidian vault, or any
+directory. Because it's files instead of chat history, work started in Cursor can be
+picked up in Claude Code, weeks later, on a different machine.
 
 The daily loop is five slash commands — [examples](#examples) show what you type.
 
@@ -34,13 +34,13 @@ The daily loop is five slash commands — [examples](#examples) show what you ty
 
 - **Files, not a service** — plain markdown on disk: open it, diff it, delete it. No database or background process.
 - **One vault, every project** — each linked project gets its own folder. A git repo or a plain folder both work.
-- **Plans live, sessions accumulate** — a plan updates in place across sessions; notes and handoffs are dated files you can always go back to. `search` ranks across all of them.
+- **Plans live, sessions accumulate** — a plan updates in place across sessions; notes and handoffs are dated files, kept to go back to. `search` ranks across all of them.
 - **Deliberate** — nothing is read or written until you run a command. No auto-capture, no RAG, no tokens spent otherwise.
 - **Follows you across machines** — the vault is just a folder, so git (or Syncthing, or Dropbox) is all the sync you need.
 - **Cursor and Claude Code today** — slash commands for both; more agents on the [roadmap](#roadmap).
 
 **Requirements:** Node.js 18+ and a folder to keep the files in — an existing Obsidian
-vault, or an empty directory Grounder fills as you go. Git is optional.
+vault, or an empty directory Grounder fills over time. Git is optional.
 
 ## Install
 
@@ -48,14 +48,14 @@ vault, or an empty directory Grounder fills as you go. Git is optional.
 npm install -g grounder
 ```
 
-Or let an agent do the whole install and setup for you:
+Or let an agent handle install and setup:
 
 ```bash
 npx skills add andrej-kolic/grounder --skill grounder-setup -g
 ```
 
 Adding the skill only loads instructions — it does **nothing** until you ask your agent to
-run it (e.g. "set up grounder"). You can also skip the global install entirely with
+run it (e.g. "set up grounder"). Skip the global install entirely with
 `npx grounder --help`, at the cost of re-running `grounder migrate` after each upgrade.
 
 ## Quickstart
@@ -76,8 +76,8 @@ one-line reminder at session start when a saved session exists — see
 
 ## Daily use
 
-Work from your agent's chat. You usually start by resuming the last saved session and
-finish by saving a short summary; what happens in between is up to you.
+Work from the agent's chat. A typical loop starts by resuming the last saved session and
+ends by saving a short summary.
 
 Anything after a slash command is an instruction, not file content — the agent turns
 that into a plan, note, or handoff. `/grounder-task` and `/grounder-task-handoff` don't
@@ -91,8 +91,8 @@ A typical session:
 | -------- | ------------ |
 | `/grounder-task` | Resume the latest saved session |
 | `/grounder-plan save insights from this session as an implementation plan with steps` | Turn this session into a plan with steps |
-| `/grounder-search decisions and discussions on token refresh` | Find earlier writing on a topic you describe |
-| `/grounder-note explain why we rejected cookie sessions` | Write and save a note from your instruction |
+| `/grounder-search decisions and discussions on token refresh` | Find earlier documents on token refresh |
+| `/grounder-note explain why we rejected cookie sessions` | Save a note on why cookie sessions were rejected |
 | `/grounder-task-handoff` | Save a short summary of this session so the next one can continue |
 
 Later, update the living plan or resume a named session:
@@ -130,9 +130,8 @@ Three things, and that's the whole model:
 
 `10-Projects/` is a common Obsidian vault convention, so Grounder slots into an existing vault instead
 of fighting it. A **handoff** is a saved session summary — what got done, what's next,
-what's blocked — and they live under `logs/` because you accumulate one per session.
-`/grounder-task` resumes the latest saved session by default, but you can name an earlier
-saved session instead.
+what's blocked — and they live under `logs/` because they accumulate one per session.
+`/grounder-task` resumes the latest saved session by default, or an earlier one by name.
 
 Here's the living plan, `plans/auth-rewrite.md`:
 
@@ -162,15 +161,14 @@ Machine config, the link marker, and how commands find the project:
 
 ## Commands
 
-No agent, or want to write by hand? Every slash command is a plain CLI command.
-Unlike slash commands, you pass the file text (or search query) yourself — not an
-instruction for the agent.
+No agent, or want to write by hand? Each slash command has a matching CLI command.
+Pass the file text (or search query) — not an instruction for the agent.
 
 ```bash
 grounder plan $'# Goal\n\nShip it' --title auth-rewrite   # named plan
 grounder note "Investigate auth middleware"               # always a new note
 grounder handoff $'# Handoff: ...\n\n## Next\n1. ...'     # saved session summary
-grounder search "token refresh"                           # find earlier writing on a topic
+grounder search "token refresh"                           # find earlier documents on token refresh
 grounder plan list                                        # also: note list, handoff list
 grounder status                                           # am I wired up?
 grounder doctor                                           # why isn't this working?
@@ -182,24 +180,24 @@ Full flags and behavior: **[CLI reference](docs/cli-reference.md)**.
 
 **How is this different from `AGENTS.md` or `CLAUDE.md`?**
 
-Those are instructions you write once: stable rules about the project. Grounder stores
+Those are instructions written once: stable rules about the project. Grounder stores
 what accumulates: what happened last session, what's next, the plan currently in flight.
 They're complements — `/grounder-task` reads the latest saved session *and* `AGENTS.md`.
 
 **Is this an MCP server?**
 
-No. It's a CLI plus slash command files. Nothing is registered with your agent, nothing
+No. It's a CLI plus slash command files. Nothing is registered with the agent, nothing
 runs in the background, and no tokens are spent until you type a command.
 
 **Do I need Obsidian?**
 
 No — any directory works. Obsidian is just a nice reader for it: frontmatter shows up as
-Properties, and you get search and backlinks for free.
+Properties, and search and backlinks come for free.
 
 **Does it work across machines?**
 
-Yes, if your vault does. Make the vault a git repo (or use Syncthing, Dropbox, iCloud) and
-your agent memory follows you. `grounder setup` is per machine; `.grounder.json` travels
+Yes, if the vault does. Make the vault a git repo (or use Syncthing, Dropbox, iCloud) and
+agent memory follows. `grounder setup` is per machine; `.grounder.json` travels
 with the project.
 
 **What does it put in my repo?**
