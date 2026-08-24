@@ -76,20 +76,12 @@ one-line reminder at session start when a saved session exists — see
 
 ## Daily use
 
-Work from your agent's chat. A session usually resumes first and saves a summary last; what
-happens in between is up to you.
+Work from your agent's chat. You usually start by resuming the last saved session and
+finish by saving a short summary; what happens in between is up to you.
 
-| Command                  | CLI it runs                    |
-| ------------------------ | ------------------------------ |
-| `/grounder-task`         | `grounder handoff list --head` |
-| `/grounder-plan`         | `grounder plan`                |
-| `/grounder-search`       | `grounder search`              |
-| `/grounder-note`         | `grounder note`                |
-| `/grounder-task-handoff` | `grounder handoff`             |
-
-Anything after a slash command is an instruction, not file content — the agent turns it
-into the plan, note, or handoff Grounder expects. `/grounder-task` and
-`/grounder-task-handoff` need no text at all.
+Anything after a slash command is an instruction, not file content — the agent turns
+that into a plan, note, or handoff. `/grounder-task` and `/grounder-task-handoff` don't
+need text at all.
 
 ### Examples
 
