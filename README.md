@@ -177,9 +177,9 @@ Unlike slash commands, you pass the file text (or search query) yourself — not
 instruction for the agent.
 
 ```bash
-grounder plan $'# Goal\n\nShip it' --title auth-rewrite   # living plan
-grounder note "Investigate auth middleware"               # one-off note
-grounder handoff $'# Handoff: ...\n\n## Next\n1. ...'     # session checkpoint
+grounder plan $'# Goal\n\nShip it' --title auth-rewrite   # named plan
+grounder note "Investigate auth middleware"               # always a new note
+grounder handoff $'# Handoff: ...\n\n## Next\n1. ...'     # saved session summary
 grounder search "token refresh"                           # find earlier writing on a topic
 grounder plan list                                        # also: note list, handoff list
 grounder status                                           # am I wired up?
