@@ -81,9 +81,9 @@ one-line reminder at session start when a saved session exists — see
 Work from the agent's chat. A typical loop starts by resuming the last saved session and
 ends by saving a short summary.
 
-Anything after a slash command is an instruction, not file content — the agent turns
-that into a plan, note, or handoff. `/grounder-task` and `/grounder-task-handoff` don't
-need text at all.
+Anything after a slash command is an instruction, not file content. The agent follows
+it — writes a plan, saves a note, or searches the vault. `/grounder-task` and
+`/grounder-task-handoff` don't need text at all.
 
 ### Examples
 
@@ -92,10 +92,10 @@ A typical session:
 | You type | What it does |
 | -------- | ------------ |
 | `/grounder-task` | Resume the latest saved session |
-| `/grounder-plan save insights from this session as an implementation plan with steps` | Turn this session into a plan with steps |
-| `/grounder-search decisions and discussions on token refresh` | Find earlier documents on token refresh |
-| `/grounder-note explain why we rejected cookie sessions` | Save a note on why cookie sessions were rejected |
-| `/grounder-task-handoff` | Save a short summary of this session so the next one can continue |
+| `/grounder-plan save insights from this session as an implementation plan with steps` | Write a named plan |
+| `/grounder-search decisions and discussions on token refresh` | Search the vault |
+| `/grounder-note explain why we rejected cookie sessions` | Save a new note |
+| `/grounder-task-handoff` | Save a short session summary |
 
 Later, update the living plan or resume a named session:
 
@@ -180,34 +180,34 @@ Full flags and behavior: **[CLI reference](https://github.com/andrej-kolic/groun
 
 ## FAQ
 
-**How is this different from `AGENTS.md` or `CLAUDE.md`?**
+### How is this different from `AGENTS.md` or `CLAUDE.md`?
 
 Those are instructions written once: stable rules about the project. Grounder stores
 what accumulates: what happened last session, what's next, the plan currently in flight.
 They're complements — `/grounder-task` reads the latest saved session *and* `AGENTS.md`.
 
-**Is this an MCP server?**
+### Is this an MCP server?
 
 No. It's a CLI plus slash command files. Nothing is registered with the agent, nothing
 runs in the background, and no tokens are spent until you type a command.
 
-**Do I need Obsidian?**
+### Do I need Obsidian?
 
 No — any directory works. Obsidian is just a nice reader for it: frontmatter shows up as
 Properties, and search and backlinks come for free.
 
-**Does it work across machines?**
+### Does it work across machines?
 
 Yes, if the vault does. Make the vault a git repo (or use Syncthing, Dropbox, iCloud) and
 agent memory follows. `grounder setup` is per machine; `.grounder.json` travels
 with the project.
 
-**What does it put in my repo?**
+### What does it put in my repo?
 
 Only `.grounder.json` — two lines, safe to commit. Slash commands go under `~/.cursor` and
 `~/.claude`; vault content stays outside the project tree entirely.
 
-**Does it capture my conversations automatically?**
+### Does it capture my conversations automatically?
 
 No. Nothing is written or loaded unless you ask. That's the point.
 
