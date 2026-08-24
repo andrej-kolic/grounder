@@ -1,12 +1,14 @@
 # Grounder
 
-> **Obsidian vault memory for Cursor and Claude Code.**
-> Session handoffs, plans, and notes in files you own.
+**Obsidian vault memory for Cursor and Claude Code.**  
+Session handoffs, plans, and notes in files you own.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/andrej-kolic/grounder/main/docs/assets/what-dark.svg">
   <img alt="Grounder connects Cursor, Claude Code, and more agents to one markdown vault through slash commands and the CLI. The vault is a folder tree: 10-Projects/your-project/ containing plans (updated in place), notes (one-off), and logs (session handoffs). Caption: Any agent. One vault. Only when you ask." src="https://raw.githubusercontent.com/andrej-kolic/grounder/main/docs/assets/what.svg">
 </picture>
+
+<br>
 
 [![npm version](https://img.shields.io/npm/v/grounder.svg)](https://www.npmjs.com/package/grounder)
 [![license](https://img.shields.io/npm/l/grounder.svg)](https://github.com/andrej-kolic/grounder/blob/main/LICENSE)
