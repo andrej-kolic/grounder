@@ -74,28 +74,10 @@ prompt or `--dry-run` to see the preview without writing. `--hooks` is optional 
 one-line reminder at session start when a handoff exists — see
 [session-start hooks](https://github.com/andrej-kolic/grounder/blob/main/docs/session-hooks.md).
 
-Then work from your agent's chat. A session usually recalls first and checkpoints last;
-what happens in between is up to you. Below, `>` lines are what you type, `←` is what the
-agent read, and `→` is what it wrote:
+## Daily use
 
-```text
-> /grounder-task
-  ← read logs/2026-07-21-091500-auth-middleware.md + AGENTS.md
-    "Last session mapped the middleware order. Next: tests for the 401 path."
-
-> /grounder-plan auth rewrite: 401 tests pass, validator swap is next
-  → wrote plans/auth-rewrite.md
-
-> /grounder-search how did we handle token refresh before
-  ← ranked the project vault, full-read the top 4 hits, answered inline
-
-> /grounder-task-handoff
-  → wrote logs/2026-07-28-143200-auth-middleware.md
-```
-
-The text after a slash command is an instruction, not file content — the agent turns it
-into the section structure Grounder expects. `/grounder-task` and `/grounder-task-handoff`
-need no text at all.
+Work from your agent's chat. A session usually recalls first and checkpoints last; what
+happens in between is up to you.
 
 | Command                  | What it does                                        | CLI it runs                    |
 | ------------------------ | --------------------------------------------------- | ------------------------------ |
@@ -105,9 +87,17 @@ need no text at all.
 | `/grounder-note`         | Save a one-off note                                 | `grounder note`                |
 | `/grounder-task-handoff` | Checkpoint the session before you close it          | `grounder handoff`             |
 
-## How it works
+Anything after a slash command is an instruction, not file content — the agent turns it
+into the plan, note, or handoff Grounder expects. `/grounder-task` and
+`/grounder-task-handoff` need no text at all.
 
-<!-- DIAGRAM 2 — docs/assets/how.svg, absolute URL when it exists (see note above). -->
+### Demo
+
+![Daily-use session loop across the five slash commands](https://raw.githubusercontent.com/andrej-kolic/grounder/main/packages/demo-casts/out/readme.gif)
+
+Dim lines in the GIF are the real `grounder` CLI call behind each slash command.
+
+## How it works
 
 Three things, and that's the whole model:
 
@@ -158,6 +148,9 @@ Ship the auth rewrite before Q3 cutover.
 same agent or a different one, on the same machine or another. Obsidian renders that
 frontmatter as Properties, so it's browsable and queryable without plugins.
 
+Machine config, the link marker, and how commands find the project:
+**[Configuration](https://github.com/andrej-kolic/grounder/blob/main/docs/configuration.md)**.
+
 ## Commands
 
 No agent, or want to write by hand? Every slash command is a plain CLI command:
@@ -173,12 +166,6 @@ grounder doctor                                           # why isn't this worki
 ```
 
 Full flags and behavior: **[CLI reference](https://github.com/andrej-kolic/grounder/blob/main/docs/cli-reference.md)**.
-
-## Demo
-
-![A session loop: peek teaser, /grounder-task resume, /grounder-plan list, continuing a plan, /grounder-note, /grounder-task-handoff — each with the real grounder CLI call it runs and the vault path it touches](https://raw.githubusercontent.com/andrej-kolic/grounder/main/packages/demo-casts/out/readme.gif)
-
-Dim lines in the GIF are the real `grounder` CLI call behind each slash command.
 
 ## FAQ
 
