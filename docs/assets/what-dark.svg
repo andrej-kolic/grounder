@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="474" viewBox="0 0 1024 474" role="img" aria-labelledby="what-title what-desc" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" text-rendering="geometricPrecision">
-  <title id="what-title">Grounder connects any agent to one markdown vault</title>
+  <title id="what-title">Grounder — Obsidian vault memory for Cursor and Claude Code</title>
   <desc id="what-desc">Cursor, Claude Code, and more agents on the left are connected by a two-way arrow to the vault on the right, labelled slash commands above and CLI below. The vault is a folder tree: 10-Projects, your-project, and inside it plans, notes, and logs. Caption: any agent, one vault, only when you ask.</desc>
 
   <defs>

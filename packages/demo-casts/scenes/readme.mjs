@@ -100,6 +100,6 @@ export default {
     // Hold on the final prompt so README GIF viewers can finish reading
     // before the loop restarts. Keep in sync with agg --last-frame-duration.
     prompt(),
-    { type: "wait", seconds: 3 },
+    { type: "wait", seconds: 5 },
   ],
 };

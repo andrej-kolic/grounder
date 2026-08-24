@@ -82,6 +82,7 @@ describe("skills/grounder-setup", () => {
     expect(description).toBeTruthy();
     expect(description?.length).toBeGreaterThan(0);
     expect(description?.length).toBeLessThanOrEqual(1024);
+    expect(description).toMatch(/Obsidian/i);
 
     expect(keys).not.toContain("disable-model-invocation");
     expect(keys).not.toContain("context");
@@ -95,10 +96,12 @@ describe("skills/grounder-setup", () => {
     expect(content).not.toContain("`init` writes:");
   });
 
-  it("asks for an Obsidian vault or markdown folder path, not a notes folder", async () => {
+  it("asks for a markdown vault path, not an Obsidian vault or notes folder", async () => {
     const content = await readFile(skillPath, "utf8");
-    expect(content).toContain(`"What's the path to your Obsidian vault (or markdown folder)?"`);
-    expect(content).not.toContain(`"What's the path to your markdown vault?"`);
+    const body = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
+    expect(content).toContain(`"What's the path to your markdown vault?"`);
+    expect(content).not.toContain("What's the path to your Obsidian vault?");
+    expect(body).not.toContain("Obsidian vault");
     expect(content).not.toContain("notes folder");
   });
 
