@@ -6,9 +6,10 @@
 > **Obsidian vault memory for Cursor and Claude Code.**
 > Session handoffs, plans, and notes in files you own.
 
-<!-- HERO DIAGRAM — once docs/assets/what.svg exists, embed it here with an ABSOLUTE URL:
-     https://raw.githubusercontent.com/andrej-kolic/grounder/main/docs/assets/what.svg
-     Relative paths break on npm; the repo root README uses the relative form. -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/andrej-kolic/grounder/main/docs/assets/what-dark.svg">
+  <img alt="Grounder connects Cursor, Claude Code, and more agents to one markdown vault through slash commands and the CLI. The vault is a folder tree: 10-Projects/your-project/ containing plans (updated in place), notes (one-off), and logs (session handoffs). Caption: Any agent. One vault. Only when you ask." src="https://raw.githubusercontent.com/andrej-kolic/grounder/main/docs/assets/what.svg">
+</picture>
 
 **Grounder** keeps your agent's memory in plain markdown inside a folder you control — an
 Obsidian vault, or any directory on disk. Because it's files instead of chat history, work
