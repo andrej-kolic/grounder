@@ -5,18 +5,27 @@
 
 > **Obsidian vault memory for Cursor and Claude Code.**
 
-**Grounder** connects projects to an Obsidian vault for AI agent memory — session handoffs, plans, and notes in files you own (plain markdown; Obsidian is never required). Context survives session ends, agent switches, and machine migrations. No vectors. No background indexing. Just markdown files, your agents, and your vault.
+**Grounder** gives your AI agents shared memory: plans, notes, and session handoffs written as plain markdown into a folder you control — an Obsidian vault, or any directory on disk. Because that memory lives in your files instead of a chat history, work started in one agent can be picked up in another, weeks later, on a different machine. No database, no vectors, no background indexing — just files you can read, diff, and delete.
 
 ### Demo
 
 ![A session loop: peek teaser, /grounder-task resume, /grounder-plan list, continuing a plan, /grounder-note, /grounder-task-handoff — each with the real grounder CLI call it runs and the vault path it touches](../demo-casts/out/readme.gif)
 
-**Link** (once per project) — `notes/`, `plans/`, and `logs/` in your vault.
+Dim lines in the GIF are the real `grounder` CLI call behind each command. Regenerated with `pnpm demo:cast` from [`@grounder/demo-casts`](../demo-casts/).
 
-1. **Store** — `/grounder-plan` writes a living file and keeps it current; `/grounder-note` for a one-off; `/grounder-task-handoff` to checkpoint a session.
-2. **Recall** — `/grounder-task` for the last handoff, `/grounder-plan list` to pick a plan into context, `/grounder-search` for anything in the vault. Nothing enters context unless you ask.
+### Slash commands
 
-Dim lines are the actual `grounder` CLI call each slash command runs under the hood. Regenerated with `pnpm demo:cast` from [`@grounder/demo-casts`](../demo-casts/).
+`grounder link` once per project, then everything runs from your agent's chat:
+
+| Command                  | What it does                                          | CLI it runs                   |
+| ------------------------ | ----------------------------------------------------- | ----------------------------- |
+| `/grounder-task`         | Pick up where the last session stopped                | `grounder handoff list --head` |
+| `/grounder-plan`         | Write or update a living plan that spans sessions     | `grounder plan`               |
+| `/grounder-search`       | Find prior context anywhere in this project's vault   | `grounder search`             |
+| `/grounder-note`         | Save a one-off note                                   | `grounder note`               |
+| `/grounder-task-handoff` | Checkpoint the session before you close it            | `grounder handoff`            |
+
+Slash commands invoke the small runtime `setup` maintains at `~/.grounder/runtime` (see [Agents](#agents)), not whatever `grounder` happens to be on your `PATH`.
 
 ### In your vault
 
@@ -50,19 +59,15 @@ Ship the auth rewrite before Q3 cutover.
 - [ ] Swap in new token validator
 ```
 
-*`created` and `updated` are different dates — the plan survived a second session. Obsidian renders this frontmatter as Properties.*
+*`created` and `updated` are different dates — the plan survived a second session, same agent or a different one, same machine or another. Obsidian renders this frontmatter as Properties.*
 
-### What it is
+### Good to know
 
-AI-first CLI and agent command set that:
+- **Any project** — a git repo or a plain folder; many projects share one vault.
+- **Deliberate, not automatic** — nothing is written or loaded unless you ask. No auto-capture, no RAG.
+- **Cursor and Claude Code today** — slash commands for both, more agents on the roadmap.
 
-- **Links any project** — git repositories or standard folders — to your local vault (multi-project support).
-- **Captures state deliberately** — converts a discussion into a living plan, checkpoints a session for handoff, or saves arbitrary notes.
-- **Resume exactly where you left off** — the agent reads the last checkpoint instead of re-deriving context from scratch.
-- **Works natively** with Cursor and Claude Code — more agents on the roadmap.
-- **Deliberate, not automatic** — nothing enters context unless you ask. No auto-capture, no RAG.
-
-**Requirements:** Node.js 18+ and a markdown vault on disk. Git is optional but used when present (project id detection and link lookup bounds).
+**Requirements:** Node.js 18+ and a folder to keep the files in — an existing Obsidian vault, or an empty directory Grounder fills as you go. Git is optional (used for project id detection and to bound the link lookup when present).
 
 **Contents:** [Install](#install) · [Upgrading](#upgrading) · [Quickstart](#quickstart) · [Setup overview](#setup-overview) · [Commands](#commands) · [Configuration](#configuration) · [Agents](#agents) · [Session-start hooks](#session-start-hooks) · [Troubleshooting](#troubleshooting) · [Roadmap](#roadmap)
 
@@ -112,24 +117,24 @@ grounder link
 
 Both commands preview what they'll write and ask to confirm; add `--yes` to skip the prompt (e.g. in scripts), or `--dry-run` to print the same preview without writing.
 
-**2. Daily use — from your agent's chat:**
+**2. Daily use — from your agent's chat.** A session usually recalls first and checkpoints last; what happens in between is up to you:
 
 ```text
 > /grounder-task
+  Reading logs/2026-07-21-091500-auth-middleware.md + AGENTS.md
+  Done: mapped middleware order. Next: add tests for the 401 path.
 
-  Reading latest handoff… (logs/2026-07-21-091500-auth-middleware.md)
-  Done: mapped middleware order.
-  Next: 1. Add tests for 401 path
-  Starting on tests for the 401 path now.
+> /grounder-plan the auth rewrite — 401 tests done, validator swap next
+  Updating plan at plans/auth-rewrite.md
 
-> ...you work with the agent...
+> /grounder-search how did we handle token refresh before
+  4 hits under notes/ and logs/ — summarized above, nothing else loaded
 
 > /grounder-task-handoff
-
-  Wrote handoff → <vault>/10-Projects/your-project/logs/2026-07-28-143200-auth-middleware.md
+  Wrote logs/2026-07-28-143200-auth-middleware.md
 ```
 
-`/grounder-task` hydrates the agent from the newest *usable* handoff plus `AGENTS.md`; `/grounder-task-handoff` writes the next checkpoint when you close the session. Behind the scenes these run `grounder handoff list --head` and `grounder handoff <text>` for you — see [Session loop](#session-loop).
+`/grounder-task` reads the newest *usable* handoff plus `AGENTS.md` — nothing else. `/grounder-plan` keeps a single file current across sessions instead of scattering updates through handoffs. `/grounder-task-handoff` writes the checkpoint the next session reads.
 
 No agent, or want to write by hand? The same actions are plain CLI commands:
 
@@ -146,29 +151,11 @@ grounder plan $'# Goal\n\nShip it' --title phase-1    # named living plan
 
 Handoffs and plans include YAML frontmatter (`project`, `created`, `branch`, `topics`) that Obsidian renders as Properties — browsable, searchable, and queryable without plugins.
 
-Unlike `note` (one-off) and `handoff` (per-session checkpoint), `plan` is for anything spanning multiple sessions — write it once with the goal + steps, then re-run with `--force` as the work progresses to keep one file current instead of scattering updates across handoffs.
+`plan` is the only living file: re-running the same `--title` with `--force` updates it in place (preserving `created`), while `note` and `handoff` always write a new dated file.
 
 Inspect or debug setup any time with `grounder status` / `grounder doctor` — see [Troubleshooting](#troubleshooting).
 
-### Session loop
-
-```text
-(optional teaser) → /grounder-task → work → /grounder-task-handoff → next session
-```
-
-
-| Slash command            | Equivalent CLI                           | Role                                                       |
-| ------------------------ | ---------------------------------------- | ---------------------------------------------------------- |
-| `/grounder-note`         | `grounder note`                          | Ad-hoc vault note                                          |
-| `/grounder-task-handoff` | `grounder handoff`                       | Write session checkpoint to `logs/`                        |
-| `/grounder-task`         | `grounder handoff list --head` + read it | Read-only hydrate from newest usable handoff + `AGENTS.md` |
-| `/grounder-plan`         | `grounder plan`                          | Named living plan under `plans/`                           |
-| `/grounder-search`       | `grounder search`                        | Find prior vault context by topic; CLI ranks, agent reads + synthesizes |
-
-
-The "Equivalent CLI" column is what you'd type by hand — under the hood, slash commands invoke a small runtime `setup` maintains at `~/.grounder/runtime` (see [Agents](#agents)), not whatever `grounder` binary happens to be on your `PATH`.
-
-With `--hooks` on `setup`, a new Cursor/Claude session may also print a one-line teaser when a handoff exists — never the full body. See [Session-start hooks](#session-start-hooks).
+With `--hooks` on `setup`, a new Cursor or Claude Code session prints a one-line teaser when a handoff exists — never the full body. See [Session-start hooks](#session-start-hooks).
 
 ## Setup overview
 
@@ -180,24 +167,37 @@ Nothing is written into the repo except the small `.grounder.json` marker. Agent
 
 ## Commands
 
+Same grouping as `grounder -h`:
+
 ```text
-grounder setup <path>        Connect to a markdown vault (once per machine)
-grounder link                Link this project inside the markdown vault (once per project)
-grounder note <text>         Write a note to the vault
-grounder note list           Print recent notes under notes/** (bucket-relative titles, newest first)
-grounder handoff <text>      Write a session handoff to vault logs/
-grounder handoff list        Print recent handoffs under logs/** (bucket-relative titles, newest first)
-grounder handoff list --head Print only the newest usable handoff path
-grounder handoff peek        One-line latest-handoff teaser (used by session hooks)
-grounder plan <text>         Write/update a named plan under vault plans/
-grounder plan list           Print recent plans under plans/** (bucket-relative titles, newest first)
-grounder search <query>      Search linked project vault (scoped keyword retrieval)
-grounder path notes          Print resolved notes directory
-grounder path logs           Print resolved logs directory
-grounder path plans          Print resolved plans directory
-grounder status              Snapshot of machine + project link + resolved paths
-grounder doctor              Health checks with fix hints
-grounder migrate             Refresh agent install after upgrading grounder
+Setup
+  grounder setup <path>         Connect this machine to a vault folder (once)
+  grounder link                 Link this project into the vault (once per project)
+
+Write
+  grounder plan <text>          Write/update a named living plan under plans/
+  grounder note <text>          Write a note under notes/
+  grounder handoff <text>       Write a session checkpoint under logs/
+  grounder plan list            Recent plans, newest first
+  grounder note list            Recent notes, newest first
+  grounder handoff list         Recent handoffs, newest first
+  grounder handoff list --head  Newest usable handoff path (what /grounder-task reads)
+
+Retrieve
+  grounder search <query>       Rank matching files in this project's vault
+
+Paths
+  grounder path notes           Print resolved notes directory
+  grounder path logs            Print resolved logs directory
+  grounder path plans           Print resolved plans directory
+
+Maintain
+  grounder status               Machine + project link snapshot
+  grounder doctor               Health checks with fix hints
+  grounder migrate              Refresh agent install after upgrading grounder
+
+Advanced
+  grounder handoff peek         One-line latest-handoff teaser (session hooks)
 ```
 
 

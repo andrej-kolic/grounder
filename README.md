@@ -6,18 +6,25 @@
 
 > **Obsidian vault memory for Cursor and Claude Code.**
 
-**Grounder** connects projects to an Obsidian vault for AI agent memory — session handoffs, plans, and notes in files you own (plain markdown; Obsidian is never required). Context survives session ends, agent switches, and machine migrations. No vectors. No background indexing. Just markdown files, your agents, and your vault.
+**Grounder** gives your AI agents shared memory: plans, notes, and session handoffs written as plain markdown into a folder you control — an Obsidian vault, or any directory on disk. Because that memory lives in your files instead of a chat history, work started in one agent can be picked up in another, weeks later, on a different machine. No database, no vectors, no background indexing — just files you can read, diff, and delete.
 
 ### Demo
 
 ![A session loop: peek teaser, /grounder-task resume, /grounder-plan list, continuing a plan, /grounder-note, /grounder-task-handoff — each with the real grounder CLI call it runs and the vault path it touches](packages/demo-casts/out/readme.gif)
 
-**Link** (once per project) — `notes/`, `plans/`, and `logs/` in your vault.
+Dim lines in the GIF are the real `grounder` CLI call behind each command.
 
-1. **Store** — `/grounder-plan` writes a living file and keeps it current; `/grounder-note` for a one-off; `/grounder-task-handoff` to checkpoint a session.
-2. **Recall** — `/grounder-task` for the last handoff, `/grounder-plan list` to pick a plan into context, `/grounder-search` for anything in the vault. Nothing enters context unless you ask.
+### Slash commands
 
-Dim lines are the actual `grounder` CLI call each slash command runs under the hood.
+`grounder link` once per project, then everything runs from your agent's chat:
+
+| Command                  | What it does                                        | CLI it runs                    |
+| ------------------------ | --------------------------------------------------- | ------------------------------ |
+| `/grounder-task`         | Pick up where the last session stopped              | `grounder handoff list --head` |
+| `/grounder-plan`         | Write or update a living plan that spans sessions    | `grounder plan`                |
+| `/grounder-search`       | Find prior context anywhere in this project's vault | `grounder search`              |
+| `/grounder-note`         | Save a one-off note                                 | `grounder note`                |
+| `/grounder-task-handoff` | Checkpoint the session before you close it          | `grounder handoff`             |
 
 ### In your vault
 
@@ -51,17 +58,14 @@ Ship the auth rewrite before Q3 cutover.
 - [ ] Swap in new token validator
 ```
 
-*`created` and `updated` are different dates — the plan survived a second session. Obsidian renders this frontmatter as Properties.*
+*`created` and `updated` are different dates — the plan survived a second session, same agent or a different one, same machine or another. Obsidian renders this frontmatter as Properties.*
 
-### What it is
+### Good to know
 
-AI-first CLI and agent command set that:
-
-- **Links any project** — git repositories or standard folders — to your local vault (multi-project support).
-- **Captures state deliberately** — converts a discussion into a living plan, checkpoints a session for handoff, or saves arbitrary notes.
-- **Resume exactly where you left off** — the agent reads the last checkpoint instead of re-deriving context from scratch.
-- **Works natively** with Cursor and Claude Code — more agents on the roadmap.
-- **Deliberate, not automatic** — nothing enters context unless you ask. No auto-capture, no RAG.
+- **Any project** — a git repo or a plain folder; many projects share one vault.
+- **Deliberate, not automatic** — nothing is written or loaded unless you ask. No auto-capture, no RAG.
+- **Cursor and Claude Code today** — slash commands for both, more agents on the roadmap.
+- **Requirements** — Node.js 18+ and a folder to keep the files in: an existing Obsidian vault, or an empty directory.
 
 ## Get started
 
