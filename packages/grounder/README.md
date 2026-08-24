@@ -3,7 +3,7 @@
 # Grounder
 
 **Obsidian vault memory for Cursor and Claude Code.**  
-Session handoffs, plans, and notes in files you own.
+Session summaries, plans, and notes in files you own.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/andrej-kolic/grounder/main/docs/assets/what-dark.svg">
@@ -20,6 +20,8 @@ Session handoffs, plans, and notes in files you own.
 **Grounder** keeps your agent's memory in plain markdown inside a folder you control — an
 Obsidian vault, or any directory on disk. Because it's files instead of chat history, work
 started in Cursor can be picked up in Claude Code, weeks later, on a different machine.
+
+The daily loop is five slash commands — [examples](#examples) show what you type.
 
 ## The problem
 
@@ -71,7 +73,7 @@ grounder link
 
 Both commands preview what they'll write and ask to confirm. Add `--yes` to skip the
 prompt or `--dry-run` to see the preview without writing. `--hooks` is optional and adds a
-one-line reminder at session start when a handoff exists — see
+one-line reminder at session start when a saved session exists — see
 [session-start hooks](https://github.com/andrej-kolic/grounder/blob/main/docs/session-hooks.md).
 
 ## Daily use
@@ -79,17 +81,36 @@ one-line reminder at session start when a handoff exists — see
 Work from your agent's chat. A session usually recalls first and checkpoints last; what
 happens in between is up to you.
 
-| Command                  | What it does                                        | CLI it runs                    |
-| ------------------------ | --------------------------------------------------- | ------------------------------ |
-| `/grounder-task`         | Pick up where the last session stopped              | `grounder handoff list --head` |
-| `/grounder-plan`         | Write or update a living plan that spans sessions   | `grounder plan`                |
-| `/grounder-search`       | Find prior context anywhere in this project's vault | `grounder search`              |
-| `/grounder-note`         | Save a one-off note                                 | `grounder note`                |
-| `/grounder-task-handoff` | Checkpoint the session before you close it          | `grounder handoff`             |
+| Command                  | CLI it runs                    |
+| ------------------------ | ------------------------------ |
+| `/grounder-task`         | `grounder handoff list --head` |
+| `/grounder-plan`         | `grounder plan`                |
+| `/grounder-search`       | `grounder search`              |
+| `/grounder-note`         | `grounder note`                |
+| `/grounder-task-handoff` | `grounder handoff`             |
 
 Anything after a slash command is an instruction, not file content — the agent turns it
 into the plan, note, or handoff Grounder expects. `/grounder-task` and
 `/grounder-task-handoff` need no text at all.
+
+### Examples
+
+A typical session:
+
+| You type | What it does |
+| -------- | ------------ |
+| `/grounder-task` | Resume the latest saved session |
+| `/grounder-plan save insights from this session as an implementation plan with steps` | Turn this session into a plan with steps |
+| `/grounder-search decisions and discussions on token refresh` | Find earlier writing on a topic you describe |
+| `/grounder-note explain why we rejected cookie sessions` | Write and save a note from your instruction |
+| `/grounder-task-handoff` | Save a short summary of this session so the next one can continue |
+
+Later, update the living plan or resume a named session:
+
+| You type | What it does |
+| -------- | ------------ |
+| `/grounder-plan update the auth rewrite plan — jwt validator is done` | Update an existing plan |
+| `/grounder-task resume the auth-middleware session` | Resume a specific saved session, not the latest |
 
 ### Demo
 
@@ -119,11 +140,11 @@ Three things, and that's the whole model:
     └── auth-rewrite.md                       ← living: updated in place
 ```
 
-`10-Projects/` is PARA naming, so Grounder slots into an existing Obsidian vault instead
-of fighting it. A **handoff** is the checkpoint one session leaves for the next — what got
-done, what's next, what's blocked — and they live under `logs/` because you accumulate one
-per session. `/grounder-task` resumes the newest usable handoff by default, but you can
-name any earlier session instead.
+`10-Projects/` is a common Obsidian vault convention, so Grounder slots into an existing vault instead
+of fighting it. A **handoff** is a saved session summary — what got done, what's next,
+what's blocked — and they live under `logs/` because you accumulate one per session.
+`/grounder-task` resumes the latest saved session by default, but you can name an earlier
+saved session instead.
 
 Here's the living plan, `plans/auth-rewrite.md`:
 
@@ -173,7 +194,7 @@ Full flags and behavior: **[CLI reference](https://github.com/andrej-kolic/groun
 
 Those are instructions you write once: stable rules about the project. Grounder stores
 what accumulates: what happened last session, what's next, the plan currently in flight.
-They're complements — `/grounder-task` reads the newest handoff *and* `AGENTS.md`.
+They're complements — `/grounder-task` reads the latest saved session *and* `AGENTS.md`.
 
 **Is this an MCP server?**
 
