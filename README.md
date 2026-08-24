@@ -114,8 +114,6 @@ Later, update the living plan or resume a named session:
 
 ![Daily-use session loop across the five slash commands](packages/demo-casts/out/readme.gif)
 
-Dim lines in the GIF are the real `grounder` CLI call behind each slash command.
-
 ## How it works
 
 Three things, and that's the whole model:
