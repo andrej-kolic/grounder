@@ -10,7 +10,7 @@ Session handoffs, plans, and notes in files you own.
   <img alt="Grounder connects Cursor, Claude Code, and more agents to one markdown vault through slash commands and the CLI. The vault is a folder tree: 10-Projects/your-project/ containing plans (updated in place), notes (one-off), and logs (session handoffs). Caption: Any agent. One vault. Only when you ask." src="docs/assets/what.svg">
 </picture>
 
-<p>&nbsp;</p>
+<div>&nbsp;</div>
 
 [![npm version](https://img.shields.io/npm/v/grounder.svg)](https://www.npmjs.com/package/grounder)
 [![CI](https://github.com/andrej-kolic/grounder/actions/workflows/ci.yml/badge.svg)](https://github.com/andrej-kolic/grounder/actions/workflows/ci.yml)
