@@ -8,7 +8,7 @@ pages are the reference material behind it.
 - [CLI reference](cli-reference.md) — every command and flag, plus `status` vs `doctor`
 - [Configuration](configuration.md) — machine config, `.grounder.json`, env vars, agent adapters
 - [Upgrading](upgrading.md) — `grounder migrate` and the shared runtime
-- [Session-start hooks](session-hooks.md) — the opt-in one-line handoff teaser
+- [Session-start hooks](session-hooks.md) — the opt-in saved-session reminder
 - [Troubleshooting](troubleshooting.md) — symptom → fix
 
 ## Design notes (contributors)

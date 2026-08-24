@@ -7,7 +7,7 @@ Session summaries, plans, and notes in files you own.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/what-dark.svg">
-  <img alt="Grounder connects Cursor, Claude Code, and more agents to one markdown vault through slash commands and the CLI. The vault is a folder tree: 10-Projects/your-project/ containing plans (updated in place), notes (one-off), and logs (session handoffs). Caption: Any agent. One vault. Only when you ask." src="docs/assets/what.svg">
+  <img alt="Grounder connects Cursor, Claude Code, and more agents to one markdown vault through slash commands and the CLI. The vault is a folder tree: 10-Projects/your-project/ containing plans (updated across sessions), notes (always a new file), and logs (saved session summaries). Caption: Any agent. One vault. Only when you ask." src="docs/assets/what.svg">
 </picture>
 
 <div>&nbsp;</div>
@@ -76,7 +76,7 @@ one-line reminder at session start when a saved session exists — see
 
 ## Daily use
 
-Work from your agent's chat. A session usually recalls first and checkpoints last; what
+Work from your agent's chat. A session usually resumes first and saves a summary last; what
 happens in between is up to you.
 
 | Command                  | CLI it runs                    |
@@ -172,13 +172,15 @@ Machine config, the link marker, and how commands find the project:
 
 ## Commands
 
-No agent, or want to write by hand? Every slash command is a plain CLI command:
+No agent, or want to write by hand? Every slash command is a plain CLI command.
+Unlike slash commands, you pass the file text (or search query) yourself — not an
+instruction for the agent.
 
 ```bash
 grounder plan $'# Goal\n\nShip it' --title auth-rewrite   # living plan
 grounder note "Investigate auth middleware"               # one-off note
 grounder handoff $'# Handoff: ...\n\n## Next\n1. ...'     # session checkpoint
-grounder search "token refresh"                           # rank matching files
+grounder search "token refresh"                           # find earlier writing on a topic
 grounder plan list                                        # also: note list, handoff list
 grounder status                                           # am I wired up?
 grounder doctor                                           # why isn't this working?
@@ -224,7 +226,7 @@ No. Nothing is written or loaded unless you ask. That's the point.
 - [CLI reference](docs/cli-reference.md) — every command and flag
 - [Configuration](docs/configuration.md) — machine config, `.grounder.json`, env vars, agent adapters
 - [Upgrading](docs/upgrading.md) — `grounder migrate` after a package upgrade
-- [Session-start hooks](docs/session-hooks.md) — the opt-in handoff teaser
+- [Session-start hooks](docs/session-hooks.md) — the opt-in saved-session reminder
 - [Troubleshooting](docs/troubleshooting.md) — symptom → fix
 - [Design notes](docs/README.md#design-notes-contributors) — for contributors
 
