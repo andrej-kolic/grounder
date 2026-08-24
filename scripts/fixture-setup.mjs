@@ -2,8 +2,8 @@
 
 process.stdout.write("fixtures/dev: ready\n");
 process.stdout.write("\nNext steps:\n");
-process.stdout.write("  pnpm grounder vault init ~/Documents/obsidian/dev --yes\n");
-process.stdout.write("  cd fixtures/dev && pnpm grounder init --yes\n");
+process.stdout.write("  pnpm grounder setup ~/Documents/obsidian/dev --yes --hooks\n");
+process.stdout.write("  cd fixtures/dev && pnpm grounder link --yes\n");
 process.stdout.write('  pnpm grounder note "hello from dev fixture"\n');
 process.stdout.write(
   '  pnpm grounder handoff "# Handoff\\n\\n## Next\\n1. Try /grounder-task next session"\n',

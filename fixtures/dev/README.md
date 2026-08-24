@@ -97,7 +97,7 @@ pnpm grounder handoff peek          # linked + handoff → one line; else silent
 
 The teaser never auto-loads the full handoff and never blocks a session — run `/grounder-task` only when you want the body.
 
-All four slash commands run through the symlinked runtime described above, so they always exercise this checkout's build — `pnpm build` after editing `src/` is enough; no re-run of `vault init` needed to pick up code changes. Re-run only after editing **templates** (`templates/agents/*/commands/*.md`), since template content is copied at install time:
+All four slash commands run through the symlinked runtime described above, so they always exercise this checkout's build — `pnpm build` after editing `src/` is enough; no re-run of `setup` needed to pick up code changes. Re-run only after editing **templates** (`templates/agents/*/commands/*.md`), since template content is copied at install time:
 
 ```bash
 pnpm grounder setup <path-to-your-vault> --force --yes --hooks
