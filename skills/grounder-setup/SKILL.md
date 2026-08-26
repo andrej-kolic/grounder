@@ -24,7 +24,7 @@ Adding this skill only loads these instructions. Running it is what installs the
 - Do not write a test note or handoff unless asked.
 - Skill present ≠ Grounder ready.
 
-The vault and `~/.grounder` live outside the project. Grant the shell whatever unrestricted / `all` permissions the host requires so those paths are reachable.
+The vault and `~/.grounder` live outside the project directory. If the host prompts for a permission scope, grant access to those two specific paths — the CLI needs to read and write there.
 
 ## 1. Environment and Grounder CLI
 
@@ -155,7 +155,7 @@ Do not invent a repair. Doctor already prints the fix after `→` on each `fail`
 
 These hints always print the literal word `grounder` — even if you're bootstrapping via `npx grounder`. Replace that prefix with your resolved `$GROUNDER` before running. Do not invent extra flags.
 
-A corrupt `~/.grounder/state.json` (unlike a corrupt `config.json`, section 2) is not self-healing: doctor's `install-state` hint reads `fix or remove ~/.grounder/state.json, then grounder migrate --force`. That file-removal instruction is doctor-sanctioned, not an invented repair — get approval, `rm` exactly that path (never `config.json`, never anything doctor didn't name), then run the `grounder migrate --force` half of the hint.
+A corrupt `~/.grounder/state.json` (unlike a corrupt `config.json`, section 2) is not self-healing: doctor's `install-state` hint reads `fix or remove ~/.grounder/state.json, then grounder migrate --force`. That file-removal instruction is doctor-sanctioned, not an invented repair. Scope is a single, exact, named file: after explicit user approval, `rm` that one literal path only — no wildcards, no other files, never `config.json`, never anything doctor didn't name — then run the `grounder migrate --force` half of the hint.
 
 `migrate` writes immediately (no confirm). Say the purpose line, then preview first:
 
