@@ -85,6 +85,9 @@ function composeStatusline(
   handoffLine: string | undefined,
   migrateNeeded: boolean,
 ): string | undefined {
+  if (handoffLine && migrateNeeded) {
+    return `${handoffLine} · ${MIGRATE_NOTICE}`;
+  }
   if (handoffLine) {
     return handoffLine;
   }

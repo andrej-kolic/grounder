@@ -283,7 +283,9 @@ body
       runStatuslineWithOptions({ cwd: env.repo, homeDir: env.home, sessionId: "session-a" }),
     );
 
-    expect(first.out).toBe('[grounder] handoff: "auth" (2026-06-26) → /grounder-task\n');
+    expect(first.out).toBe(
+      '[grounder] handoff: "auth" (2026-06-26) → /grounder-task · [grounder] install outdated — run: grounder migrate\n',
+    );
     expect(second.out).toBe("[grounder] install outdated — run: grounder migrate\n");
   });
 
@@ -347,7 +349,7 @@ body
     expect(second.stdout).toBe("");
   });
 
-  it("prefers the handoff line over the migrate notice when both apply", async () => {
+  it("combines the handoff line and the migrate notice when both apply", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -379,6 +381,53 @@ body
     );
 
     expect(code).toBe(0);
-    expect(out).toBe('[grounder] handoff: "auth" (2026-06-26) → /grounder-task\n');
+    expect(out).toBe(
+      '[grounder] handoff: "auth" (2026-06-26) → /grounder-task · [grounder] install outdated — run: grounder migrate\n',
+    );
+  });
+
+  it("shows the migrate notice when only the recorded package version is stale (schemas current)", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    // Schemas match current (see agents/cursor.ts) so only grounderVersion is stale.
+    await writeGrounderState(
+      {
+        grounderVersion: "0.0.1",
+        agents: { cursor: { commandsSchema: 3, hooksSchema: 1, files: {} } },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runStatuslineWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe("[grounder] install outdated — run: grounder migrate\n");
+  });
+
+  it("stays silent when the recorded package version is newer than this Grounder (behind)", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    await writeGrounderState(
+      {
+        grounderVersion: "999.0.0",
+        agents: { cursor: { commandsSchema: 3, hooksSchema: 1, files: {} } },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runStatuslineWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe("");
   });
 });
