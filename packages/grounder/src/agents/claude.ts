@@ -9,6 +9,7 @@ import {
   isGrounderPeekHookCommand,
   isHookRuntimeStale,
   peekHookCommand,
+  runtimeInvocation,
 } from "./hook-runtime.js";
 import { installCommandFile, recordCommandFileHashes } from "./install-command.js";
 import type {
@@ -35,6 +36,28 @@ const COMMANDS = [
  */
 export function claudePeekHookCommand(homeDir?: string): string {
   return peekHookCommand(homeDir);
+}
+
+/**
+ * Canonical `statusLine` command for Claude Code (home-local runtime).
+ * `statusLine` is a Claude Code–only concept (Cursor has no equivalent), so
+ * this is built directly rather than through a cross-agent helper.
+ */
+export function claudeStatuslineCommand(homeDir?: string): string {
+  return [runtimeInvocation(homeDir), "statusline"].join(" ");
+}
+
+/**
+ * True when `command` is Grounder's `statusline` command (home-runtime form).
+ * Used so upgrades replace the old entry instead of clobbering a user's own
+ * custom `statusLine` — see {@link mergeClaudeStatusline}.
+ */
+function isGrounderStatuslineCommand(command: unknown): boolean {
+  if (typeof command !== "string") {
+    return false;
+  }
+  const normalized = command.trim().replace(/\\/g, "/");
+  return normalized.includes("/.grounder/runtime/dist/cli.js") && /\bstatusline\b/.test(normalized);
 }
 
 /**
@@ -78,11 +101,12 @@ export function expectedHookArtifacts(homeDir?: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Session-start hook install (~/.claude/settings.json)
+// Session-start hook + statusLine install (~/.claude/settings.json)
 //
-// Claude Code settings are a shared JSON object. Grounder only owns one nested
-// command entry; unrelated keys (permissions, other hook events, etc.) must
-// survive merge. Relevant shape after install (path varies by home / Node):
+// Claude Code settings are a shared JSON object. Grounder only owns two
+// nested paths; unrelated keys (permissions, other hook events, a statusLine
+// someone else set, etc.) must survive merge. Relevant shape after install
+// (path varies by home / Node):
 //
 //   {
 //     "hooks": {
@@ -97,6 +121,10 @@ export function expectedHookArtifacts(homeDir?: string): string[] {
 //           ]
 //         }
 //       ]
+//     },
+//     "statusLine": {
+//       "type": "command",
+//       "command": "'/path/to/node' '/path/to/.grounder/runtime/dist/cli.js' statusline"
 //     }
 //   }
 //
@@ -106,8 +134,16 @@ export function expectedHookArtifacts(homeDir?: string): string[] {
 //   - SessionStart       → hooks.SessionStart (array of matcher groups)
 //   - matcher group      → { matcher, hooks: Hook[] }
 //   - hook entry         → { type: "command", command: string }
+//   - statusLine         → settings.statusLine ({ type, command } — a single
+//                          global slot, not an array like SessionStart)
 //
-// Idempotency: {@link isGrounderPeekHookCommand} (runtime path or legacy npx).
+// Idempotency: {@link isGrounderPeekHookCommand} (runtime path or legacy npx),
+// {@link isGrounderStatuslineCommand}.
+//
+// statusLine is a single slot: unlike SessionStart's matcher-group array,
+// Grounder can't "append" alongside someone else's statusLine. If one is
+// already configured and it isn't Grounder's, {@link mergeClaudeStatusline}
+// leaves it untouched (unless `--force`) rather than clobbering it.
 // ---------------------------------------------------------------------------
 
 function peekHookEntry(homeDir?: string): { type: "command"; command: string } {
@@ -200,6 +236,60 @@ async function peekHookUpToDate(filePath: string, homeDir?: string): Promise<boo
   }
 }
 
+function statuslineEntry(homeDir?: string): { type: "command"; command: string } {
+  return { type: "command", command: claudeStatuslineCommand(homeDir) };
+}
+
+/** True when `settings.statusLine` is present and is *not* Grounder's own command. */
+function hasForeignStatusline(current: Record<string, unknown>): boolean {
+  const statusLine = current.statusLine;
+  if (statusLine === undefined) {
+    return false;
+  }
+  if (!statusLine || typeof statusLine !== "object" || Array.isArray(statusLine)) {
+    return true;
+  }
+  return !isGrounderStatuslineCommand((statusLine as Record<string, unknown>).command);
+}
+
+/**
+ * Up to date when `settings.statusLine` already points at Grounder's command,
+ * or — since this is a single global slot Grounder must not clobber — when a
+ * *different* statusLine is already configured (nothing we'd change either way).
+ */
+async function statuslineUpToDate(filePath: string, homeDir?: string): Promise<boolean> {
+  try {
+    const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return false;
+    }
+    const current = parsed as Record<string, unknown>;
+    if (hasForeignStatusline(current)) {
+      return true;
+    }
+    const statusLine = current.statusLine as { command?: unknown } | undefined;
+    return statusLine?.command === claudeStatuslineCommand(homeDir);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Merge Grounder's `statusLine` command into settings, unless a *different*
+ * statusLine is already configured — never silently replace a user's own
+ * (or another tool's) statusLine. `force` overrides that protection.
+ */
+function mergeClaudeStatusline(
+  current: Record<string, unknown>,
+  homeDir: string | undefined,
+  force: boolean,
+): Record<string, unknown> {
+  if (!force && hasForeignStatusline(current)) {
+    return current;
+  }
+  return { ...current, statusLine: statuslineEntry(homeDir) };
+}
+
 /**
  * Deep-merge Grounder's SessionStart hook into an existing settings object.
  *
@@ -260,19 +350,23 @@ function mergeClaudeHooks(
 }
 
 /**
- * Install (or refresh) Grounder's SessionStart teaser hook into `~/.claude/settings.json`.
+ * Install (or refresh) Grounder's SessionStart teaser hook and `statusLine`
+ * into `~/.claude/settings.json`.
  *
  * Also materializes `~/.grounder/runtime` (see {@link installHookRuntime}).
  *
  * Force semantics:
- * - Up-to-date canonical entry + fresh runtime and `force` false → skip
+ * - Up-to-date canonical entries + fresh runtime and `force` false → skip
  * - Otherwise → refresh runtime + merge host config
+ * - `force` also lets `statusLine` replace a different, non-Grounder command
+ *   (normally left untouched — see {@link mergeClaudeStatusline})
  *
  * Unparseable settings.json: {@link mergeJsonFile} backs off and this throws (never clobbers).
  */
 async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResult> {
   const dest = claudeSettingsJsonPath(opts.homeDir);
-  const upToDate = await peekHookUpToDate(dest, opts.homeDir);
+  const upToDate =
+    (await peekHookUpToDate(dest, opts.homeDir)) && (await statuslineUpToDate(dest, opts.homeDir));
 
   if (upToDate && !opts.force) {
     return { artifacts: { [dest]: "skipped" } };
@@ -288,7 +382,11 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
   await installHookRuntime({ homeDir: opts.homeDir });
   const fileExisted = await fileExists(dest);
   const hadGrounderEntry = fileExisted && (await peekHookHadGrounderEntry(dest));
-  const result = await mergeJsonFile(dest, (current) => mergeClaudeHooks(current, opts.homeDir));
+  const force = opts.force ?? false;
+  const result = await mergeJsonFile(dest, (current) => {
+    const withHooks = mergeClaudeHooks(current, opts.homeDir);
+    return mergeClaudeStatusline(withHooks, opts.homeDir, force);
+  });
 
   if (!result.ok) {
     throw new Error(result.message);
@@ -302,7 +400,7 @@ export const claude: AgentAdapter = {
   id: "claude",
   name: "Claude Code",
   commandsSchema: 3,
-  hooksSchema: 1,
+  hooksSchema: 2,
 
   async isInstalled(): Promise<boolean> {
     return fileExists(path.join(resolveHomeDir(), ".claude"));

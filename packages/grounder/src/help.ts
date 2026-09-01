@@ -231,6 +231,13 @@ Subcommands:
           ({ additional_context } or {})`,
   },
   {
+    id: "statusline",
+    group: "Advanced",
+    summary: "One-line latest-handoff status (used by Claude Code's statusLine)",
+    listUsage: "statusline",
+    usage: "grounder statusline",
+  },
+  {
     id: "help",
     group: "Maintain",
     summary: "Show help (full reference / per-command)",
@@ -260,6 +267,7 @@ export const DISPATCHED_COMMAND_IDS = [
   "handoff",
   "handoff list",
   "handoff peek",
+  "statusline",
   "plan",
   "plan list",
   "search",

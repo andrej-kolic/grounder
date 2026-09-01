@@ -3,6 +3,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { runStatusline } from "./agents/claude-statusline.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runHandoffList } from "./commands/handoff/list.js";
 import { runHandoffPeek } from "./commands/handoff/peek.js";
@@ -71,6 +72,7 @@ async function main(): Promise<void> {
   const skipUpgradeBanner =
     wantsHelp(args) ||
     (command === "handoff" && rest[0] === "peek") ||
+    command === "statusline" ||
     command === "migrate" ||
     command === "setup";
   if (!skipUpgradeBanner) {
@@ -132,6 +134,10 @@ async function main(): Promise<void> {
 
   if (command === "status") {
     process.exit(await runStatus(rest));
+  }
+
+  if (command === "statusline") {
+    process.exit(await runStatusline(rest));
   }
 
   if (command === "doctor") {

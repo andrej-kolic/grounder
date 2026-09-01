@@ -6,6 +6,7 @@ import {
   claude,
   claudePeekHookCommand,
   claudeSettingsJsonPath,
+  claudeStatuslineCommand,
   expectedHookArtifacts,
 } from "../../src/agents/claude.js";
 import { createTempEnv } from "../helpers.js";
@@ -58,6 +59,7 @@ describe("agents/claude hooks", () => {
             },
           ],
         },
+        statusLine: { type: "command", command: claudeStatuslineCommand(env.home) },
       });
     });
 
@@ -117,6 +119,7 @@ describe("agents/claude hooks", () => {
             },
           ],
         },
+        statusLine: { type: "command", command: claudeStatuslineCommand(env.home) },
       });
     });
 
@@ -156,6 +159,7 @@ describe("agents/claude hooks", () => {
             },
           ],
         },
+        statusLine: { type: "command", command: claudeStatuslineCommand(env.home) },
       });
     });
 
@@ -203,6 +207,7 @@ describe("agents/claude hooks", () => {
             },
           ],
         },
+        statusLine: { type: "command", command: claudeStatuslineCommand(env.home) },
       });
     });
 
@@ -245,6 +250,7 @@ describe("agents/claude hooks", () => {
             },
           ],
         },
+        statusLine: { type: "command", command: claudeStatuslineCommand(env.home) },
       });
     });
 
@@ -259,11 +265,90 @@ describe("agents/claude hooks", () => {
 
       const written = JSON.parse(await readFile(dest, "utf8")) as {
         hooks: { SessionStart: Array<{ hooks: unknown[] }> };
+        statusLine: { command: string };
       };
       expect(written.hooks.SessionStart).toHaveLength(1);
       expect(written.hooks.SessionStart[0]?.hooks).toEqual([
         { type: "command", command: claudePeekHookCommand(env.home) },
       ]);
+      expect(written.statusLine.command).toBe(claudeStatuslineCommand(env.home));
+    });
+
+    it("leaves a foreign statusLine untouched without force", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(
+        dest,
+        `${JSON.stringify(
+          { statusLine: { type: "command", command: "~/.claude/my-custom-statusline.sh" } },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const result = await claude.installHooks?.({ homeDir: env.home });
+
+      expect(result?.artifacts[dest]).toBe("created");
+      const written = JSON.parse(await readFile(dest, "utf8")) as {
+        statusLine: { command: string };
+      };
+      expect(written.statusLine.command).toBe("~/.claude/my-custom-statusline.sh");
+    });
+
+    it("replaces a foreign statusLine when force is true", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(
+        dest,
+        `${JSON.stringify(
+          { statusLine: { type: "command", command: "~/.claude/my-custom-statusline.sh" } },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const result = await claude.installHooks?.({ homeDir: env.home, force: true });
+
+      // "created", not "overwritten": the label reflects whether Grounder's own
+      // hook entry pre-existed (it didn't) — same as any other file that already
+      // had unrelated content before Grounder's first write to it.
+      expect(result?.artifacts[dest]).toBe("created");
+      const written = JSON.parse(await readFile(dest, "utf8")) as {
+        statusLine: { command: string };
+      };
+      expect(written.statusLine.command).toBe(claudeStatuslineCommand(env.home));
+    });
+
+    it("refreshes a stale statusLine command in place without force", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      await claude.installHooks?.({ homeDir: env.home });
+      await writeFile(
+        dest,
+        JSON.stringify({
+          ...JSON.parse(await readFile(dest, "utf8")),
+          statusLine: {
+            type: "command",
+            command: `${claudeStatuslineCommand(env.home)} --stale`,
+          },
+        }),
+      );
+
+      const result = await claude.installHooks?.({ homeDir: env.home });
+
+      expect(result?.artifacts[dest]).toBe("overwritten");
+      const written = JSON.parse(await readFile(dest, "utf8")) as {
+        statusLine: { command: string };
+      };
+      expect(written.statusLine.command).toBe(claudeStatuslineCommand(env.home));
     });
 
     it("backs off without clobbering malformed settings.json", async () => {

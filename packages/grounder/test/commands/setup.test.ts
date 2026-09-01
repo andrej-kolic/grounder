@@ -360,7 +360,7 @@ describe("commands/setup", () => {
           },
           claude: {
             commandsSchema: 3,
-            hooksSchema: 1,
+            hooksSchema: 2,
             files: await expectedFileLedger(claude.expectedArtifacts(env.home)),
           },
         },
