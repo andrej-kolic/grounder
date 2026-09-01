@@ -467,4 +467,32 @@ body
     expect(code).toBe(0);
     expect(out).toBe("[grounder] Install outdated — run: grounder migrate.\n");
   });
+
+  it("stays silent on a stale grounderVersion alone (schemas current) — schema-only by design", async () => {
+    // docs/architecture/schema-versioning.md: "Schemas vs package version
+    // (keep separate)" — peek must not nag "run migrate" for a plain package
+    // bump; that can also mean "upgrade Grounder", which is the CLI banner's
+    // job, not peek's. Regression guard for mixing this into a shared helper
+    // that `grounder statusline` also uses.
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    // Schemas match current (see agents/cursor.ts) so only grounderVersion is stale.
+    await writeGrounderState(
+      {
+        grounderVersion: "0.0.1",
+        agents: { cursor: { commandsSchema: 3, hooksSchema: 1, files: {} } },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runHandoffPeekWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe("");
+  });
 });

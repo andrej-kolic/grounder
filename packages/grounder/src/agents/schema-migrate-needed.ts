@@ -1,17 +1,20 @@
-import { packageVersionNotice } from "../commands/package-version-notice.js";
 import { isInstallSchemaStale, readGrounderState } from "../connector/state.js";
-import { VERSION } from "../index.js";
 import { ALL_AGENTS } from "./index.js";
 
 /**
- * Whether `grounder migrate` is needed, per `~/.grounder/state.json` alone —
- * does not open agent config files. True when either:
- *  - an installed agent's on-disk artifacts are behind Grounder's current
- *    command/hook schema versions, or
- *  - the recorded `grounderVersion` disagrees with the running Grounder in a
- *    way `migrate` fixes (relation `ahead` or `differs` — a `behind` relation
- *    means this Grounder is older than the config and needs an *upgrade*
- *    instead, which is a different notice callers here don't surface).
+ * Whether any installed agent's on-disk artifacts are behind Grounder's
+ * current command/hook schema versions — i.e. `grounder migrate` is needed.
+ * Only looks at `~/.grounder/state.json` — does not open agent config files.
+ *
+ * Schema-only by design — see "Schemas vs package version (keep separate)" in
+ * docs/architecture/schema-versioning.md. Shared by `handoff peek` and
+ * `grounder statusline`: both must never nag "run migrate" for a plain
+ * package bump (that can also mean "upgrade Grounder", a different action the
+ * CLI banner already owns) — and, since both run via the materialized
+ * `~/.grounder/runtime` copy, a `grounderVersion`-based check can't reliably
+ * see a newer Grounder anyway (the copy's baked `VERSION` and the recorded
+ * `grounderVersion` are always stamped together by the same `setup`/`migrate`
+ * run). See that doc for the fuller reasoning.
  *
  * If hooks were never enabled (no hooks version in state), that is not "out
  * of date" here. Doctor is the place that checks whether hook files exist on
@@ -20,14 +23,7 @@ import { ALL_AGENTS } from "./index.js";
 export async function schemaMigrateNeeded(homeDir?: string): Promise<boolean> {
   try {
     const state = await readGrounderState(homeDir);
-    if (isInstallSchemaStale(state, ALL_AGENTS)) {
-      return true;
-    }
-    if (!state) {
-      return false;
-    }
-    const notice = packageVersionNotice(VERSION, state.grounderVersion);
-    return notice !== null && notice.relation !== "behind";
+    return isInstallSchemaStale(state, ALL_AGENTS);
   } catch {
     return false;
   }

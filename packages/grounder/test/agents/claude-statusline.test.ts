@@ -386,7 +386,7 @@ body
     );
   });
 
-  it("shows the migrate notice when only the recorded package version is stale (schemas current)", async () => {
+  it("stays silent on a stale grounderVersion alone (schemas current) — schema-only, same as peek", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -396,28 +396,6 @@ body
     await writeGrounderState(
       {
         grounderVersion: "0.0.1",
-        agents: { cursor: { commandsSchema: 3, hooksSchema: 1, files: {} } },
-      },
-      env.home,
-    );
-
-    const { code, out } = await captureStdout(() =>
-      runStatuslineWithOptions({ cwd: env.repo, homeDir: env.home }),
-    );
-
-    expect(code).toBe(0);
-    expect(out).toBe("[grounder] install outdated — run: grounder migrate\n");
-  });
-
-  it("stays silent when the recorded package version is newer than this Grounder (behind)", async () => {
-    const env = await createTempEnv({ packageName: "my-app" });
-    cleanup = env.cleanup;
-
-    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
-    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
-    await writeGrounderState(
-      {
-        grounderVersion: "999.0.0",
         agents: { cursor: { commandsSchema: 3, hooksSchema: 1, files: {} } },
       },
       env.home,

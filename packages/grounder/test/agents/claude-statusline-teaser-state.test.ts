@@ -73,4 +73,38 @@ describe("agents/claude-statusline-teaser-state", () => {
     const remaining = await readdir(dir);
     expect(remaining.sort()).toEqual(["session-a", "session-b"]);
   });
+
+  it("keeps suppressing a session whose own marker has aged past the prune window", async () => {
+    // Regression guard: a session left open (or resumed) for >24h must stay
+    // suppressed, per docs/session-hooks.md ("stays suppressed across a
+    // resume too"). Before the mtime refresh, the next check would prune the
+    // session's own stale-looking marker and show the teaser again.
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    expect(await isFirstHandoffTeaserRender("session-a", env.home)).toBe(true);
+
+    const dir = path.join(env.home, ".grounder", "tmp", CLAUDE_AGENT_ID, "statusline-seen");
+    const file = path.join(dir, "session-a");
+    const oldTime = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    await utimes(file, oldTime, oldTime);
+
+    expect(await isFirstHandoffTeaserRender("session-a", env.home)).toBe(false);
+    const remaining = await readdir(dir);
+    expect(remaining).toEqual(["session-a"]);
+  });
+
+  it("treats a session id outside the safe charset as never-persisted (always shows, touches no file)", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    const unsafeIds = ["../escape", "a/b", "..", ".", ""];
+    for (const id of unsafeIds) {
+      expect(await isFirstHandoffTeaserRender(id, env.home)).toBe(true);
+      expect(await isFirstHandoffTeaserRender(id, env.home)).toBe(true);
+    }
+
+    const dir = path.join(env.home, ".grounder", "tmp", CLAUDE_AGENT_ID, "statusline-seen");
+    await expect(readdir(dir)).rejects.toThrow();
+  });
 });

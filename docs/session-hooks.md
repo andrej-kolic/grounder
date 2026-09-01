@@ -42,6 +42,13 @@ notice isn't gated by this — it re-checks `state.json` fresh on every render, 
 clears on its own the next time `statusLine` renders after you run `grounder migrate`
 (even from a different terminal).
 
+Like the `SessionStart` teaser above, `statusLine`'s install-outdated notice checks
+schema drift only — see
+[Schema versioning](architecture/schema-versioning.md#schemas-vs-package-version-keep-separate).
+It does not also flag a stale recorded `grounderVersion` alone: both hooks run via the
+materialized `~/.grounder/runtime` copy, where a `grounderVersion` comparison can't
+reliably tell you anything a schema check doesn't already cover (see that doc for why).
+
 ## What hooks do not do
 
 - They never auto-load the full handoff body into context

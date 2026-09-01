@@ -1,4 +1,3 @@
-import { schemaMigrateNeeded } from "../agents/schema-migrate-needed.js";
 import { withHomeDir } from "../connector/home.js";
 import { resolveLinkedProject } from "../connector/linked.js";
 import { resolveLogsDir } from "../connector/vault.js";
@@ -6,6 +5,7 @@ import { helpExitCode } from "../help.js";
 import { readStdinWithTimeout } from "../util/read-stdin.js";
 import { resolveCurrentHandoffLabel } from "../vault/current-handoff.js";
 import { isFirstHandoffTeaserRender } from "./claude-statusline-teaser-state.js";
+import { schemaMigrateNeeded } from "./schema-migrate-needed.js";
 
 /** Max wait for Claude Code's statusLine JSON on stdin before giving up. */
 const STDIN_TIMEOUT_MS = 200;
@@ -122,9 +122,12 @@ export async function runStatusline(argv: string[]): Promise<number> {
  *
  * The handoff line only shows on the session's first render (see
  * {@link isFirstHandoffTeaserRender}) — a one-time "heads up", not a
- * permanent fixture. The migrate notice is not gated by this: `state.json` is
- * re-read fresh on every call, so it tracks reality live (e.g. it clears on
- * the next render after `grounder migrate` runs in another terminal).
+ * permanent fixture. The session-marker check runs *before* resolving the
+ * project/vault, so a suppressed render skips that I/O entirely instead of
+ * walking the vault only to throw the result away.
+ * The migrate notice is not gated by this: `state.json` is re-read fresh on
+ * every call, so it tracks reality live (e.g. it clears on the next render
+ * after `grounder migrate` runs in another terminal).
  * Uses {@link resolveLinkedProject} directly (not `requireLinkedProject`) so failures stay silent.
  * @returns Always `0`.
  */
@@ -132,22 +135,22 @@ export async function runStatuslineWithOptions(options: StatuslineOptions = {}):
   try {
     return await withHomeDir(options.homeDir, async () => {
       let handoffLine: string | undefined;
-      try {
-        const resolved = await resolveLinkedProject(options.cwd ?? process.cwd());
-        if (resolved.ok) {
-          const logsDir = resolveLogsDir(resolved.value.home, resolved.value.repo);
-          const current = await resolveCurrentHandoffLabel(logsDir);
-          if (current) {
-            const shouldShow = options.sessionId
-              ? await isFirstHandoffTeaserRender(options.sessionId, options.homeDir)
-              : true;
-            if (shouldShow) {
+      const shouldCheckHandoff = options.sessionId
+        ? await isFirstHandoffTeaserRender(options.sessionId, options.homeDir)
+        : true;
+      if (shouldCheckHandoff) {
+        try {
+          const resolved = await resolveLinkedProject(options.cwd ?? process.cwd());
+          if (resolved.ok) {
+            const logsDir = resolveLogsDir(resolved.value.home, resolved.value.repo);
+            const current = await resolveCurrentHandoffLabel(logsDir);
+            if (current) {
               handoffLine = `[grounder] handoff: "${current.label}" (${current.createdDate}) → /grounder-task`;
             }
           }
+        } catch {
+          handoffLine = undefined;
         }
-      } catch {
-        handoffLine = undefined;
       }
 
       const migrateNeeded = await schemaMigrateNeeded(options.homeDir);

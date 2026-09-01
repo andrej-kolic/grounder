@@ -47,6 +47,7 @@ Maintain
 
 Advanced
   grounder handoff peek         One-line latest-handoff teaser (session hooks)
+  grounder statusline           One-line latest-handoff status (Claude Code statusLine)
 ```
 
 Where output lands:
@@ -70,7 +71,7 @@ in place (preserving `created`), while `note` and `handoff` always write a new d
 | `--id <id>`      | `link`                          | Override detected project id                                                                      |
 | `--vault <path>` | `link`                          | Override home vault root for this run                                                             |
 | `--agent <id>`   | `setup`, `migrate`              | Install for a specific agent (repeatable; default: auto-detect). Supported: `cursor`, `claude`    |
-| `--hooks`        | `setup`, `migrate`              | Also install session-start teaser hooks (opt-in; see [Session-start hooks](session-hooks.md)) |
+| `--hooks`        | `setup`, `migrate`              | Also install session-start teaser hooks — and, on Claude Code, the `statusLine` command (opt-in; see [Session-start hooks](session-hooks.md)) |
 
 Both `setup` and `link` preview what they'll write and ask to confirm; add `--yes` to
 skip the prompt (e.g. in scripts), or `--dry-run` to print the same preview without

@@ -1,4 +1,4 @@
-import { mkdir, readdir, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, stat, unlink, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { resolveHomeDir } from "../connector/home.js";
 
@@ -31,6 +31,20 @@ import { resolveHomeDir } from "../connector/home.js";
 
 /** Marker files older than this are pruned opportunistically on every check. */
 const MARKER_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * `session_id` becomes a filename (`seenDir()/<sessionId>`) with no further
+ * escaping, so it's constrained to a safe charset before it ever touches
+ * disk — no `/`, and not the literal `.`/`..` (which `path.join` would
+ * resolve outside `seenDir()` even without a slash). Claude Code's ids are
+ * UUIDs, well inside this, but the value arrives over stdin so it's treated
+ * as untrusted.
+ */
+const SAFE_SESSION_ID = /^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,127}$/;
+
+function isSafeSessionId(sessionId: string): boolean {
+  return SAFE_SESSION_ID.test(sessionId);
+}
 
 /**
  * Mirrors `claude.id` in `agents/claude.ts` — kept as a literal (not imported)
@@ -74,6 +88,17 @@ async function pruneStaleMarkers(dir: string): Promise<void> {
  * effect (atomic create-exclusive write), so every later call for the same
  * `sessionId` returns `false`.
  *
+ * When the marker already exists, its mtime is refreshed on every call
+ * instead of left untouched — otherwise a session left open (or resumed)
+ * past {@link MARKER_MAX_AGE_MS} would have its own marker swept by
+ * {@link pruneStaleMarkers} and the teaser would reappear mid-session, which
+ * contradicts "stays suppressed across a resume" (docs/session-hooks.md).
+ * The refresh is a plain `utimes`, not a full prune pass, so a hot "already
+ * seen" call stays cheap.
+ *
+ * A `sessionId` outside {@link SAFE_SESSION_ID} never touches disk — it's
+ * treated like a filesystem error (see below).
+ *
  * Never throws. On any filesystem error, returns `true` (show it) — favors
  * an extra render of the teaser over a permanently stuck "never shows again".
  */
@@ -81,10 +106,25 @@ export async function isFirstHandoffTeaserRender(
   sessionId: string,
   homeDir?: string,
 ): Promise<boolean> {
+  if (!isSafeSessionId(sessionId)) {
+    return true;
+  }
+
   const dir = seenDir(homeDir);
   const file = path.join(dir, sessionId);
   try {
     await mkdir(dir, { recursive: true });
+
+    try {
+      const now = new Date();
+      await utimes(file, now, now);
+      return false;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw err;
+      }
+    }
+
     await pruneStaleMarkers(dir);
     await writeFile(file, "", { flag: "wx" });
     return true;

@@ -120,6 +120,7 @@ Three channels, no new product surface:
 | --- | --- |
 | **`grounder doctor` / `status`** | Checks install state. Schema stale → warn + migrate. Schema too new → fail (upgrade grounder). Also shows package mismatch when present. Missing/non-executable Node in hooks or commands → fail + migrate ([details](./runtime-invocation.md)). |
 | **Session hook / `handoff peek`** | Checks **schemas only**. One-line teaser: `Install outdated — run: grounder migrate`. No auto-migrate. |
+| **`grounder statusline`** (Claude Code `statusLine`) | Checks **schemas only**, same helper as peek (`schemaMigrateNeeded`). See below for why it doesn't also check `grounderVersion`. |
 | **CLI upgrade banner** | Checks **`grounderVersion` only**. Package newer → migrate. Package older → install a newer Grounder. Skipped for peek, migrate, and setup. |
 
 #### Schemas vs package version (keep separate)
@@ -135,15 +136,34 @@ Why peek ignores `grounderVersion`: peek always says “run migrate.” But a pa
 
 For maintainers: bumping the package version is **not** enough for session hooks to warn. Bump the adapter schema when install output changes. That is what peek looks at.
 
+`grounder statusline` also stays schema-only, sharing `schemaMigrateNeeded` with peek —
+not just for the "package mismatch can mean upgrade, not migrate" reason above, but
+because a `grounderVersion` check is unreliable from where statusline actually runs.
+Both `statusline` and peek execute via the materialized copy at
+`~/.grounder/runtime/dist/cli.js` (see [Runtime invocation](./runtime-invocation.md)),
+not the ambient `grounder` the user typed. For a **symlink** install (durable source:
+global/monorepo), that copy's `VERSION` is always live-current, so it would fire on
+every upgrade the user hasn't migrated yet — mostly a harmless "just stamps the
+version" case. For a **copy** install (bare `npx`), the copy's baked `VERSION` and the
+recorded `grounderVersion` are always stamped together by the same `setup`/`migrate`
+run, so the comparison can never observe a newer release existing — the one case this
+check exists for. Net effect: noisy for the harmless case, silent for the case that
+matters. `grounder doctor` and the CLI upgrade banner run via genuine ambient
+resolution instead, so they're the correct place for a `grounderVersion` signal — see
+[Runtime invocation](./runtime-invocation.md) for the symlink/copy distinction.
+
 ```mermaid
 flowchart TD
   Upgrade["User upgrades grounder package"] --> NextRun["Next grounder command"]
   NextRun --> Banner["stderr: package vs ledger"]
   NextRun --> Hook["Session peek: schema only"]
+  NextRun --> Status["statusline: schema only"]
   NextRun --> Doctor["grounder doctor"]
   Hook --> Teaser["Install outdated teaser"]
+  Status --> Bar["Install outdated status line"]
   Doctor --> Warn["warn: schema and/or package"]
   Teaser --> Migrate["grounder migrate"]
+  Bar --> Migrate
   Warn --> Migrate
   Banner --> Migrate
   Migrate --> Owned["Owned JSON / runtime: always refresh"]
@@ -165,13 +185,14 @@ flowchart TD
 | `grounder migrate` | `commands/migrate.ts` |
 | Doctor / status checks | `commands/doctor.ts`, `commands/status.ts` |
 | Peek teaser | `commands/handoff/peek.ts` |
+| `statusline` command | `agents/claude-statusline.ts` — shares `schemaMigrateNeeded` with peek |
 | Upgrade banner | `commands/upgrade-banner.ts`, `commands/package-version-notice.ts`, `util/semver.ts`, wired from `cli.ts` |
 
 ## Rejected alternatives
 
 - **Only `setup --force` for upgrades** — wrong verb; requires vault path; trains users to force-clobber.
 - **Auto-migrate from the session hook** — hooks must stay fast and side-effect-free.
-- **Make peek also check `grounderVersion`** — peek can only say “run migrate,” but package mismatch sometimes means “upgrade grounder.” Keep schema and package checks separate (see above).
+- **Make peek (or statusline) also check `grounderVersion`** — peek can only say “run migrate,” but package mismatch sometimes means “upgrade grounder.” Keep schema and package checks separate (see above). Tried making statusline the exception (checking both); reverted — see above for why a `grounderVersion` check is actively misleading from the runtime-copy execution path both peek and statusline use.
 - **Name the command `upgrade`** — confuses with upgrading the npm package itself.
 - **Compare on-disk files to shipped templates** — rendered output is machine-specific (`{{GROUNDER_CLI}}`); only “bytes we last wrote” is a valid hash baseline.
 - **Content sniffing for every future migration** — does not scale; ledger + integer schemas replace one-off detectors after the legacy bootstrap.
