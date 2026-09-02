@@ -467,4 +467,99 @@ body
     expect(code).toBe(0);
     expect(out).toBe("[grounder] Install outdated — run: grounder migrate.\n");
   });
+
+  it("stays silent on a stale grounderVersion alone (schemas current) — schema-only by design", async () => {
+    // docs/architecture/schema-versioning.md: "Schemas vs package version
+    // (keep separate)" — peek must not nag "run migrate" for a plain package
+    // bump; that can also mean "upgrade Grounder", which is the CLI banner's
+    // job, not peek's.
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    // Schemas match current (see agents/cursor.ts) so only grounderVersion is stale.
+    await writeGrounderState(
+      {
+        grounderVersion: "0.0.1",
+        agents: { cursor: { commandsSchema: 3, hooksSchema: 1, files: {} } },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runHandoffPeekWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe("");
+  });
+
+  it("collapses embedded newlines/whitespace in the title to single spaces", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
+    await mkdir(logsDir, { recursive: true });
+    // `\n` here is the YAML double-quoted escape (two literal chars in the
+    // file) that parseHandoffFrontmatter unescapes into a real newline —
+    // exercising the same "control char embedded in title" case sanitizeLabel
+    // guards against.
+    await writeFile(
+      path.join(logsDir, "2026-06-26-150000-auth.md"),
+      `---
+created: "2026-06-26T15:00:00.000Z"
+title: "auth   fix\\nfor login"
+---
+
+body
+`,
+      "utf8",
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runHandoffPeekWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe(
+      '[grounder] Latest handoff: "auth fix for login" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n',
+    );
+  });
+
+  it("truncates an unusually long title with an ellipsis", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
+    await mkdir(logsDir, { recursive: true });
+    const longTitle = "x".repeat(200);
+    await writeFile(
+      path.join(logsDir, "2026-06-26-150000-auth.md"),
+      `---
+created: "2026-06-26T15:00:00.000Z"
+title: "${longTitle}"
+---
+
+body
+`,
+      "utf8",
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runHandoffPeekWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    const expectedLabel = `${"x".repeat(79)}…`;
+    expect(out).toBe(
+      `[grounder] Latest handoff: "${expectedLabel}" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n`,
+    );
+  });
 });
