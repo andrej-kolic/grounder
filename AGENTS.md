@@ -77,18 +77,18 @@ Agent-agnostic core = `connector/`, `vault/`, most of `commands/`, `util/`. Agen
 ```text
 packages/grounder/templates/
   agents/
-    cursor/commands/
-      grounder-note.md
-      grounder-task.md            # recall — read-only hydrate
-      grounder-task-handoff.md    # write session checkpoint
-      grounder-plan.md            # named living plan
-      grounder-search.md          # vault retrieval — CLI ranks, agent synthesizes
-    claude/commands/
-      grounder-note.md
-      grounder-task.md
-      grounder-task-handoff.md
-      grounder-plan.md
-      grounder-search.md
+    cursor/skills/
+      grounder-note/SKILL.md
+      grounder-task/SKILL.md            # recall — read-only hydrate
+      grounder-task-handoff/SKILL.md    # write session checkpoint
+      grounder-plan/SKILL.md            # named living plan
+      grounder-search/SKILL.md          # vault retrieval — CLI ranks, agent synthesizes
+    claude/skills/
+      grounder-note/SKILL.md
+      grounder-task/SKILL.md
+      grounder-task-handoff/SKILL.md
+      grounder-plan/SKILL.md
+      grounder-search/SKILL.md
   vault/
     session-handoff.md            # lean section reference for slash commands
     plan.md                       # section reference for /grounder-plan

@@ -222,7 +222,7 @@ describe("commands/doctor", () => {
     expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
   });
 
-  it("fails when a detected agent is missing a command file", async () => {
+  it("fails when a detected agent is missing a skill file", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -242,10 +242,60 @@ describe("commands/doctor", () => {
 
     expect(code).toBe(1);
     expect(out).toContain("fail  agent-cursor");
-    expect(out).toContain("grounder-task.md");
+    expect(out).toContain("grounder-task/SKILL.md");
     expect(out).toContain("grounder migrate --force");
     expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).toContain("ok    hook-runtime");
+  });
+
+  it("warns about a leftover pre-skill command file that migrate could not retire", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    // Superseded by grounder-note/SKILL.md, but never retired: locally edited
+    // (or pre-ledger — either way, no ledger hash matches its current bytes).
+    const legacyPath = path.join(env.home, ".cursor", "commands", "grounder-note.md");
+    await mkdir(path.dirname(legacyPath), { recursive: true });
+    await writeFile(legacyPath, "hand-edited leftover\n", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("warn  agent-cursor-legacy-commands");
+    expect(out).toContain(legacyPath);
+    expect(out).toContain("grounder migrate --force");
+    expect(out).toContain("ok    agent-cursor");
+    expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
+  });
+
+  it("does not warn about a legacy command file migrate already retired", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).not.toContain("legacy-commands");
   });
 
   it("warns when install state is missing (legacy pre-ledger install)", async () => {
@@ -260,7 +310,7 @@ describe("commands/doctor", () => {
       agents: ["cursor"],
     });
     await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
-    // Pre-ledger installs have command files but no ~/.grounder/state.json →
+    // Pre-ledger installs have skill files but no ~/.grounder/state.json →
     // treat as schema 0 (same migrate hint as the old npx content sniff).
     await rm(statePath(env.home));
 
@@ -272,14 +322,14 @@ describe("commands/doctor", () => {
     expect(out).toContain("warn  install-state");
     expect(out).toContain("install state missing (pre-ledger / never migrated)");
     expect(out).toContain("warn  agent-cursor");
-    expect(out).toContain("Cursor: 5 command file(s) locally modified (needs --force to refresh)");
+    expect(out).toContain("Cursor: 5 skill file(s) locally modified (needs --force to refresh)");
     expect(out).toContain("grounder migrate --force");
     // Hooks content is still current — no schema-int warn without a ledger.
     expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).toMatch(/^\d+ passed, 0 failed, 2 warned$/m);
   });
 
-  it("warns when command file hashes are missing (legacy / wiped ledger files)", async () => {
+  it("warns when skill file hashes are missing (legacy / wiped ledger files)", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -311,7 +361,7 @@ describe("commands/doctor", () => {
 
     expect(code).toBe(0);
     expect(out).toContain("warn  agent-cursor");
-    expect(out).toContain("Cursor: 5 command file(s) locally modified (needs --force to refresh)");
+    expect(out).toContain("Cursor: 5 skill file(s) locally modified (needs --force to refresh)");
     expect(out).toContain("grounder migrate --force");
     expect(out).not.toContain("package-version");
     expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
@@ -405,7 +455,7 @@ describe("commands/doctor", () => {
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });
 
-  it("warns when a command file is locally modified without a schema bump", async () => {
+  it("warns when a skill file is locally modified without a schema bump", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -426,13 +476,13 @@ describe("commands/doctor", () => {
 
     expect(code).toBe(0);
     expect(out).toContain("warn  agent-cursor");
-    expect(out).toContain("Cursor: 1 command file(s) locally modified (needs --force to refresh)");
+    expect(out).toContain("Cursor: 1 skill file(s) locally modified (needs --force to refresh)");
     expect(out).toContain("→ grounder migrate --force");
     expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });
 
-  it("warns when ledger commands schema lags but command files already match", async () => {
+  it("warns when ledger commands schema lags but skill files already match", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -466,7 +516,7 @@ describe("commands/doctor", () => {
     expect(code).toBe(0);
     expect(out).toContain("warn  agent-cursor");
     expect(out).toContain(
-      "Cursor: commands schema behind in ledger (recorded 1, current 3; files match)",
+      "Cursor: commands schema behind in ledger (recorded 1, current 4; files match)",
     );
     expect(out).toContain("→ grounder migrate");
     expect(out).toContain("ok    agent-cursor-hooks");
@@ -514,7 +564,7 @@ describe("commands/doctor", () => {
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });
 
-  it("warns when command drift dry-run throws", async () => {
+  it("warns when skill drift dry-run throws", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -535,7 +585,7 @@ describe("commands/doctor", () => {
 
       expect(code).toBe(0);
       expect(out).toContain("warn  agent-cursor");
-      expect(out).toContain("Cursor: could not verify command drift (boom)");
+      expect(out).toContain("Cursor: could not verify skill drift (boom)");
       expect(out).toContain("→ grounder migrate");
       expect(out).toContain("ok    agent-cursor-hooks");
       expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
@@ -570,7 +620,7 @@ describe("commands/doctor", () => {
 
       expect(code).toBe(0);
       expect(out).toContain("warn  agent-cursor");
-      expect(out).toContain("Cursor: 1 command file(s) would install on next migrate");
+      expect(out).toContain("Cursor: 1 skill file(s) would install on next migrate");
       expect(out).toContain("→ grounder migrate");
       expect(out).toContain("ok    agent-cursor-hooks");
       expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
@@ -635,7 +685,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("grounder migrate --force");
     // Presence still ok — do not invent a migrate/drift warn on corrupt ledger.
     expect(out).toContain("ok    agent-cursor");
-    expect(out).toContain("command files present");
+    expect(out).toContain("skill files present");
     expect(out).not.toContain("locally modified");
     expect(out).not.toContain("would update on next migrate");
   });
@@ -678,7 +728,7 @@ describe("commands/doctor", () => {
 
     expect(code).toBe(1);
     expect(out).toContain("fail  agent-cursor");
-    expect(out).toContain("commands schema newer than this grounder (recorded 99, supported 3)");
+    expect(out).toContain("commands schema newer than this grounder (recorded 99, supported 4)");
     expect(out).toContain("fail  agent-cursor-hooks");
     expect(out).toContain("hooks schema newer than this grounder (recorded 50, supported 1)");
     expect(out).toContain("upgrade grounder");
@@ -713,7 +763,7 @@ describe("commands/doctor", () => {
     expect(out).not.toContain("grounder link --force");
   });
 
-  it("warns when a detected agent has no command files", async () => {
+  it("warns when a detected agent has no skill files", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -732,7 +782,7 @@ describe("commands/doctor", () => {
     expect(code).toBe(0);
     expect(out).toContain("warn  install-state");
     expect(out).toContain("warn  agent-cursor");
-    expect(out).toContain("no Grounder command files");
+    expect(out).toContain("no Grounder skill files");
     expect(out).toContain("warn  agent-cursor-hooks");
     expect(out).toContain("no Grounder session hook → grounder migrate --hooks");
     expect(out).toMatch(/^\d+ passed, 0 failed, 3 warned$/m);
@@ -911,7 +961,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("agent-cursor-hooks");
   });
 
-  it("fails when a slash-command Node interpreter is missing", async () => {
+  it("fails when a slash-skill Node interpreter is missing", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -932,13 +982,13 @@ describe("commands/doctor", () => {
 
     expect(code).toBe(1);
     expect(out).toContain("fail  agent-cursor");
-    expect(out).toContain("command Node interpreter missing or not executable");
+    expect(out).toContain("skill Node interpreter missing or not executable");
     expect(out).toContain(missingNode);
     expect(out).toContain("→ grounder migrate");
   });
 
   it.skipIf(process.platform === "win32")(
-    "fails when a slash-command Node interpreter exists but is not executable",
+    "fails when a slash-skill Node interpreter exists but is not executable",
     async () => {
       const env = await createTempEnv({ packageName: "my-app" });
       cleanup = env.cleanup;
@@ -960,7 +1010,7 @@ describe("commands/doctor", () => {
 
       expect(code).toBe(1);
       expect(out).toContain("fail  agent-cursor");
-      expect(out).toContain("command Node interpreter missing or not executable");
+      expect(out).toContain("skill Node interpreter missing or not executable");
       expect(out).toContain(nonExecNode);
       expect(out).toContain("→ grounder migrate");
     },
@@ -989,7 +1039,7 @@ describe("commands/doctor", () => {
     // Content hash drifts vs ledger, but the alternate Node path is still executable.
     expect(out).toContain("warn  agent-cursor");
     expect(out).toContain("locally modified");
-    expect(out).not.toContain("command Node interpreter missing or not executable");
+    expect(out).not.toContain("skill Node interpreter missing or not executable");
   });
 
   it("skips project checks with --global", async () => {

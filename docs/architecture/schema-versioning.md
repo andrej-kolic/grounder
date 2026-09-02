@@ -16,7 +16,7 @@ Grounder writes several persistent artifacts. They need **different** upgrade ru
 
 | Artifact | Owner | Location | User-editable? | Upgrade rule |
 | --- | --- | --- | --- | --- |
-| Slash command markdown | Grounder-generated | `~/.cursor/commands/grounder-*.md`, `~/.claude/commands/grounder-*.md` | Yes (by design) | Hash-safe update; `--force` if edited |
+| Agent skill markdown | Grounder-generated | `~/.cursor/skills/grounder-*/SKILL.md`, `~/.claude/skills/grounder-*/SKILL.md` | Yes (by design) | Hash-safe update; `--force` if edited |
 | Hook config fragment | Grounder-owned key in a shared file | Cursor `hooks.json` / Claude `settings.json` | No (that nested entry) | Always regenerate on install/migrate |
 | Runtime materialization | Grounder-owned | `~/.grounder/runtime/` | No | Always refresh |
 | Home config | Grounder-owned | `~/.grounder/config.json` | Path may be hand-edited | Not schema-migrated here |
@@ -72,7 +72,7 @@ Module: [`connector/state.ts`](../../packages/grounder/src/connector/state.ts).
       "commandsSchema": 1,
       "hooksSchema": 1,
       "files": {
-        "/Users/x/.cursor/commands/grounder-note.md": {
+        "/Users/x/.cursor/skills/grounder-note/SKILL.md": {
           "hash": "sha256:…"
         }
       }

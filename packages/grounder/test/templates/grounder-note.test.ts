@@ -8,14 +8,27 @@ const templatesRoot = path.resolve(
   "../../templates/agents",
 );
 
-const cursorNoteTemplate = path.join(templatesRoot, "cursor/commands/grounder-note.md");
-const claudeNoteTemplate = path.join(templatesRoot, "claude/commands/grounder-note.md");
+const cursorNoteTemplate = path.join(templatesRoot, "cursor/skills/grounder-note/SKILL.md");
+const claudeNoteTemplate = path.join(templatesRoot, "claude/skills/grounder-note/SKILL.md");
 const noteTemplates = [cursorNoteTemplate, claudeNoteTemplate] as const;
 
+function stripFrontmatter(raw: string): string {
+  return raw.replace(/^---\n[\s\S]*?\n---\n\n/, "");
+}
+
 describe("templates/grounder-note", () => {
-  it("documents list-and-stop before write flow", async () => {
+  it("has the intersection skill frontmatter", async () => {
     for (const filePath of noteTemplates) {
       const body = await readFile(filePath, "utf8");
+      expect(body).toContain("name: grounder-note");
+      expect(body).toContain("disable-model-invocation: true");
+    }
+  });
+
+  it("documents list-and-stop before write flow", async () => {
+    for (const filePath of noteTemplates) {
+      const raw = await readFile(filePath, "utf8");
+      const body = stripFrontmatter(raw);
       expect(body).toContain("note list --limit <N> --markdown");
       expect(body).toContain("Relay the CLI stdout as-is");
       expect(body).toContain("count header");

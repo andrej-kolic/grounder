@@ -115,7 +115,7 @@ export interface RecordAgentInstallOptions {
   agentId: string;
   /**
    * When set, updates the commands version in state; when omitted, keeps the
-   * existing value (or `0` for a new agent). Omit when every command file was
+   * existing value (or `0` for a new agent). Omit when every skill file was
    * skipped as locally edited or from an old install, so state does not look
    * up to date when the files were not updated.
    */
@@ -226,6 +226,35 @@ export function recordedFileHash(
   filePath: string,
 ): string | undefined {
   return state?.agents[agentId]?.files[filePath]?.hash;
+}
+
+/**
+ * Drop one path's entry from an agent's `files` map — for a file deleted
+ * outright (not rewritten), where `recordAgentInstall`'s merge-in-new-hashes
+ * shape has nothing to overwrite it with. A no-op when there's no state, no
+ * such agent, or no recorded entry for that path.
+ */
+export async function forgetRecordedFile(
+  agentId: string,
+  filePath: string,
+  homeDir?: string,
+): Promise<void> {
+  const state = await readGrounderState(homeDir);
+  const entry = state?.agents[agentId];
+  if (!state || !entry || !(filePath in entry.files)) {
+    return;
+  }
+
+  const files = Object.fromEntries(
+    Object.entries(entry.files).filter(([recordedPath]) => recordedPath !== filePath),
+  );
+  await writeGrounderState(
+    {
+      ...state,
+      agents: { ...state.agents, [agentId]: { ...entry, files } },
+    },
+    homeDir,
+  );
 }
 
 /**

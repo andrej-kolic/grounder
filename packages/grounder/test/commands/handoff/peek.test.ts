@@ -482,7 +482,7 @@ body
     await writeGrounderState(
       {
         grounderVersion: "0.0.1",
-        agents: { cursor: { commandsSchema: 3, hooksSchema: 1, files: {} } },
+        agents: { cursor: { commandsSchema: 4, hooksSchema: 1, files: {} } },
       },
       env.home,
     );

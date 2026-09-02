@@ -8,11 +8,19 @@ const templatesRoot = path.resolve(
   "../../templates/agents",
 );
 
-const cursorSearchTemplate = path.join(templatesRoot, "cursor/commands/grounder-search.md");
-const claudeSearchTemplate = path.join(templatesRoot, "claude/commands/grounder-search.md");
+const cursorSearchTemplate = path.join(templatesRoot, "cursor/skills/grounder-search/SKILL.md");
+const claudeSearchTemplate = path.join(templatesRoot, "claude/skills/grounder-search/SKILL.md");
 const searchTemplates = [cursorSearchTemplate, claudeSearchTemplate] as const;
 
 describe("templates/grounder-search", () => {
+  it("has the intersection skill frontmatter", async () => {
+    for (const filePath of searchTemplates) {
+      const body = await readFile(filePath, "utf8");
+      expect(body).toContain("name: grounder-search");
+      expect(body).toContain("disable-model-invocation: true");
+    }
+  });
+
   it("documents the term recipe, query stripping, and leftover-hit order", async () => {
     for (const filePath of searchTemplates) {
       const body = await readFile(filePath, "utf8");

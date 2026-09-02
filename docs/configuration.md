@@ -23,8 +23,8 @@ See also: [CLI reference](cli-reference.md) · [Upgrading](upgrading.md) ·
 Written by `grounder setup`. Holds the vault path for this machine only — it is not
 committed anywhere, so each machine can keep its vault wherever it likes.
 
-`grounder setup <path>` also creates `<vault>/10-Projects/` and installs slash commands
-for detected agents (Cursor → `~/.cursor/commands/`, Claude Code → `~/.claude/commands/`;
+`grounder setup <path>` also creates `<vault>/10-Projects/` and installs agent skills
+for detected agents (Cursor → `~/.cursor/skills/`, Claude Code → `~/.claude/skills/`;
 override with `--agent=<id>`).
 
 ## Link marker
@@ -68,8 +68,8 @@ detected agent via a pluggable adapter registry (`src/agents/`).
 
 | Agent       | Detection          | Artifacts                                                      |
 | ----------- | ------------------ | -------------------------------------------------------------- |
-| Cursor      | `~/.cursor` exists | `~/.cursor/commands/grounder-{note,search,task,task-handoff,plan}.md` |
-| Claude Code | `~/.claude` exists | `~/.claude/commands/grounder-{note,search,task,task-handoff,plan}.md` |
+| Cursor      | `~/.cursor` exists | `~/.cursor/skills/grounder-{note,search,task,task-handoff,plan}/SKILL.md` |
+| Claude Code | `~/.claude` exists | `~/.claude/skills/grounder-{note,search,task,task-handoff,plan}/SKILL.md` |
 
 With no `--agent` flag, `setup` auto-detects installed agents. To install explicitly:
 

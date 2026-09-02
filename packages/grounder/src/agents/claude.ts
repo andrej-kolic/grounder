@@ -19,15 +19,17 @@ import type {
 } from "./types.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const templateDir = path.join(pkgRoot, "templates", "agents", "claude", "commands");
+const templateDir = path.join(pkgRoot, "templates", "agents", "claude", "skills");
 
-const COMMANDS = [
-  "grounder-note.md",
-  "grounder-search.md",
-  "grounder-plan.md",
-  "grounder-task-handoff.md",
-  "grounder-task.md",
+const SKILLS = [
+  "grounder-note",
+  "grounder-search",
+  "grounder-plan",
+  "grounder-task-handoff",
+  "grounder-task",
 ] as const;
+
+const COMMANDS = SKILLS.map((name) => path.join(name, "SKILL.md"));
 
 /**
  * Canonical SessionStart command for Claude Code (home-local runtime, not `npx`).
@@ -43,8 +45,8 @@ export function claudePeekHookCommand(homeDir?: string): string {
  */
 export const CLAUDE_SESSION_START_MATCHER = "startup|clear|compact";
 
-export function claudeCommandsDir(homeDir?: string): string {
-  return path.join(resolveHomeDir(homeDir), ".claude", "commands");
+export function claudeSkillsDir(homeDir?: string): string {
+  return path.join(resolveHomeDir(homeDir), ".claude", "skills");
 }
 
 /** Absolute path to Claude Code's shared settings file (`~/.claude/settings.json`). */
@@ -53,23 +55,23 @@ export function claudeSettingsJsonPath(homeDir?: string): string {
 }
 
 export function grounderNoteCommandPath(homeDir?: string): string {
-  return path.join(claudeCommandsDir(homeDir), "grounder-note.md");
+  return path.join(claudeSkillsDir(homeDir), "grounder-note", "SKILL.md");
 }
 
 export function grounderPlanCommandPath(homeDir?: string): string {
-  return path.join(claudeCommandsDir(homeDir), "grounder-plan.md");
+  return path.join(claudeSkillsDir(homeDir), "grounder-plan", "SKILL.md");
 }
 
 export function grounderTaskHandoffCommandPath(homeDir?: string): string {
-  return path.join(claudeCommandsDir(homeDir), "grounder-task-handoff.md");
+  return path.join(claudeSkillsDir(homeDir), "grounder-task-handoff", "SKILL.md");
 }
 
 export function grounderTaskCommandPath(homeDir?: string): string {
-  return path.join(claudeCommandsDir(homeDir), "grounder-task.md");
+  return path.join(claudeSkillsDir(homeDir), "grounder-task", "SKILL.md");
 }
 
 export function expectedArtifacts(homeDir?: string): string[] {
-  return COMMANDS.map((filename) => path.join(claudeCommandsDir(homeDir), filename));
+  return COMMANDS.map((filename) => path.join(claudeSkillsDir(homeDir), filename));
 }
 
 /** Paths of hook config this adapter touches — currently just `settings.json`. */
@@ -301,7 +303,7 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
 export const claude: AgentAdapter = {
   id: "claude",
   name: "Claude Code",
-  commandsSchema: 3,
+  commandsSchema: 4,
   hooksSchema: 1,
 
   async isInstalled(): Promise<boolean> {
@@ -319,7 +321,7 @@ export const claude: AgentAdapter = {
         ...opts,
         agentId: claude.id,
         templateDir,
-        commandsDir: claudeCommandsDir(opts.homeDir),
+        commandsDir: claudeSkillsDir(opts.homeDir),
         filename,
       });
       artifacts[dest] = status;

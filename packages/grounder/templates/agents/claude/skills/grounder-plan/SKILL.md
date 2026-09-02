@@ -1,3 +1,9 @@
+---
+name: grounder-plan
+description: Write a named, updatable plan document to the markdown vault for this project.
+disable-model-invocation: true
+---
+
 Write a named, updatable plan document to the markdown vault for this project.
 
 Distill the instruction after `/grounder-plan` into a structured plan — not a chat transcript.
@@ -65,7 +71,7 @@ If `--title` collides with an existing plan (non-zero exit; stderr names the con
 Always include `--topics` with 3-5 comma-separated lowercase keywords that capture the plan's core concepts (e.g. `--topics "caching,redis,performance,api"`). Pick terms a future search would use — concrete nouns and technical terms, not verbs or filler.
 
 Run from the linked project folder or any subdirectory beneath it.
-Run {{GROUNDER_CLI}} with `required_permissions: ["all"]` (vault is outside the workspace).
+The vault is outside the workspace — grant shell permissions if Claude Code prompts you.
 
 Do not compute vault paths or write files yourself — the CLI handles it.
 Report the exact path the CLI prints on stdout — it confirms the real outcome, not just the intent.

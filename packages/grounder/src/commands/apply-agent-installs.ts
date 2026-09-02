@@ -12,7 +12,6 @@ import {
   recordedHooksSchema,
   statePath,
 } from "../connector/state.js";
-
 export interface ApplyAgentInstallsOptions {
   agents: AgentAdapter[];
   force?: boolean;
@@ -52,9 +51,14 @@ async function agentHasInstalledHooks(agent: AgentAdapter, homeDir?: string): Pr
   return false;
 }
 
-async function shouldInstallHooks(
+/**
+ * Whether hooks would be (re)installed for this agent under the given
+ * options/state. Shared by the actual install pass below and by `migrate`'s
+ * dry preview, so the preview can't drift from what actually happens.
+ */
+export async function shouldInstallHooks(
   agent: AgentAdapter,
-  opts: ApplyAgentInstallsOptions,
+  opts: Pick<ApplyAgentInstallsOptions, "hooks" | "refreshInstalledHooks" | "homeDir">,
   state: GrounderState | null,
 ): Promise<boolean> {
   if (!agent.installHooks) {
@@ -72,10 +76,10 @@ async function shouldInstallHooks(
   return agentHasInstalledHooks(agent, opts.homeDir);
 }
 
-function commandLabel(status: ArtifactStatus, artifactPath: string, dryRun: boolean): string {
+type ChangedStatus = Exclude<ArtifactStatus, "skipped">;
+
+function commandLabel(status: ChangedStatus, artifactPath: string, dryRun: boolean): string {
   switch (status) {
-    case "skipped":
-      return dryRun ? "would skip (already current)" : "already current (skipped)";
     case "modified":
       return dryRun
         ? `would skip locally modified (needs --force): ${artifactPath}`
@@ -87,16 +91,50 @@ function commandLabel(status: ArtifactStatus, artifactPath: string, dryRun: bool
   }
 }
 
-function hookLabel(status: ArtifactStatus, artifactPath: string, dryRun: boolean): string {
+function hookLabel(status: ChangedStatus, artifactPath: string, dryRun: boolean): string {
   switch (status) {
-    case "skipped":
-      return dryRun ? "would skip (already current)" : "already exists (skipped)";
     case "created":
       return dryRun ? `would install: ${artifactPath}` : `installed: ${artifactPath}`;
     case "overwritten":
       return dryRun ? `would update: ${artifactPath}` : `updated: ${artifactPath}`;
     case "modified":
       return dryRun ? `would skip: ${artifactPath}` : `skipped: ${artifactPath}`;
+  }
+}
+
+/**
+ * Print one line per skill/hook file that actually changed (or would), plus
+ * a single collapsed count for everything already current — not one
+ * identical, path-less line per current file. That per-file "skipped" line
+ * used to carry no path at all, so 5 up-to-date files produced 5 indistinguishable
+ * lines with no information in any of them.
+ */
+function printArtifactResults(
+  agentName: string,
+  kind: "skill" | "hook",
+  result: AgentInstallResult,
+  dryRun: boolean,
+): void {
+  const entries = Object.entries(result.artifacts);
+  if (entries.length === 0) {
+    if (kind === "skill") {
+      process.stdout.write(`✓ ${agentName}: no artifacts to install yet\n`);
+    }
+    return;
+  }
+
+  const label = kind === "skill" ? commandLabel : hookLabel;
+  let currentCount = 0;
+  for (const [artifactPath, status] of entries) {
+    if (status === "skipped") {
+      currentCount++;
+      continue;
+    }
+    process.stdout.write(`✓ ${agentName} ${kind} ${label(status, artifactPath, dryRun)}\n`);
+  }
+  if (currentCount > 0) {
+    const noun = currentCount === 1 ? "file" : "files";
+    process.stdout.write(`✓ ${agentName}: ${currentCount} ${kind} ${noun} already current\n`);
   }
 }
 
@@ -132,14 +170,7 @@ export async function applyAgentInstalls(
 
   for (const agent of agents) {
     const commands = await agent.install({ force, dryRun, homeDir });
-    for (const [artifactPath, status] of Object.entries(commands.artifacts)) {
-      process.stdout.write(
-        `✓ ${agent.name} command ${commandLabel(status, artifactPath, dryRun)}\n`,
-      );
-    }
-    if (Object.keys(commands.artifacts).length === 0) {
-      process.stdout.write(`✓ ${agent.name}: no artifacts to install yet\n`);
-    }
+    printArtifactResults(agent.name, "skill", commands, dryRun);
 
     let hooksResult: AgentInstallResult | undefined;
     let hooksInstalled = false;
@@ -148,9 +179,7 @@ export async function applyAgentInstalls(
       if (installHooks) {
         hooksResult = await installHooks({ force, dryRun, homeDir });
         hooksInstalled = true;
-        for (const [artifactPath, status] of Object.entries(hooksResult.artifacts)) {
-          process.stdout.write(`✓ ${agent.name} hook ${hookLabel(status, artifactPath, dryRun)}\n`);
-        }
+        printArtifactResults(agent.name, "hook", hooksResult, dryRun);
       }
     }
 
@@ -160,7 +189,7 @@ export async function applyAgentInstalls(
       // written or already up to date. If every file was skipped as locally
       // edited (or from before Grounder tracked hashes), do not mark state as
       // current — otherwise plain migrate would silence doctor while leaving
-      // those old command files untouched.
+      // those skill files untouched.
       const advanceCommandsSchema =
         statuses.length === 0 || statuses.some((status) => status !== "modified");
       await recordAgentInstallState(agent, {
@@ -193,7 +222,7 @@ export async function applyAgentInstalls(
     results.some((r) => Object.values(r.commands.artifacts).some((s) => s === "modified"));
   if (modifiedWithoutForce) {
     process.stdout.write(
-      "\nNote: some command files were left alone (local edits, or an install from before Grounder 0.3).\n" +
+      "\nNote: some skill files were left alone (local edits, or an install from before Grounder 0.3).\n" +
         "  To refresh them: grounder migrate --force\n",
     );
   }

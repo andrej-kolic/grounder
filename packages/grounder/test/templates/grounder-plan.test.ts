@@ -8,14 +8,27 @@ const templatesRoot = path.resolve(
   "../../templates/agents",
 );
 
-const cursorPlanTemplate = path.join(templatesRoot, "cursor/commands/grounder-plan.md");
-const claudePlanTemplate = path.join(templatesRoot, "claude/commands/grounder-plan.md");
+const cursorPlanTemplate = path.join(templatesRoot, "cursor/skills/grounder-plan/SKILL.md");
+const claudePlanTemplate = path.join(templatesRoot, "claude/skills/grounder-plan/SKILL.md");
 const planTemplates = [cursorPlanTemplate, claudePlanTemplate] as const;
 
+function stripFrontmatter(raw: string): string {
+  return raw.replace(/^---\n[\s\S]*?\n---\n\n/, "");
+}
+
 describe("templates/grounder-plan", () => {
-  it("documents path update, plan list lookup, and title-only create", async () => {
+  it("has the intersection skill frontmatter", async () => {
     for (const filePath of planTemplates) {
       const body = await readFile(filePath, "utf8");
+      expect(body).toContain("name: grounder-plan");
+      expect(body).toContain("disable-model-invocation: true");
+    }
+  });
+
+  it("documents path update, plan list lookup, and title-only create", async () => {
+    for (const filePath of planTemplates) {
+      const raw = await readFile(filePath, "utf8");
+      const body = stripFrontmatter(raw);
       expect(body).toContain("state it plainly before writing");
       expect(body).toContain("not a blocking confirmation");
       expect(body).toContain("printed by an earlier `grounder plan` this conversation");

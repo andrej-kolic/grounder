@@ -19,15 +19,17 @@ import type {
 } from "./types.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const templateDir = path.join(pkgRoot, "templates", "agents", "cursor", "commands");
+const templateDir = path.join(pkgRoot, "templates", "agents", "cursor", "skills");
 
-const COMMANDS = [
-  "grounder-note.md",
-  "grounder-search.md",
-  "grounder-plan.md",
-  "grounder-task-handoff.md",
-  "grounder-task.md",
+const SKILLS = [
+  "grounder-note",
+  "grounder-search",
+  "grounder-plan",
+  "grounder-task-handoff",
+  "grounder-task",
 ] as const;
+
+const COMMANDS = SKILLS.map((name) => path.join(name, "SKILL.md"));
 
 /**
  * Canonical sessionStart command for Cursor (home-local runtime, not `npx`).
@@ -41,8 +43,8 @@ export function cursorPeekHookCommand(
   return peekHookCommand(homeDir, extraArgs);
 }
 
-export function cursorCommandsDir(homeDir?: string): string {
-  return path.join(resolveHomeDir(homeDir), ".cursor", "commands");
+export function cursorSkillsDir(homeDir?: string): string {
+  return path.join(resolveHomeDir(homeDir), ".cursor", "skills");
 }
 
 /** Absolute path to Cursor's shared hooks config (`~/.cursor/hooks.json`). */
@@ -51,23 +53,23 @@ export function cursorHooksJsonPath(homeDir?: string): string {
 }
 
 export function grounderNoteCommandPath(homeDir?: string): string {
-  return path.join(cursorCommandsDir(homeDir), "grounder-note.md");
+  return path.join(cursorSkillsDir(homeDir), "grounder-note", "SKILL.md");
 }
 
 export function grounderPlanCommandPath(homeDir?: string): string {
-  return path.join(cursorCommandsDir(homeDir), "grounder-plan.md");
+  return path.join(cursorSkillsDir(homeDir), "grounder-plan", "SKILL.md");
 }
 
 export function grounderTaskHandoffCommandPath(homeDir?: string): string {
-  return path.join(cursorCommandsDir(homeDir), "grounder-task-handoff.md");
+  return path.join(cursorSkillsDir(homeDir), "grounder-task-handoff", "SKILL.md");
 }
 
 export function grounderTaskCommandPath(homeDir?: string): string {
-  return path.join(cursorCommandsDir(homeDir), "grounder-task.md");
+  return path.join(cursorSkillsDir(homeDir), "grounder-task", "SKILL.md");
 }
 
 export function expectedArtifacts(homeDir?: string): string[] {
-  return COMMANDS.map((filename) => path.join(cursorCommandsDir(homeDir), filename));
+  return COMMANDS.map((filename) => path.join(cursorSkillsDir(homeDir), filename));
 }
 
 /** Paths of hook config this adapter touches — currently just `hooks.json`. */
@@ -254,7 +256,7 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
 export const cursor: AgentAdapter = {
   id: "cursor",
   name: "Cursor",
-  commandsSchema: 3,
+  commandsSchema: 4,
   hooksSchema: 1,
 
   async isInstalled(): Promise<boolean> {
@@ -272,7 +274,7 @@ export const cursor: AgentAdapter = {
         ...opts,
         agentId: cursor.id,
         templateDir,
-        commandsDir: cursorCommandsDir(opts.homeDir),
+        commandsDir: cursorSkillsDir(opts.homeDir),
         filename,
       });
       artifacts[dest] = status;

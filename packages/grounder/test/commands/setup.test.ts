@@ -89,7 +89,7 @@ describe("commands/setup", () => {
       grounderVersion: VERSION,
       agents: {
         cursor: {
-          commandsSchema: 3,
+          commandsSchema: 4,
           files: await expectedFileLedger(cursor.expectedArtifacts(env.home)),
         },
       },
@@ -280,7 +280,7 @@ describe("commands/setup", () => {
       expect(out).toContain("✓ Vault scaffold:");
       const stderrOut = stderrChunks.join("");
       expect(stderrOut).toContain(
-        "Home config and vault scaffold were written, but agent command files/hooks were not installed",
+        "Home config and vault scaffold were written, but agent skill files/hooks were not installed",
       );
       expect(stderrOut).toContain("grounder migrate --force");
       expect(JSON.parse(await readFile(homeConfigPath(env.home), "utf8"))).toEqual({
@@ -354,12 +354,12 @@ describe("commands/setup", () => {
         grounderVersion: VERSION,
         agents: {
           cursor: {
-            commandsSchema: 3,
+            commandsSchema: 4,
             hooksSchema: 1,
             files: await expectedFileLedger(cursor.expectedArtifacts(env.home)),
           },
           claude: {
-            commandsSchema: 3,
+            commandsSchema: 4,
             hooksSchema: 1,
             files: await expectedFileLedger(claude.expectedArtifacts(env.home)),
           },

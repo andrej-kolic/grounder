@@ -66,7 +66,7 @@ in place (preserving `created`), while `note` and `handoff` always write a new d
 | ---------------- | ------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `--yes`          | `setup`, `link`                 | Skip confirmation prompts                                                                         |
 | `--dry-run`      | `setup`, `link`, `migrate`      | Preview without writing                                                                           |
-| `--force`        | `setup`, `link`, `migrate`      | Overwrite existing generated / locally-modified files                                             |
+| `--force`        | `setup`, `link`, `migrate`      | Overwrite existing generated / locally-modified files. On `migrate`, also deletes locally-edited pre-skill `grounder-*.md` command files left over from before 0.6 (edits are not ported — see [Upgrading](upgrading.md)) |
 | `--id <id>`      | `link`                          | Override detected project id                                                                      |
 | `--vault <path>` | `link`                          | Override home vault root for this run                                                             |
 | `--agent <id>`   | `setup`, `migrate`              | Install for a specific agent (repeatable; default: auto-detect). Supported: `cursor`, `claude`    |

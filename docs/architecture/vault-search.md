@@ -36,7 +36,7 @@ It does **not** search:
 
 - Sibling projects under `10-Projects/`
 - The git working tree
-- Installed slash-command files under `~/.cursor/commands/`
+- Installed skill files under `~/.cursor/skills/` / `~/.claude/skills/`
 
 Missing project vault root → exit 1, hint `grounder setup`. Unlinked cwd → `requireLinkedProject` error.
 
@@ -129,7 +129,7 @@ Each `hits[]` entry:
 
 ## Slash-command protocol
 
-Installed from `templates/agents/{cursor,claude}/commands/grounder-search.md` via `grounder setup` / `grounder migrate`. `{{GROUNDER_CLI}}` becomes the baked runtime invocation. Cursor requires Shell `required_permissions: ["all"]` (vault is outside the workspace).
+Installed from `templates/agents/{cursor,claude}/skills/grounder-search/SKILL.md` via `grounder setup` / `grounder migrate`. `{{GROUNDER_CLI}}` becomes the baked runtime invocation. Cursor requires Shell `required_permissions: ["all"]` (vault is outside the workspace).
 
 After **any** template edit, run `grounder migrate` (hash-safe if the on-disk file is untouched). A new parent chat is not required; `/grounder-search` re-reads the installed file. Un-migrated sessions keep the old spec.
 
@@ -285,9 +285,9 @@ Evaluate **one change at a time** (CLI xor template). Migrating templates mid-ex
 | CLI parse / formats | `packages/grounder/src/commands/search.ts` |
 | Help text | `packages/grounder/src/help.ts` (`id: "search"`) |
 | Project vault root | `connector/vault.ts` `resolveProjectVaultRoot` → `vault/layout.ts` `projectDir` |
-| Cursor / Claude templates | `templates/agents/{cursor,claude}/commands/grounder-search.md` |
+| Cursor / Claude templates | `templates/agents/{cursor,claude}/skills/grounder-search/SKILL.md` |
 | `{{GROUNDER_CLI}}` bake | `agents/install-command.ts` |
-| Command file list | `agents/cursor.ts`, `agents/claude.ts` (`grounder-search.md`) |
+| Command file list | `agents/cursor.ts`, `agents/claude.ts` (`grounder-search/SKILL.md`) |
 | Template contract tests | `test/templates/grounder-search.test.ts` |
 | Rank unit tests | `test/vault/search.test.ts` |
 | CLI output / scope / errors | `test/commands/search/*.test.ts` |

@@ -1,11 +1,22 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cursorHooksJsonPath, grounderNoteCommandPath } from "../../src/agents/cursor.js";
 import { runMigrateWithOptions } from "../../src/commands/migrate.js";
 import { runSetupWithOptions } from "../../src/commands/setup.js";
-import { readGrounderState, statePath, writeGrounderState } from "../../src/connector/state.js";
+import {
+  readGrounderState,
+  recordAgentInstall,
+  statePath,
+  writeGrounderState,
+} from "../../src/connector/state.js";
 import { fileExists } from "../../src/util/fs.js";
+import { hashContent } from "../../src/util/hash.js";
 import { captureStdout, createTempEnv } from "../helpers.js";
+
+function legacyCursorNotePath(homeDir: string): string {
+  return path.join(homeDir, ".cursor", "commands", "grounder-note.md");
+}
 
 describe("commands/migrate", () => {
   let cleanup: (() => Promise<void>) | undefined;
@@ -50,9 +61,9 @@ describe("commands/migrate", () => {
 
     expect(code).toBe(0);
     expect(out).toContain(`Vault root: ${env.vault}`);
-    expect(out).toContain("already current (skipped)");
+    expect(out).toContain("skill files already current");
     expect(await readGrounderState(env.home)).toMatchObject({
-      agents: { cursor: { commandsSchema: 3 } },
+      agents: { cursor: { commandsSchema: 4 } },
     });
   });
 
@@ -115,7 +126,7 @@ describe("commands/migrate", () => {
     );
     expect(forced.code).toBe(0);
     expect(await readGrounderState(env.home)).toMatchObject({
-      agents: { cursor: { commandsSchema: 3 } },
+      agents: { cursor: { commandsSchema: 4 } },
     });
     expect(
       Object.keys((await readGrounderState(env.home))?.agents.cursor?.files ?? {}).length,
@@ -137,7 +148,8 @@ describe("commands/migrate", () => {
     const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
 
     expect(code).toBe(0);
-    expect(out).toMatch(/Cursor hook /);
+    expect(out).toMatch(/Will refresh:\n(.|\n)*cursor {3}.*hooks\.json/);
+    expect(out).toMatch(/Cursor: 1 hook file already current/);
     expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(true);
   });
 
@@ -156,6 +168,7 @@ describe("commands/migrate", () => {
 
     expect(code).toBe(0);
     expect(out).not.toMatch(/Cursor hook /);
+    expect(out).toContain("hooks    none previously installed (pass --hooks to install)");
     expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(false);
   });
 
@@ -251,7 +264,7 @@ describe("commands/migrate", () => {
     try {
       const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
       expect(code).toBe(0);
-      expect(out).toContain("already current (skipped)");
+      expect(out).toContain("skill files already current");
       expect(errChunks.join("")).toContain("Skipping unknown agent(s) in install state: windsurf");
       expect(errChunks.join("")).toContain("Upgrade grounder");
     } finally {
@@ -260,7 +273,7 @@ describe("commands/migrate", () => {
 
     expect(await readGrounderState(env.home)).toMatchObject({
       agents: {
-        cursor: { commandsSchema: 3 },
+        cursor: { commandsSchema: 4 },
         windsurf: { commandsSchema: 1 },
       },
     });
@@ -336,5 +349,115 @@ describe("commands/migrate", () => {
     await expect(runMigrateWithOptions({ homeDir: env.home, dryRun: true })).rejects.toThrow(
       /Invalid grounder state.*migrate --force/,
     );
+  });
+
+  describe("legacy command retirement", () => {
+    it("retires a legacy pre-skill command file whose hash matches the ledger", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      await runSetupWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      });
+      const legacyPath = legacyCursorNotePath(env.home);
+      await mkdir(path.dirname(legacyPath), { recursive: true });
+      const legacyContent = "old pre-skill note command\n";
+      await writeFile(legacyPath, legacyContent, "utf8");
+      await recordAgentInstall({
+        agentId: "cursor",
+        grounderVersion: "0.5.0",
+        files: { [legacyPath]: { hash: hashContent(legacyContent) } },
+        homeDir: env.home,
+      });
+
+      const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+
+      expect(code).toBe(0);
+      expect(out).toContain(`Deleted old command file: ${legacyPath}`);
+      expect(await fileExists(legacyPath)).toBe(false);
+    });
+
+    it("leaves a locally modified legacy command file without --force", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      await runSetupWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      });
+      const legacyPath = legacyCursorNotePath(env.home);
+      await mkdir(path.dirname(legacyPath), { recursive: true });
+      await writeFile(legacyPath, "hand-edited legacy command\n", "utf8");
+
+      const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+
+      expect(code).toBe(0);
+      expect(out).toContain("1 old command file left in place");
+      expect(out).toContain(`  ${legacyPath}`);
+      expect(out).toContain("grounder migrate --force");
+      expect(await fileExists(legacyPath)).toBe(true);
+
+      const forced = await captureStdout(() =>
+        runMigrateWithOptions({ homeDir: env.home, force: true }),
+      );
+      expect(forced.code).toBe(0);
+      expect(forced.out).toContain(`Deleted old command file: ${legacyPath}`);
+      expect(await fileExists(legacyPath)).toBe(false);
+      expect(forced.out).not.toContain("left in place");
+    });
+
+    it("dry-run reports the retirement without deleting", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      await runSetupWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      });
+      const legacyPath = legacyCursorNotePath(env.home);
+      await mkdir(path.dirname(legacyPath), { recursive: true });
+      const legacyContent = "old pre-skill note command\n";
+      await writeFile(legacyPath, legacyContent, "utf8");
+      await recordAgentInstall({
+        agentId: "cursor",
+        grounderVersion: "0.5.0",
+        files: { [legacyPath]: { hash: hashContent(legacyContent) } },
+        homeDir: env.home,
+      });
+
+      const { code, out } = await captureStdout(() =>
+        runMigrateWithOptions({ homeDir: env.home, dryRun: true }),
+      );
+
+      expect(code).toBe(0);
+      expect(out).toContain(`Would delete old command file: ${legacyPath}`);
+      expect(await fileExists(legacyPath)).toBe(true);
+    });
+
+    it("grounder setup never touches legacy command files", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const legacyPath = legacyCursorNotePath(env.home);
+      await mkdir(path.dirname(legacyPath), { recursive: true });
+      await writeFile(legacyPath, "pre-existing legacy file\n", "utf8");
+
+      await runSetupWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      });
+
+      expect(await fileExists(legacyPath)).toBe(true);
+      expect(await readFile(legacyPath, "utf8")).toBe("pre-existing legacy file\n");
+    });
   });
 });

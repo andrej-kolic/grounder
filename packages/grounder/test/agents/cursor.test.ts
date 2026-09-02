@@ -22,18 +22,18 @@ describe("agents/cursor", () => {
   });
 
   describe("command paths", () => {
-    it("returns paths inside .cursor/commands/", () => {
+    it("returns paths inside .cursor/skills/", () => {
       expect(grounderNoteCommandPath("/home/user")).toBe(
-        "/home/user/.cursor/commands/grounder-note.md",
+        "/home/user/.cursor/skills/grounder-note/SKILL.md",
       );
       expect(grounderPlanCommandPath("/home/user")).toBe(
-        "/home/user/.cursor/commands/grounder-plan.md",
+        "/home/user/.cursor/skills/grounder-plan/SKILL.md",
       );
       expect(grounderTaskHandoffCommandPath("/home/user")).toBe(
-        "/home/user/.cursor/commands/grounder-task-handoff.md",
+        "/home/user/.cursor/skills/grounder-task-handoff/SKILL.md",
       );
       expect(grounderTaskCommandPath("/home/user")).toBe(
-        "/home/user/.cursor/commands/grounder-task.md",
+        "/home/user/.cursor/skills/grounder-task/SKILL.md",
       );
     });
   });
@@ -41,11 +41,11 @@ describe("agents/cursor", () => {
   describe("cursor.expectedArtifacts", () => {
     it("lists the same command paths install writes", () => {
       expect(cursor.expectedArtifacts("/home/user")).toEqual([
-        "/home/user/.cursor/commands/grounder-note.md",
-        "/home/user/.cursor/commands/grounder-search.md",
-        "/home/user/.cursor/commands/grounder-plan.md",
-        "/home/user/.cursor/commands/grounder-task-handoff.md",
-        "/home/user/.cursor/commands/grounder-task.md",
+        "/home/user/.cursor/skills/grounder-note/SKILL.md",
+        "/home/user/.cursor/skills/grounder-search/SKILL.md",
+        "/home/user/.cursor/skills/grounder-plan/SKILL.md",
+        "/home/user/.cursor/skills/grounder-task-handoff/SKILL.md",
+        "/home/user/.cursor/skills/grounder-task/SKILL.md",
       ]);
     });
 
@@ -61,7 +61,7 @@ describe("agents/cursor", () => {
   });
 
   describe("cursor.install", () => {
-    it("creates note, plan, handoff, and task command files", async () => {
+    it("creates note, plan, handoff, and task skill files", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
 

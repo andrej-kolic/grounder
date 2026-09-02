@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import type { Dirent } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,22 +23,23 @@ function runCli(args: string[]) {
   return spawnSync(process.execPath, [cli, ...args], { encoding: "utf8" });
 }
 
-/** Every command dir under `templates/agents/*` — agent dirs without one are skipped, not an error. */
+/** Every `SKILL.md` under each host's `templates/agents/<host>/skills/` — agent dirs without one are skipped, not an error. */
 async function findTemplateFiles(): Promise<string[]> {
   const agentDirs = await readdir(templatesRoot, { withFileTypes: true });
   const files: string[] = [];
   for (const agentDir of agentDirs) {
     if (!agentDir.isDirectory()) continue;
-    const commandsDir = path.join(templatesRoot, agentDir.name, "commands");
-    let names: string[];
+    const skillsDir = path.join(templatesRoot, agentDir.name, "skills");
+    let skillEntries: Dirent[];
     try {
-      names = await readdir(commandsDir);
+      skillEntries = await readdir(skillsDir, { withFileTypes: true });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
       throw error;
     }
-    for (const name of names) {
-      files.push(path.join(commandsDir, name));
+    for (const entry of skillEntries) {
+      if (!entry.isDirectory()) continue;
+      files.push(path.join(skillsDir, entry.name, "SKILL.md"));
     }
   }
   return files;

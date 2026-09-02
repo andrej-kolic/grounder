@@ -28,6 +28,7 @@ import {
 } from "../connector/vault.js";
 import { helpExitCode } from "../help.js";
 import { VERSION } from "../index.js";
+import { retireLegacyCommands } from "../migrations/004-retire-legacy-commands.js";
 import { fileExists, isExecutable } from "../util/fs.js";
 import { flagBool, parseArgs } from "../util/parse-args.js";
 import { projectsParent } from "../vault/layout.js";
@@ -367,7 +368,7 @@ async function checkAgentArtifacts(
         checks.push(
           failCheck(
             id,
-            `${agent.name} command Node interpreter missing or not executable (${danglingNode})`,
+            `${agent.name} skill Node interpreter missing or not executable (${danglingNode})`,
             MIGRATE,
           ),
         );
@@ -386,9 +387,9 @@ async function checkAgentArtifacts(
           const previewCheck = checkFromInstallPreview(
             id,
             agent.name,
-            "command file(s)",
+            "skill file(s)",
             preview,
-            `${agent.name} command files up to date`,
+            `${agent.name} skill files up to date`,
           );
           checks.push(
             applyLedgerSchemaLag(previewCheck, {
@@ -403,24 +404,24 @@ async function checkAgentArtifacts(
         } catch (error: unknown) {
           const detail = error instanceof Error ? error.message : String(error);
           checks.push(
-            warnCheck(id, `${agent.name}: could not verify command drift (${detail})`, MIGRATE),
+            warnCheck(id, `${agent.name}: could not verify skill drift (${detail})`, MIGRATE),
           );
         }
       } else {
-        checks.push(okCheck(id, `${agent.name} command files present`));
+        checks.push(okCheck(id, `${agent.name} skill files present`));
       }
       continue;
     }
 
     const fix = `${MIGRATE_FORCE} (or --agent=${agent.id})`;
     if (presentCount === 0) {
-      checks.push(warnCheck(id, `${agent.name} detected but no Grounder command files`, fix));
+      checks.push(warnCheck(id, `${agent.name} detected but no Grounder skill files`, fix));
     } else {
       const missing = expected.filter((_, i) => !present[i]);
       checks.push(
         failCheck(
           id,
-          `${agent.name} missing ${missing.length} command file(s): ${missing.map((p) => path.basename(p)).join(", ")}`,
+          `${agent.name} missing ${missing.length} skill file(s): ${missing.map((p) => path.join(path.basename(path.dirname(p)), path.basename(p))).join(", ")}`,
           fix,
         ),
       );
@@ -428,6 +429,45 @@ async function checkAgentArtifacts(
   }
 
   return checks;
+}
+
+/**
+ * Detect pre-skill `grounder-*.md` command files a schema-3→4 upgrade should
+ * have retired but couldn't (hand-edited, or a pre-ledger install with no
+ * recorded hash to compare against). Reuses `retireLegacyCommands` itself in
+ * dry-run mode — identical existence/hash logic to what `migrate` uses to
+ * decide whether to delete, with `dryRun: true` guaranteeing no unlink runs.
+ *
+ * Only `left-modified` is reported: a plain `migrate` retires anything else
+ * (matching hash or `already-absent`) on its own, so warning there would just
+ * be noise ahead of a self-healing state. This is the backstop for the
+ * duplicate-command-menu failure mode regardless of whether the leftover came
+ * from `migrate` (declined without `--force`) or `setup --force` (never
+ * retires — see `docs/architecture/migrations.md`).
+ */
+async function checkLegacyCommands(
+  agents: AgentAdapter[],
+  state: GrounderState | null,
+  homeDir?: string,
+): Promise<CheckResult[]> {
+  const results = await retireLegacyCommands.run({
+    homeDir,
+    force: false,
+    dryRun: true,
+    agentIds: agents.map((agent) => agent.id),
+    state,
+  });
+  const nameById = new Map(agents.map((agent) => [agent.id, agent.name]));
+
+  return results
+    .filter((result) => result.status === "left-modified")
+    .map((result) =>
+      warnCheck(
+        `agent-${result.agentId}-legacy-commands`,
+        `${nameById.get(result.agentId) ?? result.agentId}: leftover pre-skill command file (superseded by skill, may duplicate the menu entry): ${result.path}`,
+        MIGRATE_FORCE,
+      ),
+    );
 }
 
 /**
@@ -590,9 +630,11 @@ async function runAgentChecks(
   stateReadable: boolean,
   homeDir?: string,
 ): Promise<CheckResult[]> {
+  const agents = await resolveAgents();
   const agentChecks = await checkAgentArtifacts(state, stateReadable, homeDir);
+  const legacyChecks = await checkLegacyCommands(agents, state, homeDir);
   const hookChecks = await checkAgentHooks(state, stateReadable, homeDir);
-  return [...agentChecks, ...hookChecks];
+  return [...agentChecks, ...legacyChecks, ...hookChecks];
 }
 
 async function runProjectChecks(

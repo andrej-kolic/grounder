@@ -167,7 +167,7 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
       process.stderr.write(
-        `\nHome config and vault scaffold were written, but agent command files/hooks were not installed:\n  ${detail}\n`,
+        `\nHome config and vault scaffold were written, but agent skill files/hooks were not installed:\n  ${detail}\n`,
       );
       return 1;
     }

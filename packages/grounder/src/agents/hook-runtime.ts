@@ -18,7 +18,7 @@
  * ## Design
  * On `setup`, materialize this package's `dist/` at
  * `~/.grounder/runtime/dist/` and point both host hook configs *and* the
- * commands copied into `~/.cursor/commands/` / `~/.claude/commands/` at:
+ * skills copied into `~/.cursor/skills/` / `~/.claude/skills/` at:
  *   `process.execPath` + `~/.grounder/runtime/dist/cli.js` + `<subcommand> …`
  * No global install and no registry fetch at invocation time, for either
  * surface. This mirrors how Corepack (packageManager shims) and Husky/lint-staged

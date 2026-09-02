@@ -214,11 +214,16 @@ Subcommands:
     listUsage: "migrate",
     usage: "grounder migrate [--force] [--dry-run] [--agent <id>] [--hooks]",
     flags: `Flags:
-  --force      Overwrite command files you edited locally; also needed
-               once when upgrading from Grounder before 0.3
+  --force      Overwrite skill files you edited locally; also needed
+               once when upgrading from Grounder before 0.3. Also
+               deletes locally-edited pre-skill grounder-*.md command
+               files left over from before 0.6 (edits are not ported)
   --dry-run    Preview without writing
   --agent <id> Limit to a specific agent (repeatable)
-  --hooks      Also install hooks if not previously installed`,
+  --hooks      Also install hooks if not previously installed
+
+Also retires pre-skill grounder-*.md command files superseded by
+SKILL.md packaging (safe ones automatically; edited ones need --force).`,
   },
   {
     id: "handoff peek",

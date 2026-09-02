@@ -8,14 +8,33 @@ const templatesRoot = path.resolve(
   "../../templates/agents",
 );
 
-const cursorHandoffTemplate = path.join(templatesRoot, "cursor/commands/grounder-task-handoff.md");
-const claudeHandoffTemplate = path.join(templatesRoot, "claude/commands/grounder-task-handoff.md");
+const cursorHandoffTemplate = path.join(
+  templatesRoot,
+  "cursor/skills/grounder-task-handoff/SKILL.md",
+);
+const claudeHandoffTemplate = path.join(
+  templatesRoot,
+  "claude/skills/grounder-task-handoff/SKILL.md",
+);
 const handoffTemplates = [cursorHandoffTemplate, claudeHandoffTemplate] as const;
 
+function stripFrontmatter(raw: string): string {
+  return raw.replace(/^---\n[\s\S]*?\n---\n\n/, "");
+}
+
 describe("templates/grounder-task-handoff", () => {
-  it("opens with a markdown-vault write, not an Obsidian vault", async () => {
+  it("has the intersection skill frontmatter", async () => {
     for (const filePath of handoffTemplates) {
       const body = await readFile(filePath, "utf8");
+      expect(body).toContain("name: grounder-task-handoff");
+      expect(body).toContain("disable-model-invocation: true");
+    }
+  });
+
+  it("opens with a markdown-vault write, not an Obsidian vault", async () => {
+    for (const filePath of handoffTemplates) {
+      const raw = await readFile(filePath, "utf8");
+      const body = stripFrontmatter(raw);
       expect(
         body.startsWith(
           "Write a session handoff checkpoint to the markdown vault for this project.",

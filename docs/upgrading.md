@@ -22,7 +22,7 @@ See also: [CLI reference](cli-reference.md) · [Configuration](configuration.md)
 
 | Flag           | Description                                                                                                    |
 | -------------- | -------------------------------------------------------------------------------------------------------------- |
-| `--force`      | Overwrite slash command files you edited locally; also needed **once** when upgrading from Grounder before 0.3 |
+| `--force`      | Overwrite skill files you edited locally; also needed **once** when upgrading from Grounder before 0.3 |
 | `--dry-run`    | Preview without writing                                                                                        |
 | `--agent <id>` | Limit to a specific agent (repeatable)                                                                         |
 | `--hooks`      | Install hooks even if they were never installed before                                                          |
@@ -30,6 +30,16 @@ See also: [CLI reference](cli-reference.md) · [Configuration](configuration.md)
 Untouched command files update automatically; locally edited ones (and pre-0.3 installs
 with no ledger) are skipped unless you pass `--force`. `setup --force` still works for
 scripts that already use it — it shares the same install path as `migrate`.
+
+**Upgrading from before 0.6** (`grounder-*.md` slash commands, not yet `SKILL.md`):
+`migrate` installs the new skill files and then deletes the old `~/.cursor/commands/` /
+`~/.claude/commands/grounder-*.md` files, but only ones it can prove are untouched (hash
+matches what Grounder last wrote). `--force` also deletes ones you edited locally —
+those edits are **not** ported into the new `SKILL.md`, so back up any customizations
+first. Files it can't safely delete are left in place and `grounder doctor` will keep
+flagging them (they can otherwise cause a duplicate `/grounder-*` menu entry) until you
+re-run with `--force`. Note that `grounder setup` never does this cleanup, even with
+`--force` — only `migrate` retires old install shapes.
 
 Contributor detail on the install ledger and hash drift:
 [Schema versioning and install migration](architecture/schema-versioning.md).

@@ -1,3 +1,9 @@
+---
+name: grounder-task
+description: Hydrate this session from the latest vault handoff and repo truth.
+disable-model-invocation: true
+---
+
 Hydrate this session from the latest vault handoff and repo truth.
 
 Read-only — do not write to the vault. Do not invent vault paths.
@@ -18,5 +24,5 @@ Otherwise, from the linked project folder or any subdirectory beneath it:
 
 5. Summarize briefly what is next (from the handoff `## Next` section when present), then start work.
 
-Run {{GROUNDER_CLI}} with `required_permissions: ["all"]` (vault is outside the workspace).
+The vault is outside the workspace — grant shell permissions if Claude Code prompts you.
 Use free-text after `/grounder-task` as optional focus (session name, index, or task hint).

@@ -1,3 +1,9 @@
+---
+name: grounder-note
+description: Save a note to the markdown vault for this project.
+disable-model-invocation: true
+---
+
 Save a note to the markdown vault for this project.
 
 Distill the instruction after `/grounder-note` into a clean note body — not a chat transcript.
