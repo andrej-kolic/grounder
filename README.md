@@ -71,7 +71,8 @@ grounder link
 
 Both commands preview what they'll write and ask to confirm. Add `--yes` to skip the
 prompt or `--dry-run` to see the preview without writing. `--hooks` is optional and adds a
-one-line reminder at session start when a saved session exists — see
+one-line reminder at session start when a saved session exists, plus — on Claude Code — a
+matching status-bar line shown once at session start — see
 [session-start hooks](docs/session-hooks.md).
 
 ## Daily use

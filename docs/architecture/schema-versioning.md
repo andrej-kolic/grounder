@@ -121,7 +121,7 @@ Three channels, no new product surface:
 | **`grounder doctor` / `status`** | Checks install state. Schema stale → warn + migrate. Schema too new → fail (upgrade grounder). Also shows package mismatch when present. Missing/non-executable Node in hooks or commands → fail + migrate ([details](./runtime-invocation.md)). |
 | **Session hook / `handoff peek`** | Checks **schemas only**. One-line teaser: `Install outdated — run: grounder migrate`. No auto-migrate. |
 | **`grounder statusline`** (Claude Code `statusLine`) | Checks **schemas only**, same helper as peek (`schemaMigrateNeeded`). See below for why it doesn't also check `grounderVersion`. |
-| **CLI upgrade banner** | Checks **`grounderVersion` only**. Package newer → migrate. Package older → install a newer Grounder. Skipped for peek, migrate, and setup. |
+| **CLI upgrade banner** | Checks **`grounderVersion` only**. Package newer → migrate. Package older → install a newer Grounder. Skipped for peek, statusline, migrate, and setup. |
 
 #### Schemas vs package version (keep separate)
 
@@ -132,25 +132,18 @@ These are two different checks. Do not mix them.
 | `commandsSchema` / `hooksSchema` | Did the install shape change? (files, placeholders, hooks) | Peek, doctor schema checks, hard stop if too new |
 | `grounderVersion` | Which package last wrote the ledger? | CLI banner, doctor/status package line |
 
-Why peek ignores `grounderVersion`: peek always says “run migrate.” But a package mismatch can also mean “this Grounder is too old — upgrade the package.” Wrong hint. The CLI banner handles that case. `cli.ts` skips the banner for peek on purpose.
+Why peek ignores `grounderVersion`: peek always says “run migrate.” But a package mismatch can also mean “this Grounder is too old — upgrade the package.” Wrong hint. The CLI banner handles that case. `cli.ts` skips the banner for peek (and, for the same reason, statusline) on purpose.
 
 For maintainers: bumping the package version is **not** enough for session hooks to warn. Bump the adapter schema when install output changes. That is what peek looks at.
 
-`grounder statusline` also stays schema-only, sharing `schemaMigrateNeeded` with peek —
-not just for the "package mismatch can mean upgrade, not migrate" reason above, but
-because a `grounderVersion` check is unreliable from where statusline actually runs.
-Both `statusline` and peek execute via the materialized copy at
-`~/.grounder/runtime/dist/cli.js` (see [Runtime invocation](./runtime-invocation.md)),
-not the ambient `grounder` the user typed. For a **symlink** install (durable source:
-global/monorepo), that copy's `VERSION` is always live-current, so it would fire on
-every upgrade the user hasn't migrated yet — mostly a harmless "just stamps the
-version" case. For a **copy** install (bare `npx`), the copy's baked `VERSION` and the
-recorded `grounderVersion` are always stamped together by the same `setup`/`migrate`
-run, so the comparison can never observe a newer release existing — the one case this
-check exists for. Net effect: noisy for the harmless case, silent for the case that
-matters. `grounder doctor` and the CLI upgrade banner run via genuine ambient
-resolution instead, so they're the correct place for a `grounderVersion` signal — see
-[Runtime invocation](./runtime-invocation.md) for the symlink/copy distinction.
+`grounder statusline` also stays schema-only, sharing `schemaMigrateNeeded` with peek.
+A `grounderVersion` check was tried there and reverted: both `statusline` and peek run
+via the materialized `~/.grounder/runtime` copy, not the ambient `grounder` the user
+typed, and from inside that copy a `grounderVersion` comparison ends up noisy for
+durable (symlink) installs and blind to the actual npx-copy staleness it would exist to
+catch — see the `schemaMigrateNeeded` docstring in `agents/schema-migrate-needed.ts`
+for the full reasoning, and [Runtime invocation](./runtime-invocation.md) for the
+symlink/copy distinction it depends on.
 
 ```mermaid
 flowchart TD

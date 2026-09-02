@@ -83,52 +83,84 @@ async function pruneStaleMarkers(dir: string): Promise<void> {
 }
 
 /**
- * True when this is the *first* `statusline` render for `sessionId` — i.e.
- * the handoff teaser should show now. Marks the session as seen as a side
- * effect (atomic create-exclusive write), so every later call for the same
- * `sessionId` returns `false`.
+ * True when `sessionId`'s handoff teaser has already been marked shown.
+ * Read-only — never marks a session as seen. Callers must call
+ * {@link markHandoffTeaserShown} themselves, and only once the teaser has
+ * actually reached stdout (see that function's docstring for why this is
+ * split in two instead of one check-and-mark call).
  *
- * When the marker already exists, its mtime is refreshed on every call
- * instead of left untouched — otherwise a session left open (or resumed)
- * past {@link MARKER_MAX_AGE_MS} would have its own marker swept by
+ * When a marker exists, its mtime is refreshed on every call instead of left
+ * untouched — otherwise a session left open (or resumed) past
+ * {@link MARKER_MAX_AGE_MS} would have its own marker swept by
  * {@link pruneStaleMarkers} and the teaser would reappear mid-session, which
  * contradicts "stays suppressed across a resume" (docs/session-hooks.md).
  * The refresh is a plain `utimes`, not a full prune pass, so a hot "already
- * seen" call stays cheap.
+ * shown" call stays cheap. This refresh is a liveness signal only — it does
+ * not affect what this call returns.
  *
- * A `sessionId` outside {@link SAFE_SESSION_ID} never touches disk — it's
- * treated like a filesystem error (see below).
+ * A `sessionId` outside {@link SAFE_SESSION_ID} never touches disk and always
+ * reports "not shown" — treated like a filesystem error (see below).
  *
- * Never throws. On any filesystem error, returns `true` (show it) — favors
- * an extra render of the teaser over a permanently stuck "never shows again".
+ * Never throws. On any filesystem error, returns `false` ("not shown yet") —
+ * favors an extra render of the teaser over a permanently stuck "never shows
+ * again".
  */
-export async function isFirstHandoffTeaserRender(
+export async function hasHandoffTeaserBeenShown(
   sessionId: string,
   homeDir?: string,
 ): Promise<boolean> {
   if (!isSafeSessionId(sessionId)) {
+    return false;
+  }
+
+  const file = path.join(seenDir(homeDir), sessionId);
+  try {
+    const now = new Date();
+    await utimes(file, now, now);
     return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Marks `sessionId`'s handoff teaser as shown (atomic create-exclusive
+ * write), so a later {@link hasHandoffTeaserBeenShown} call returns `true`.
+ *
+ * Call this *only* after the handoff line has actually reached stdout — not
+ * before resolving or printing it. Claude Code aborts an in-flight
+ * `statusLine` process when a newer refresh starts (overlapping spawns are
+ * expected at session start), and an aborted process's stdout is discarded.
+ * Marking up front (the previous behavior, check-and-mark in one call) let an
+ * aborted spawn's marker consume the one render the user would have actually
+ * seen: the next spawn would see "already shown" and print nothing, so the
+ * teaser could vanish without the user ever seeing it, with no way back
+ * (`--resume` reuses the same `session_id`). Marking only after a successful
+ * write means an aborted spawn simply never marks, and the next spawn tries
+ * again — the earlier `hasHandoffTeaserBeenShown` docstring's "favor an extra
+ * render" guarantee actually holds.
+ *
+ * Best-effort and idempotent: a concurrent duplicate write (two spawns both
+ * printing the line before either marks) just means the teaser rendered
+ * twice — the accepted fail-open trade-off, not an error.
+ *
+ * A `sessionId` outside {@link SAFE_SESSION_ID} never touches disk.
+ *
+ * Never throws.
+ */
+export async function markHandoffTeaserShown(sessionId: string, homeDir?: string): Promise<void> {
+  if (!isSafeSessionId(sessionId)) {
+    return;
   }
 
   const dir = seenDir(homeDir);
   const file = path.join(dir, sessionId);
   try {
     await mkdir(dir, { recursive: true });
-
-    try {
-      const now = new Date();
-      await utimes(file, now, now);
-      return false;
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
-        throw err;
-      }
-    }
-
     await pruneStaleMarkers(dir);
     await writeFile(file, "", { flag: "wx" });
-    return true;
-  } catch (err) {
-    return (err as NodeJS.ErrnoException).code !== "EEXIST";
+  } catch {
+    // EEXIST (already marked, e.g. a concurrent spawn) or any other
+    // filesystem error — best-effort, safe to ignore either way.
   }
 }

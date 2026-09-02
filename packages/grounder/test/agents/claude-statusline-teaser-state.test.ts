@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { claude } from "../../src/agents/claude.js";
 import {
   CLAUDE_AGENT_ID,
-  isFirstHandoffTeaserRender,
+  hasHandoffTeaserBeenShown,
+  markHandoffTeaserShown,
 } from "../../src/agents/claude-statusline-teaser-state.js";
 import { createTempEnv } from "../helpers.js";
 
@@ -22,27 +23,37 @@ describe("agents/claude-statusline-teaser-state", () => {
     expect(CLAUDE_AGENT_ID).toBe(claude.id);
   });
 
-  it("returns true on the first check for a session, false after", async () => {
+  it("reports not-shown until explicitly marked, then shown after", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    const first = await isFirstHandoffTeaserRender("session-a", env.home);
-    const second = await isFirstHandoffTeaserRender("session-a", env.home);
-    const third = await isFirstHandoffTeaserRender("session-a", env.home);
+    expect(await hasHandoffTeaserBeenShown("session-a", env.home)).toBe(false);
+    expect(await hasHandoffTeaserBeenShown("session-a", env.home)).toBe(false);
 
-    expect(first).toBe(true);
-    expect(second).toBe(false);
-    expect(third).toBe(false);
+    await markHandoffTeaserShown("session-a", env.home);
+
+    expect(await hasHandoffTeaserBeenShown("session-a", env.home)).toBe(true);
+    expect(await hasHandoffTeaserBeenShown("session-a", env.home)).toBe(true);
   });
 
   it("tracks each session id independently", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await isFirstHandoffTeaserRender("session-a", env.home);
+    await markHandoffTeaserShown("session-a", env.home);
 
-    expect(await isFirstHandoffTeaserRender("session-b", env.home)).toBe(true);
-    expect(await isFirstHandoffTeaserRender("session-a", env.home)).toBe(false);
+    expect(await hasHandoffTeaserBeenShown("session-b", env.home)).toBe(false);
+    expect(await hasHandoffTeaserBeenShown("session-a", env.home)).toBe(true);
+  });
+
+  it("marking is idempotent", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await markHandoffTeaserShown("session-a", env.home);
+    await markHandoffTeaserShown("session-a", env.home);
+
+    expect(await hasHandoffTeaserBeenShown("session-a", env.home)).toBe(true);
   });
 
   it("prunes markers older than 24h so the store does not grow unbounded", async () => {
@@ -56,7 +67,7 @@ describe("agents/claude-statusline-teaser-state", () => {
     const oldTime = new Date(Date.now() - 25 * 60 * 60 * 1000);
     await utimes(staleFile, oldTime, oldTime);
 
-    await isFirstHandoffTeaserRender("session-fresh", env.home);
+    await markHandoffTeaserShown("session-fresh", env.home);
 
     const remaining = await readdir(dir);
     expect(remaining.sort()).toEqual(["session-fresh"]);
@@ -66,8 +77,8 @@ describe("agents/claude-statusline-teaser-state", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await isFirstHandoffTeaserRender("session-a", env.home);
-    await isFirstHandoffTeaserRender("session-b", env.home);
+    await markHandoffTeaserShown("session-a", env.home);
+    await markHandoffTeaserShown("session-b", env.home);
 
     const dir = path.join(env.home, ".grounder", "tmp", CLAUDE_AGENT_ID, "statusline-seen");
     const remaining = await readdir(dir);
@@ -77,31 +88,36 @@ describe("agents/claude-statusline-teaser-state", () => {
   it("keeps suppressing a session whose own marker has aged past the prune window", async () => {
     // Regression guard: a session left open (or resumed) for >24h must stay
     // suppressed, per docs/session-hooks.md ("stays suppressed across a
-    // resume too"). Before the mtime refresh, the next check would prune the
-    // session's own stale-looking marker and show the teaser again.
+    // resume too"). A `hasHandoffTeaserBeenShown` check refreshes the
+    // marker's mtime, so a later prune pass (triggered by marking a
+    // different session) must not sweep this session's own stale-looking
+    // marker.
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    expect(await isFirstHandoffTeaserRender("session-a", env.home)).toBe(true);
+    await markHandoffTeaserShown("session-a", env.home);
 
     const dir = path.join(env.home, ".grounder", "tmp", CLAUDE_AGENT_ID, "statusline-seen");
     const file = path.join(dir, "session-a");
     const oldTime = new Date(Date.now() - 25 * 60 * 60 * 1000);
     await utimes(file, oldTime, oldTime);
 
-    expect(await isFirstHandoffTeaserRender("session-a", env.home)).toBe(false);
+    expect(await hasHandoffTeaserBeenShown("session-a", env.home)).toBe(true);
+
+    await markHandoffTeaserShown("session-b", env.home);
     const remaining = await readdir(dir);
-    expect(remaining).toEqual(["session-a"]);
+    expect(remaining.sort()).toEqual(["session-a", "session-b"]);
   });
 
-  it("treats a session id outside the safe charset as never-persisted (always shows, touches no file)", async () => {
+  it("treats a session id outside the safe charset as never-persisted (always not-shown, touches no file)", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
     const unsafeIds = ["../escape", "a/b", "..", ".", ""];
     for (const id of unsafeIds) {
-      expect(await isFirstHandoffTeaserRender(id, env.home)).toBe(true);
-      expect(await isFirstHandoffTeaserRender(id, env.home)).toBe(true);
+      expect(await hasHandoffTeaserBeenShown(id, env.home)).toBe(false);
+      await markHandoffTeaserShown(id, env.home);
+      expect(await hasHandoffTeaserBeenShown(id, env.home)).toBe(false);
     }
 
     const dir = path.join(env.home, ".grounder", "tmp", CLAUDE_AGENT_ID, "statusline-seen");

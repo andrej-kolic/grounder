@@ -22,6 +22,23 @@ export function labelFromHandoffFilename(filePath: string): string {
   return slug.replace(/-/g, " ");
 }
 
+/** Max characters kept from a handoff title before truncating with an ellipsis. */
+const MAX_LABEL_LENGTH = 80;
+
+/**
+ * Collapse embedded newlines/control characters to single spaces and cap
+ * length, so a malformed or unusually long `title` frontmatter value can't
+ * blow out the single-line surfaces this label renders on (the statusLine
+ * bar, the SessionStart teaser).
+ */
+function sanitizeLabel(label: string): string {
+  const collapsed = label.replace(/\s+/g, " ").trim();
+  if (collapsed.length <= MAX_LABEL_LENGTH) {
+    return collapsed;
+  }
+  return `${collapsed.slice(0, MAX_LABEL_LENGTH - 1)}…`;
+}
+
 function createdDateFromFilename(filePath: string): string | undefined {
   const stem = path.basename(filePath, ".md");
   const match = TIMESTAMP_STEM.exec(stem);
@@ -59,7 +76,7 @@ export async function resolveCurrentHandoffLabel(
     return undefined;
   }
   const fm = parseHandoffFrontmatter(usable.content);
-  const label = fm.title?.trim() || labelFromHandoffFilename(usable.path);
+  const label = sanitizeLabel(fm.title?.trim() || labelFromHandoffFilename(usable.path));
   const createdDate = formatCreatedDate(fm.created, usable.path);
   if (!createdDate) {
     return undefined;

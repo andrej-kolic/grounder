@@ -1,7 +1,12 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { claude, claudePeekHookCommand, claudeSettingsJsonPath } from "../../src/agents/claude.js";
+import {
+  claude,
+  claudePeekHookCommand,
+  claudeSettingsJsonPath,
+  claudeStatuslineCommand,
+} from "../../src/agents/claude.js";
 import {
   cursor,
   cursorHooksJsonPath,
@@ -349,6 +354,7 @@ describe("commands/setup", () => {
             },
           ],
         },
+        statusLine: { type: "command", command: claudeStatuslineCommand(env.home) },
       });
       expect(await readGrounderState(env.home)).toEqual({
         grounderVersion: VERSION,

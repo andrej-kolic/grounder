@@ -45,7 +45,8 @@ export const COMMANDS: readonly CommandMeta[] = [
   --force        Overwrite existing home config / generated files
   --agent <id>   Install for a specific agent (repeatable; default: auto-detect)
                  Supported: cursor, claude
-  --hooks        Also install session-start teaser hooks
+  --hooks        Also install session-start teaser hooks — and, on Claude Code,
+                 the statusLine command
   --dry-run      Preview without writing`,
   },
   {
@@ -218,7 +219,8 @@ Subcommands:
                once when upgrading from Grounder before 0.3
   --dry-run    Preview without writing
   --agent <id> Limit to a specific agent (repeatable)
-  --hooks      Also install hooks if not previously installed`,
+  --hooks      Also install hooks (and, on Claude Code, the statusLine command)
+               if not previously installed`,
   },
   {
     id: "handoff peek",
@@ -233,7 +235,7 @@ Subcommands:
   {
     id: "statusline",
     group: "Advanced",
-    summary: "One-line latest-handoff status (used by Claude Code's statusLine)",
+    summary: "One-shot handoff status, plus a migrate nudge (used by Claude Code's statusLine)",
     listUsage: "statusline",
     usage: "grounder statusline",
   },
