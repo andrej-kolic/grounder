@@ -76,7 +76,8 @@ Only `packages/grounder` is published to npm. Releases are tag-driven via GitHub
 (OIDC trusted publishing) — do not publish from a laptop for steady-state releases.
 
 1. Ensure `main` is green.
-2. Bump `version` in `packages/grounder/package.json` and merge to `main`.
+2. Set `version` in `packages/grounder/package.json` to the exact release (drop any
+   `-dev.N` suffix) and merge to `main`.
 3. Tag and push (tag must match the package version, e.g. `0.1.0` → `v0.1.0`):
 
 ```bash
@@ -86,6 +87,8 @@ git push origin v0.1.0
 
 4. Watch the [Release](https://github.com/andrej-kolic/grounder/actions/workflows/release.yml)
    workflow — it runs `pnpm check`, publishes to npm, and creates a GitHub Release.
+5. After the tag publishes, bump `version` to the next `x.y.z-dev.1` so `grounder -v`
+   does not claim the published number. Do not tag prereleases.
 
 ## Demo GIF
 
