@@ -24,9 +24,13 @@ export interface InstallCommandFileResult {
 /**
  * Install one slash-command markdown file with chezmoi-style drift detection.
  *
- * When the file already exists and `--force` is off:
- * - on-disk hash matches the ledger → safe to refresh to the new template
- * - no ledger hash, or on-disk hash differs → treat as user-edited (`modified`)
+ * On-disk content matching the rendered template is always `skipped` — even
+ * under `--force` — since there is nothing to overwrite. When it differs:
+ * - `--force` → overwrite unconditionally
+ * - on-disk hash matches the ledger → untouched since Grounder wrote it, safe
+ *   to refresh to the new template
+ * - no ledger hash, or on-disk hash differs from the ledger → user-edited,
+ *   protect content (`modified`)
  */
 export async function installCommandFile(
   opts: InstallCommandFileOptions,
@@ -38,25 +42,27 @@ export async function installCommandFile(
   const rendered = template.replaceAll("{{GROUNDER_CLI}}", runtimeInvocation(opts.homeDir));
   const renderedHash = hashContent(rendered);
 
-  if (existed && !opts.force) {
+  if (existed) {
     const onDisk = await readFile(dest, "utf8");
     const onDiskHash = hashContent(onDisk);
-    const state = await readGrounderState(opts.homeDir);
-    const recorded = recordedFileHash(state, opts.agentId, dest);
 
-    if (recorded !== undefined && recorded === onDiskHash) {
-      // Untouched since Grounder last wrote it — safe to auto-update.
-      if (onDiskHash === renderedHash) {
-        return { dest, status: "skipped", hash: renderedHash };
-      }
-      if (!opts.dryRun) {
-        await writeFile(dest, rendered);
-      }
-      return { dest, status: "overwritten", hash: renderedHash };
+    if (onDiskHash === renderedHash) {
+      return { dest, status: "skipped", hash: renderedHash };
     }
 
-    // Legacy (no hash) or user-edited — protect content.
-    return { dest, status: "modified" };
+    if (!opts.force) {
+      const state = await readGrounderState(opts.homeDir);
+      const recorded = recordedFileHash(state, opts.agentId, dest);
+      if (recorded === undefined || recorded !== onDiskHash) {
+        // Legacy (no hash) or user-edited — protect content.
+        return { dest, status: "modified" };
+      }
+    }
+
+    if (!opts.dryRun) {
+      await writeFile(dest, rendered);
+    }
+    return { dest, status: "overwritten", hash: renderedHash };
   }
 
   if (!opts.dryRun) {
@@ -64,11 +70,7 @@ export async function installCommandFile(
     await writeFile(dest, rendered);
   }
 
-  return {
-    dest,
-    status: existed ? "overwritten" : "created",
-    hash: renderedHash,
-  };
+  return { dest, status: "created", hash: renderedHash };
 }
 
 /**

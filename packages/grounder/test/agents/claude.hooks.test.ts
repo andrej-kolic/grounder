@@ -120,6 +120,20 @@ describe("agents/claude hooks", () => {
       });
     });
 
+    it("reports already-current under force as skipped, not overwritten", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      await claude.installHooks?.({ homeDir: env.home });
+      const before = await readFile(dest, "utf8");
+
+      const result = await claude.installHooks?.({ homeDir: env.home, force: true });
+
+      expect(result?.artifacts[dest]).toBe("skipped");
+      expect(await readFile(dest, "utf8")).toBe(before);
+    });
+
     it("migrates a legacy npx command without requiring force", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;

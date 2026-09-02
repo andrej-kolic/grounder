@@ -18,6 +18,17 @@ function legacyCursorNotePath(homeDir: string): string {
   return path.join(homeDir, ".cursor", "commands", "grounder-note.md");
 }
 
+/** True when the migrate table has a row with this exact status and path. */
+function hasRow(out: string, status: string, artifactPath: string): boolean {
+  return out.split("\n").some((line) => {
+    const trimmed = line.trimEnd();
+    if (!trimmed.endsWith(artifactPath)) {
+      return false;
+    }
+    return trimmed.trim().split(/\s+/)[0] === status;
+  });
+}
+
 describe("commands/migrate", () => {
   let cleanup: (() => Promise<void>) | undefined;
 
@@ -61,7 +72,7 @@ describe("commands/migrate", () => {
 
     expect(code).toBe(0);
     expect(out).toContain(`Vault root: ${env.vault}`);
-    expect(out).toContain("skill files already current");
+    expect(out).toContain("unchanged");
     expect(await readGrounderState(env.home)).toMatchObject({
       agents: { cursor: { commandsSchema: 4 } },
     });
@@ -82,7 +93,8 @@ describe("commands/migrate", () => {
 
     const skipped = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
     expect(skipped.code).toBe(0);
-    expect(skipped.out).toContain("locally modified (skipped — use --force)");
+    expect(hasRow(skipped.out, "conflict", noteDest)).toBe(true);
+    expect(skipped.out).toContain("left alone");
     expect(skipped.out).toContain("grounder migrate --force");
     expect(await readFile(noteDest, "utf8")).toBe("my local edits\n");
 
@@ -90,7 +102,7 @@ describe("commands/migrate", () => {
       runMigrateWithOptions({ homeDir: env.home, force: true }),
     );
     expect(forced.code).toBe(0);
-    expect(forced.out).toContain(`updated: ${noteDest}`);
+    expect(hasRow(forced.out, "updated", noteDest)).toBe(true);
     expect(await readFile(noteDest, "utf8")).not.toBe("my local edits\n");
   });
 
@@ -104,14 +116,22 @@ describe("commands/migrate", () => {
       homeDir: env.home,
       agents: ["cursor"],
     });
-    // Pre-0.3 / pre-ledger: command files exist, but no per-file hashes.
+    // Pre-0.3 / pre-ledger: command files exist with drift Grounder can't
+    // verify (no per-file hashes) — content differing from the current
+    // template is what actually needs protecting, so simulate that rather
+    // than leaving the freshly-installed (already-matching) content in place.
+    const { cursor } = await import("../../src/agents/cursor.js");
+    for (const filePath of cursor.expectedArtifacts(env.home)) {
+      const original = await readFile(filePath, "utf8");
+      await writeFile(filePath, `${original}\n<!-- legacy -->\n`, "utf8");
+    }
     const { rm } = await import("node:fs/promises");
     await rm(statePath(env.home), { force: true });
 
     const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
 
     expect(code).toBe(0);
-    expect(out).toContain("locally modified (skipped — use --force)");
+    expect(out).toContain("5 files left alone");
     expect(out).toContain("grounder migrate --force");
 
     const state = await readGrounderState(env.home);
@@ -148,8 +168,7 @@ describe("commands/migrate", () => {
     const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
 
     expect(code).toBe(0);
-    expect(out).toMatch(/Will refresh:\n(.|\n)*cursor {3}.*hooks\.json/);
-    expect(out).toMatch(/Cursor: 1 hook file already current/);
+    expect(hasRow(out, "unchanged", cursorHooksJsonPath(env.home))).toBe(true);
     expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(true);
   });
 
@@ -167,8 +186,7 @@ describe("commands/migrate", () => {
     const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
 
     expect(code).toBe(0);
-    expect(out).not.toMatch(/Cursor hook /);
-    expect(out).toContain("hooks    none previously installed (pass --hooks to install)");
+    expect(out).not.toContain(cursorHooksJsonPath(env.home));
     expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(false);
   });
 
@@ -194,16 +212,14 @@ describe("commands/migrate", () => {
     expect(out).toContain(
       "Refresh Grounder after an upgrade (slash commands/hooks; vault path unchanged).",
     );
-    expect(out).toContain("Would refresh:");
-    expect(out).not.toContain("Dry run");
-    expect(out).not.toContain("Will refresh:");
-    expect(out).toContain("would update:");
+    expect(out).toContain("Dry run — no files will be written.");
+    expect(hasRow(out, "updated", noteDest)).toBe(true);
     expect(
       out.indexOf(
         "Refresh Grounder after an upgrade (slash commands/hooks; vault path unchanged).",
       ),
-    ).toBeLessThan(out.indexOf("Would refresh:"));
-    expect(out).toContain(`Install state would update: ${statePath(env.home)}`);
+    ).toBeLessThan(out.indexOf("Dry run — no files will be written."));
+    expect(hasRow(out, "updated", statePath(env.home))).toBe(true);
     expect(out).not.toContain("grounder migrate --force");
     expect(await readFile(noteDest, "utf8")).toBe(before);
   });
@@ -226,8 +242,7 @@ describe("commands/migrate", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain(`  state    ${statePath(env.home)}`);
-    expect(out).toContain(`Install state would create: ${statePath(env.home)}`);
+    expect(hasRow(out, "created", statePath(env.home))).toBe(true);
   });
 
   it("skips unknown ledger agent ids and still migrates known ones", async () => {
@@ -264,7 +279,7 @@ describe("commands/migrate", () => {
     try {
       const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
       expect(code).toBe(0);
-      expect(out).toContain("skill files already current");
+      expect(out).toContain("unchanged");
       expect(errChunks.join("")).toContain("Skipping unknown agent(s) in install state: windsurf");
       expect(errChunks.join("")).toContain("Upgrade grounder");
     } finally {
@@ -376,7 +391,7 @@ describe("commands/migrate", () => {
       const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
 
       expect(code).toBe(0);
-      expect(out).toContain(`Deleted old command file: ${legacyPath}`);
+      expect(hasRow(out, "deleted", legacyPath)).toBe(true);
       expect(await fileExists(legacyPath)).toBe(false);
     });
 
@@ -397,7 +412,7 @@ describe("commands/migrate", () => {
       const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
 
       expect(code).toBe(0);
-      expect(out).toContain("1 old command file left in place");
+      expect(out).toContain("1 file left alone");
       expect(out).toContain(`  ${legacyPath}`);
       expect(out).toContain("grounder migrate --force");
       expect(await fileExists(legacyPath)).toBe(true);
@@ -406,9 +421,9 @@ describe("commands/migrate", () => {
         runMigrateWithOptions({ homeDir: env.home, force: true }),
       );
       expect(forced.code).toBe(0);
-      expect(forced.out).toContain(`Deleted old command file: ${legacyPath}`);
+      expect(hasRow(forced.out, "deleted", legacyPath)).toBe(true);
       expect(await fileExists(legacyPath)).toBe(false);
-      expect(forced.out).not.toContain("left in place");
+      expect(forced.out).not.toContain("left alone");
     });
 
     it("dry-run reports the retirement without deleting", async () => {
@@ -437,7 +452,7 @@ describe("commands/migrate", () => {
       );
 
       expect(code).toBe(0);
-      expect(out).toContain(`Would delete old command file: ${legacyPath}`);
+      expect(hasRow(out, "deleted", legacyPath)).toBe(true);
       expect(await fileExists(legacyPath)).toBe(true);
     });
 

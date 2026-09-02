@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { fileExists } from "../../src/util/fs.js";
 import { mergeJsonFile } from "../../src/util/merge-json.js";
 import { createTempEnv } from "../helpers.js";
 
@@ -51,7 +52,7 @@ describe("util/merge-json", () => {
       upsertSessionStart(current, { command: "npx grounder handoff peek" }),
     );
 
-    expect(result).toEqual({ ok: true, created: true });
+    expect(result).toEqual({ ok: true, created: true, changed: true });
     const written = JSON.parse(await readFile(filePath, "utf8")) as unknown;
     expect(written).toEqual({
       hooks: {
@@ -66,7 +67,7 @@ describe("util/merge-json", () => {
     const filePath = path.join(env.home, ".cursor", "hooks.json");
 
     const result = await mergeJsonFile(filePath, () => ({ version: 1 }));
-    expect(result).toEqual({ ok: true, created: true });
+    expect(result).toEqual({ ok: true, created: true, changed: true });
     expect(JSON.parse(await readFile(filePath, "utf8"))).toEqual({ version: 1 });
   });
 
@@ -91,7 +92,7 @@ describe("util/merge-json", () => {
       upsertSessionStart(current, { command: "npx grounder handoff peek" }),
     );
 
-    expect(result).toEqual({ ok: true, created: false });
+    expect(result).toEqual({ ok: true, created: false, changed: true });
     expect(JSON.parse(await readFile(filePath, "utf8"))).toEqual({
       version: 1,
       hooks: {
@@ -102,15 +103,17 @@ describe("util/merge-json", () => {
     });
   });
 
-  it("re-applying the same entry is idempotent", async () => {
+  it("re-applying the same entry is idempotent and reports no change", async () => {
     const filePath = await tempFile();
     const merge = (current: Record<string, unknown>) =>
       upsertSessionStart(current, { command: "npx grounder handoff peek" });
 
     await mergeJsonFile(filePath, merge);
+    const before = await readFile(filePath, "utf8");
     const second = await mergeJsonFile(filePath, merge);
 
-    expect(second).toEqual({ ok: true, created: false });
+    expect(second).toEqual({ ok: true, created: false, changed: false });
+    expect(await readFile(filePath, "utf8")).toBe(before);
     const written = JSON.parse(await readFile(filePath, "utf8")) as {
       hooks: { sessionStart: unknown[] };
     };
@@ -118,6 +121,17 @@ describe("util/merge-json", () => {
     expect(written.hooks.sessionStart[0]).toEqual({
       command: "npx grounder handoff peek",
     });
+  });
+
+  it("dry run reports the change without writing", async () => {
+    const filePath = await tempFile();
+    const merge = (current: Record<string, unknown>) =>
+      upsertSessionStart(current, { command: "npx grounder handoff peek" });
+
+    const result = await mergeJsonFile(filePath, merge, { dryRun: true });
+
+    expect(result).toEqual({ ok: true, created: true, changed: true });
+    expect(await fileExists(filePath)).toBe(false);
   });
 
   it("does not overwrite malformed JSON and returns a clear error", async () => {

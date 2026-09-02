@@ -321,12 +321,13 @@ describe("commands/doctor", () => {
     expect(code).toBe(0);
     expect(out).toContain("warn  install-state");
     expect(out).toContain("install state missing (pre-ledger / never migrated)");
-    expect(out).toContain("warn  agent-cursor");
-    expect(out).toContain("Cursor: 5 skill file(s) locally modified (needs --force to refresh)");
     expect(out).toContain("grounder migrate --force");
-    // Hooks content is still current — no schema-int warn without a ledger.
+    // Skill file content still matches the current template exactly — nothing
+    // to protect, so no per-agent warning without a ledger to compare against.
+    expect(out).toContain("ok    agent-cursor ");
+    expect(out).toContain("Cursor skill files up to date");
     expect(out).toContain("ok    agent-cursor-hooks");
-    expect(out).toMatch(/^\d+ passed, 0 failed, 2 warned$/m);
+    expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });
 
   it("warns when skill file hashes are missing (legacy / wiped ledger files)", async () => {
@@ -360,9 +361,13 @@ describe("commands/doctor", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain("warn  agent-cursor");
-    expect(out).toContain("Cursor: 5 skill file(s) locally modified (needs --force to refresh)");
-    expect(out).toContain("grounder migrate --force");
+    expect(out).toContain("warn  agent-cursor ");
+    // Skill file content still matches the current template exactly — the
+    // ledger just hasn't caught up, so a plain migrate (no --force) fixes it.
+    expect(out).toContain(
+      "Cursor: commands schema behind in ledger (recorded 0, current 4; files match)",
+    );
+    expect(out).toContain("grounder migrate");
     expect(out).not.toContain("package-version");
     expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
   });

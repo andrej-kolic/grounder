@@ -12,6 +12,7 @@ import {
   recordedHooksSchema,
   statePath,
 } from "../connector/state.js";
+import { fileExists } from "../util/fs.js";
 export interface ApplyAgentInstallsOptions {
   agents: AgentAdapter[];
   force?: boolean;
@@ -25,6 +26,8 @@ export interface ApplyAgentInstallsOptions {
   refreshInstalledHooks?: boolean;
   dryRun?: boolean;
   homeDir?: string;
+  /** Suppress all stdout reporting — caller renders the returned result itself. */
+  quiet?: boolean;
 }
 
 export interface AgentApplyResult {
@@ -51,12 +54,7 @@ async function agentHasInstalledHooks(agent: AgentAdapter, homeDir?: string): Pr
   return false;
 }
 
-/**
- * Whether hooks would be (re)installed for this agent under the given
- * options/state. Shared by the actual install pass below and by `migrate`'s
- * dry preview, so the preview can't drift from what actually happens.
- */
-export async function shouldInstallHooks(
+async function shouldInstallHooks(
   agent: AgentAdapter,
   opts: Pick<ApplyAgentInstallsOptions, "hooks" | "refreshInstalledHooks" | "homeDir">,
   state: GrounderState | null,
@@ -147,6 +145,7 @@ export async function applyAgentInstalls(
 ): Promise<ApplyAgentInstallsResult> {
   const force = opts.force ?? false;
   const dryRun = opts.dryRun ?? false;
+  const quiet = opts.quiet ?? false;
   const homeDir = opts.homeDir;
   const agents = opts.agents;
   const state = await readGrounderState(homeDir);
@@ -155,13 +154,21 @@ export async function applyAgentInstalls(
   let runtime: ApplyAgentInstallsResult["runtime"];
   if (agents.length > 0) {
     if (dryRun) {
-      process.stdout.write(`✓ Grounder runtime would refresh: ${runtimeCliPath(homeDir)}\n`);
+      const cliPath = runtimeCliPath(homeDir);
+      runtime = {
+        cliPath,
+        status: (await fileExists(cliPath)) ? "overwritten" : "created",
+        mode: "symlink",
+      };
     } else {
       runtime = await installHookRuntime({ homeDir });
+    }
+    if (!quiet) {
+      const verb = dryRun ? "would refresh" : "installed";
       const runtimeLabel =
         runtime.status === "skipped"
           ? "already exists (skipped)"
-          : `installed (${runtime.mode}): ${runtime.cliPath}`;
+          : `${verb} (${runtime.mode}): ${runtime.cliPath}`;
       process.stdout.write(`✓ Grounder runtime ${runtimeLabel}\n`);
     }
   }
@@ -170,7 +177,9 @@ export async function applyAgentInstalls(
 
   for (const agent of agents) {
     const commands = await agent.install({ force, dryRun, homeDir });
-    printArtifactResults(agent.name, "skill", commands, dryRun);
+    if (!quiet) {
+      printArtifactResults(agent.name, "skill", commands, dryRun);
+    }
 
     let hooksResult: AgentInstallResult | undefined;
     let hooksInstalled = false;
@@ -179,7 +188,9 @@ export async function applyAgentInstalls(
       if (installHooks) {
         hooksResult = await installHooks({ force, dryRun, homeDir });
         hooksInstalled = true;
-        printArtifactResults(agent.name, "hook", hooksResult, dryRun);
+        if (!quiet) {
+          printArtifactResults(agent.name, "hook", hooksResult, dryRun);
+        }
       }
     }
 
@@ -202,7 +213,7 @@ export async function applyAgentInstalls(
     results.push({ agent, commands, hooks: hooksResult });
   }
 
-  if (agents.length > 0) {
+  if (agents.length > 0 && !quiet) {
     const ledger = statePath(homeDir);
     if (dryRun) {
       process.stdout.write(
@@ -217,14 +228,16 @@ export async function applyAgentInstalls(
     }
   }
 
-  const modifiedWithoutForce =
-    !force &&
-    results.some((r) => Object.values(r.commands.artifacts).some((s) => s === "modified"));
-  if (modifiedWithoutForce) {
-    process.stdout.write(
-      "\nNote: some skill files were left alone (local edits, or an install from before Grounder 0.3).\n" +
-        "  To refresh them: grounder migrate --force\n",
-    );
+  if (!quiet) {
+    const modifiedWithoutForce =
+      !force &&
+      results.some((r) => Object.values(r.commands.artifacts).some((s) => s === "modified"));
+    if (modifiedWithoutForce) {
+      process.stdout.write(
+        "\nNote: some skill files were left alone (local edits, or an install from before Grounder 0.3).\n" +
+          "  To refresh them: grounder migrate --force\n",
+      );
+    }
   }
 
   return { runtime, agents: results };

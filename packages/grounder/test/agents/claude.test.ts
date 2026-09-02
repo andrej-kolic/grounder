@@ -129,21 +129,26 @@ describe("agents/claude", () => {
       expect(result.artifacts[taskDest]).toBe("skipped");
     });
 
-    it("overwrites if force is true", async () => {
+    it("overwrites locally modified files if force is true, leaving unchanged ones alone", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
 
       await claude.install({ homeDir: env.home });
-      const result = await claude.install({ homeDir: env.home, force: true });
       const noteDest = grounderNoteCommandPath(env.home);
+      await writeFile(noteDest, "my custom edits\n", "utf8");
+      const result = await claude.install({ homeDir: env.home, force: true });
       const planDest = grounderPlanCommandPath(env.home);
       const handoffDest = grounderTaskHandoffCommandPath(env.home);
       const taskDest = grounderTaskCommandPath(env.home);
 
+      // Only the file that actually differs from the template gets rewritten —
+      // force overrides the "protect local edits" guard, not the "already
+      // matches the template" check.
       expect(result.artifacts[noteDest]).toBe("overwritten");
-      expect(result.artifacts[planDest]).toBe("overwritten");
-      expect(result.artifacts[handoffDest]).toBe("overwritten");
-      expect(result.artifacts[taskDest]).toBe("overwritten");
+      expect(result.artifacts[planDest]).toBe("skipped");
+      expect(result.artifacts[handoffDest]).toBe("skipped");
+      expect(result.artifacts[taskDest]).toBe("skipped");
+      expect(await readFile(noteDest, "utf8")).toContain(runtimeInvocation(env.home));
     });
   });
 

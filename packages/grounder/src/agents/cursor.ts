@@ -231,25 +231,29 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
     return { artifacts: { [dest]: "skipped" } };
   }
 
-  if (opts.dryRun) {
-    const fileExisted = await fileExists(dest);
-    const hadGrounderEntry = fileExisted && (await peekHookHadGrounderEntry(dest));
-    const status: ArtifactStatus = hadGrounderEntry ? "overwritten" : "created";
-    return { artifacts: { [dest]: status } };
+  if (!opts.dryRun) {
+    await installHookRuntime({ homeDir: opts.homeDir });
   }
-
-  await installHookRuntime({ homeDir: opts.homeDir });
   const fileExisted = await fileExists(dest);
   const hadGrounderEntry = fileExisted && (await peekHookHadGrounderEntry(dest));
-  const result = await mergeJsonFile(dest, (current) =>
-    mergeCursorHooks(current, !fileExisted, opts.homeDir),
+  const result = await mergeJsonFile(
+    dest,
+    (current) => mergeCursorHooks(current, !fileExisted, opts.homeDir),
+    { dryRun: opts.dryRun },
   );
 
   if (!result.ok) {
     throw new Error(result.message);
   }
 
-  const status: ArtifactStatus = hadGrounderEntry ? "overwritten" : "created";
+  // `force` can land here even when nothing would actually change (e.g. the
+  // canonical entry is correct but the runtime symlink was stale) — trust
+  // the merge's own before/after comparison, not just "did we run it."
+  const status: ArtifactStatus = !result.changed
+    ? "skipped"
+    : hadGrounderEntry
+      ? "overwritten"
+      : "created";
   return { artifacts: { [dest]: status } };
 }
 
