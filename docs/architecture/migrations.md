@@ -83,8 +83,8 @@ Both flags carry the same meaning they already have for command install:
   distinguishes the two (delete vs. overwrite) since `--force` does something different to each.
 - `--dry-run` previews without touching disk: a retirable legacy file shows as `deleted` in the
   STATUS/TARGET/PATH table (dry-run and a real run use the same table word — see
-  `commands/migrate.ts`'s `TABLE_LABEL`), and a `left-modified` one shows as `conflict`, listed in
-  the "left alone" footer below the table. `already-absent` never appears in either — it's not a
+  `render-artifact-table.ts`'s `TABLE_LABEL`), and a `left-modified` one shows as `conflict`, listed
+  in the "left alone" footer below the table. `already-absent` never appears in either — it's not a
   decision, it's nothing happening.
 
 ### Wired into `migrate` only, never `setup`
@@ -128,5 +128,6 @@ ledger consistent with whatever migrations actually completed, not silently behi
    never actually differs; dry-run-ness is announced once above the table, not re-conjugated per
    row. And a status that can repeat across many files (e.g. `left-modified`, shown as `conflict`)
    belongs in one grouped footer block listing every path once (`renderModifiedNote` in
-   `commands/migrate.ts`), not a second per-file line beyond its table row — a per-file line is for
-   something that actually happened to that specific file (created, overwritten, deleted).
+   `render-artifact-table.ts`, shared by `setup` and `migrate`), not a second per-file line beyond
+   its table row — a per-file line is for something that actually happened to that specific file
+   (created, overwritten, deleted).

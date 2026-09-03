@@ -1,13 +1,20 @@
 import { type AgentAdapter, ALL_AGENTS, resolveAgents } from "../agents/index.js";
-import type { ArtifactStatus } from "../agents/types.js";
 import { readHomeConfig, withHomeDir } from "../connector/home.js";
 import { assertAgentSchemasSupported, readGrounderState, statePath } from "../connector/state.js";
 import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
 import { helpExitCode } from "../help.js";
 import { runMigrations } from "../migrations/index.js";
-import type { LegacyRetireStatus } from "../migrations/types.js";
 import { flagBool, flagStrings, parseArgs } from "../util/parse-args.js";
 import { applyAgentInstalls } from "./apply-agent-installs.js";
+import {
+  type Row,
+  renderModifiedNote,
+  renderSummary,
+  renderTable,
+  rowsFromApplyResult,
+  stateRow,
+  toLegacyRowStatus,
+} from "./render-artifact-table.js";
 
 export interface MigrateOptions {
   force?: boolean;
@@ -16,160 +23,6 @@ export interface MigrateOptions {
   homeDir?: string;
   /** Agent ids to migrate. Defaults to ledger keys, else auto-detect. */
   agents?: string[];
-}
-
-/** A row's plan status, independent of tense — "current" never changes wording; the
- * others are rendered as an infinitive in a dry run and past tense in a real one. */
-type RowStatus = "current" | "create" | "update" | "delete" | "modified";
-
-interface Row {
-  status: RowStatus;
-  target: string;
-  path: string;
-  /** Only meaningful when `status === "modified"` — what `--force` would do to this path. */
-  forceAction?: "overwrite" | "delete";
-}
-
-function toRowStatus(status: ArtifactStatus): RowStatus {
-  switch (status) {
-    case "skipped":
-      return "current";
-    case "created":
-      return "create";
-    case "overwritten":
-      return "update";
-    case "modified":
-      return "modified";
-  }
-}
-
-function toLegacyRowStatus(status: LegacyRetireStatus): RowStatus | undefined {
-  switch (status) {
-    case "retired":
-      return "delete";
-    case "left-modified":
-      return "modified";
-    case "already-absent":
-      return undefined;
-  }
-}
-
-const VERB: Record<RowStatus, { dry: string; real: string }> = {
-  current: { dry: "current", real: "current" },
-  create: { dry: "create", real: "created" },
-  update: { dry: "update", real: "updated" },
-  delete: { dry: "delete", real: "deleted" },
-  modified: { dry: "modified", real: "modified" },
-};
-
-/**
- * Table cell label per status — the same word in dry-run and real, so the
- * table asserts one outcome vocabulary instead of reconjugating per row
- * (matching `kubectl apply`'s created/configured/unchanged). Dry-run-ness is
- * already announced once above the table and in the summary sentence, which
- * keeps its own tense (`VERB` above) since "would create" is a sentence
- * construction, not a table cell.
- *
- * `modified` is deliberately not "modified" here: that word would read as
- * Grounder having modified the file, when the row means the opposite — a
- * local edit was found and Grounder left it untouched. "conflict" names that
- * outcome without implying an action was taken (see the STATUS header below,
- * not ACTION, for the same reason).
- */
-const TABLE_LABEL: Record<RowStatus, string> = {
-  current: "unchanged",
-  create: "created",
-  update: "updated",
-  delete: "deleted",
-  modified: "conflict",
-};
-
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
-}
-
-function renderTable(rows: Row[]): void {
-  const statusWidth =
-    Math.max("STATUS".length, ...rows.map((r) => TABLE_LABEL[r.status].length)) + 1;
-  const targetWidth = Math.max("TARGET".length, ...rows.map((r) => r.target.length)) + 1;
-  process.stdout.write(`${"STATUS".padEnd(statusWidth)}${"TARGET".padEnd(targetWidth)}PATH\n`);
-  for (const row of rows) {
-    const verb = TABLE_LABEL[row.status];
-    process.stdout.write(
-      `${verb.padEnd(statusWidth)}${row.target.padEnd(targetWidth)}${row.path}\n`,
-    );
-  }
-}
-
-function renderSummary(rows: Row[], dryRun: boolean): void {
-  const counts: Record<RowStatus, number> = {
-    current: 0,
-    create: 0,
-    update: 0,
-    delete: 0,
-    modified: 0,
-  };
-  for (const row of rows) {
-    counts[row.status]++;
-  }
-
-  const acted: string[] = [];
-  for (const status of ["create", "update", "delete"] as const) {
-    if (counts[status] > 0) {
-      acted.push(`${VERB[status][dryRun ? "dry" : "real"]} ${counts[status]}`);
-    }
-  }
-
-  if (acted.length === 0) {
-    process.stdout.write(
-      counts.current > 0
-        ? `Nothing to do — ${plural(counts.current, "file")} unchanged.\n`
-        : "Nothing to do.\n",
-    );
-    return;
-  }
-
-  let line: string;
-  if (dryRun) {
-    line = `Would ${acted.join(", ")}`;
-    if (counts.current > 0) {
-      line += `, leave ${plural(counts.current, "file")} unchanged`;
-    }
-    line += ". Run without --dry-run to apply.";
-  } else {
-    line = acted.join(", ");
-    if (counts.current > 0) {
-      line += `, ${plural(counts.current, "file")} unchanged`;
-    }
-    line += ".";
-    line = line[0]?.toUpperCase() + line.slice(1);
-  }
-  process.stdout.write(`${line}\n`);
-}
-
-function renderModifiedNote(rows: Row[]): void {
-  const modified = rows.filter((r) => r.status === "modified");
-  if (modified.length === 0) {
-    return;
-  }
-  process.stdout.write(
-    `\n${plural(modified.length, "file")} left alone — Grounder can't confirm ${
-      modified.length === 1 ? "it's" : "they're"
-    } unedited:\n`,
-  );
-  for (const row of modified) {
-    const action = row.forceAction === "delete" ? "would be deleted" : "would be overwritten";
-    process.stdout.write(`  ${row.path} (${action})\n`);
-  }
-  const hasOverwrite = modified.some((r) => r.forceAction !== "delete");
-  const hasDelete = modified.some((r) => r.forceAction === "delete");
-  const verb =
-    hasOverwrite && hasDelete ? "overwrite or delete" : hasDelete ? "delete" : "overwrite";
-  process.stdout.write(
-    `Run 'grounder migrate --force' to ${verb} ${
-      modified.length === 1 ? "it" : "them"
-    } (any local edits are lost).\n`,
-  );
 }
 
 /**
@@ -274,7 +127,6 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
       refreshInstalledHooks: true,
       dryRun,
       homeDir,
-      quiet: true,
     });
 
     const migrationResults = await runMigrations({
@@ -285,48 +137,32 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
       state: await readGrounderState(homeDir),
     });
 
-    const rows: Row[] = [];
-    if (applyResult.runtime) {
-      rows.push({
-        status: toRowStatus(applyResult.runtime.status),
-        target: "runtime",
-        path: applyResult.runtime.cliPath,
-      });
-    }
-    for (const agentResult of applyResult.agents) {
-      for (const [path, status] of Object.entries(agentResult.commands.artifacts)) {
-        rows.push({
-          status: toRowStatus(status),
-          target: agentResult.agent.id,
-          path,
-          forceAction: status === "modified" ? "overwrite" : undefined,
-        });
-      }
-      if (agentResult.hooks) {
-        for (const [path, status] of Object.entries(agentResult.hooks.artifacts)) {
-          rows.push({
-            status: toRowStatus(status),
-            target: agentResult.agent.id,
-            path,
-            forceAction: status === "modified" ? "overwrite" : undefined,
-          });
-        }
-      }
-      for (const result of migrationResults) {
-        if (result.agentId !== agentResult.agent.id) {
-          continue;
-        }
-        const rowStatus = toLegacyRowStatus(result.status);
-        if (rowStatus) {
-          rows.push({
-            status: rowStatus,
-            target: agentResult.agent.id,
-            path: result.path,
-            forceAction: result.status === "left-modified" ? "delete" : undefined,
-          });
+    // Grouped by agent id so each agent's legacy-retirement rows land right
+    // after that same agent's own command/hook rows (see `rowsFromApplyResult`)
+    // instead of every agent's rows followed by every agent's legacy rows.
+    const legacyRowsByAgent = new Map<string, Row[]>();
+    for (const result of migrationResults) {
+      const rowStatus = toLegacyRowStatus(result.status);
+      if (rowStatus) {
+        const row: Row = {
+          status: rowStatus,
+          target: result.agentId,
+          path: result.path,
+          forceAction: result.status === "left-modified" ? "delete" : undefined,
+        };
+        const existing = legacyRowsByAgent.get(result.agentId);
+        if (existing) {
+          existing.push(row);
+        } else {
+          legacyRowsByAgent.set(result.agentId, [row]);
         }
       }
     }
+
+    const rows: Row[] = rowsFromApplyResult(
+      applyResult,
+      (agentId) => legacyRowsByAgent.get(agentId) ?? [],
+    );
 
     // `ledgerChanged` is computed once, by the same code, whether or not this
     // is `--dry-run` — `applyAgentInstalls`/`recordAgentInstallState` and
@@ -338,18 +174,18 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
     const ledgerChanged =
       applyResult.agents.some((a) => a.ledgerChanged) ||
       migrationResults.some((r) => r.ledgerChanged);
-    // Driven entirely by `ledgerChanged` — `!state` only picks the word
-    // ("create" vs "update"), it can't force a change that isn't there. In
-    // practice `!state && agents.length > 0` always yields `ledgerChanged`
-    // (any write against a missing ledger changes it), but this stays correct
-    // even if a future adapter path could reach here without writing.
-    const stateStatus: RowStatus = !ledgerChanged ? "current" : !state ? "create" : "update";
-    rows.push({ status: stateStatus, target: "state", path: statePath(homeDir) });
+    // `stateRow` is driven entirely by `ledgerChanged` — `state` only picks
+    // the word ("create" vs "update"), it can't force a change that isn't
+    // there. In practice `!state && agents.length > 0` always yields
+    // `ledgerChanged` (any write against a missing ledger changes it), but
+    // this stays correct even if a future adapter path could reach here
+    // without writing.
+    rows.push(stateRow(ledgerChanged, state, statePath(homeDir)));
 
     renderTable(rows);
     process.stdout.write("\n");
     renderSummary(rows, dryRun);
-    renderModifiedNote(rows);
+    renderModifiedNote(rows, "grounder migrate");
 
     return 0;
   });

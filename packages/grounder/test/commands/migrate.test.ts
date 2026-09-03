@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { grounderNoteCommandPath as claudeNoteCommandPath } from "../../src/agents/claude.js";
 import { cursorHooksJsonPath, grounderNoteCommandPath } from "../../src/agents/cursor.js";
 import { runtimeCliPath } from "../../src/agents/hook-runtime.js";
 import { runMigrateWithOptions } from "../../src/commands/migrate.js";
@@ -13,21 +14,14 @@ import {
 } from "../../src/connector/state.js";
 import { fileExists } from "../../src/util/fs.js";
 import { hashContent } from "../../src/util/hash.js";
-import { captureStdout, createTempEnv } from "../helpers.js";
+import { captureStdout, createTempEnv, hasRow } from "../helpers.js";
 
 function legacyCursorNotePath(homeDir: string): string {
   return path.join(homeDir, ".cursor", "commands", "grounder-note.md");
 }
 
-/** True when the migrate table has a row with this exact status and path. */
-function hasRow(out: string, status: string, artifactPath: string): boolean {
-  return out.split("\n").some((line) => {
-    const trimmed = line.trimEnd();
-    if (!trimmed.endsWith(artifactPath)) {
-      return false;
-    }
-    return trimmed.trim().split(/\s+/)[0] === status;
-  });
+function legacyClaudeNotePath(homeDir: string): string {
+  return path.join(homeDir, ".claude", "commands", "grounder-note.md");
 }
 
 describe("commands/migrate", () => {
@@ -158,6 +152,15 @@ describe("commands/migrate", () => {
     expect(code).toBe(0);
     expect(hasRow(out, "conflict", grounderNoteCommandPath(env.home))).toBe(true);
     expect(hasRow(out, "unchanged", statePath(env.home))).toBe(true);
+    // A conflict is pending work — the summary must not claim there's nothing
+    // to do just because nothing was created/updated/deleted.
+    expect(out).not.toContain("Nothing to do");
+    expect(out).toContain("left as a conflict");
+    // Nothing would actually be created/updated/deleted by re-running without
+    // --dry-run when the only pending row is a conflict — --force is what
+    // resolves it, so the summary must not tell the reader to drop --dry-run.
+    expect(out).not.toContain("Run without --dry-run to apply");
+    expect(out).toContain("Run with --force to resolve");
   });
 
   it("reports locally modified files and overwrites with --force", async () => {
@@ -250,7 +253,7 @@ describe("commands/migrate", () => {
     const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
 
     expect(code).toBe(0);
-    expect(hasRow(out, "unchanged", cursorHooksJsonPath(env.home))).toBe(true);
+    expect(hasRow(out, "unchanged", cursorHooksJsonPath(env.home), "cursor hook")).toBe(true);
     expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(true);
   });
 
@@ -641,6 +644,50 @@ describe("commands/migrate", () => {
 
       expect(await fileExists(legacyPath)).toBe(true);
       expect(await readFile(legacyPath, "utf8")).toBe("pre-existing legacy file\n");
+    });
+
+    it("groups each agent's legacy-retirement row with that agent's own rows, not after every agent's rows", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      await runSetupWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        homeDir: env.home,
+        agents: ["cursor", "claude"],
+      });
+
+      // A retirable legacy leftover for both agents, hash matching the
+      // ledger so both retire cleanly (no conflict).
+      for (const [agentId, legacyPath] of [
+        ["cursor", legacyCursorNotePath(env.home)],
+        ["claude", legacyClaudeNotePath(env.home)],
+      ] as const) {
+        await mkdir(path.dirname(legacyPath), { recursive: true });
+        const legacyContent = `old pre-skill ${agentId} note command\n`;
+        await writeFile(legacyPath, legacyContent, "utf8");
+        await recordAgentInstall({
+          agentId,
+          grounderVersion: "0.5.0",
+          files: { [legacyPath]: { hash: hashContent(legacyContent) } },
+          homeDir: env.home,
+        });
+      }
+
+      const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+
+      expect(code).toBe(0);
+      expect(hasRow(out, "deleted", legacyCursorNotePath(env.home), "cursor")).toBe(true);
+      expect(hasRow(out, "deleted", legacyClaudeNotePath(env.home), "claude")).toBe(true);
+
+      // cursor's legacy row must land before claude's own rows start, not
+      // after all of claude's rows — i.e. grouped per agent, not appended in
+      // one trailing block after every agent.
+      const cursorLegacyIndex = out.indexOf(legacyCursorNotePath(env.home));
+      const claudeOwnRowIndex = out.indexOf(claudeNoteCommandPath(env.home));
+      expect(cursorLegacyIndex).toBeGreaterThan(-1);
+      expect(claudeOwnRowIndex).toBeGreaterThan(-1);
+      expect(cursorLegacyIndex).toBeLessThan(claudeOwnRowIndex);
     });
   });
 });

@@ -57,6 +57,7 @@ commands/             # mirrors CLI structure
   output.ts           # shared formatting (doctor/status + vault item lists)
   migrate.ts          # grounder migrate (refresh install after upgrade)
   apply-agent-installs.ts # shared agent install loop (setup + migrate)
+  render-artifact-table.ts # shared STATUS/TARGET/PATH table + summary (setup + migrate)
   upgrade-banner.ts   # stderr notice when package version ahead of ledger
 agents/               # AgentAdapter registry (pluggable install targets)
   types.ts            # AgentAdapter interface
