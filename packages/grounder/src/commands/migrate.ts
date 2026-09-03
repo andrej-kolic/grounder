@@ -68,10 +68,11 @@ const VERB: Record<RowStatus, { dry: string; real: string }> = {
  * keeps its own tense (`VERB` above) since "would create" is a sentence
  * construction, not a table cell.
  *
- * `modified` is deliberately not "modified" here: under an ACTION column
- * that reads as Grounder having modified the file, when the row means the
- * opposite — a local edit was found and Grounder left it untouched. "conflict"
- * names that outcome without implying an action was taken.
+ * `modified` is deliberately not "modified" here: that word would read as
+ * Grounder having modified the file, when the row means the opposite — a
+ * local edit was found and Grounder left it untouched. "conflict" names that
+ * outcome without implying an action was taken (see the STATUS header below,
+ * not ACTION, for the same reason).
  */
 const TABLE_LABEL: Record<RowStatus, string> = {
   current: "unchanged",
@@ -87,9 +88,9 @@ function plural(count: number, noun: string): string {
 
 function renderTable(rows: Row[]): void {
   const statusWidth =
-    Math.max("ACTION".length, ...rows.map((r) => TABLE_LABEL[r.status].length)) + 1;
+    Math.max("STATUS".length, ...rows.map((r) => TABLE_LABEL[r.status].length)) + 1;
   const agentWidth = Math.max("TARGET".length, ...rows.map((r) => r.agent.length)) + 1;
-  process.stdout.write(`${"ACTION".padEnd(statusWidth)}${"TARGET".padEnd(agentWidth)}PATH\n`);
+  process.stdout.write(`${"STATUS".padEnd(statusWidth)}${"TARGET".padEnd(agentWidth)}PATH\n`);
   for (const row of rows) {
     const verb = TABLE_LABEL[row.status];
     process.stdout.write(`${verb.padEnd(statusWidth)}${row.agent.padEnd(agentWidth)}${row.path}\n`);
