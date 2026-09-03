@@ -413,7 +413,10 @@ async function checkAgentArtifacts(
       continue;
     }
 
-    const fix = `${MIGRATE_FORCE} (or --agent=${agent.id})`;
+    // Missing files are always safe to create with a plain migrate — no
+    // conflict to override, since `installCommandFile` only reaches for
+    // `--force` when a file already exists with different content.
+    const fix = `${MIGRATE} (or --agent=${agent.id})`;
     if (presentCount === 0) {
       checks.push(warnCheck(id, `${agent.name} detected but no Grounder skill files`, fix));
     } else {
@@ -433,17 +436,18 @@ async function checkAgentArtifacts(
 
 /**
  * Detect pre-skill `grounder-*.md` command files a schema-3→4 upgrade should
- * have retired but couldn't (hand-edited, or a pre-ledger install with no
- * recorded hash to compare against). Reuses `retireLegacyCommands` itself in
- * dry-run mode — identical existence/hash logic to what `migrate` uses to
- * decide whether to delete, with `dryRun: true` guaranteeing no unlink runs.
+ * have retired but hasn't. Reuses `retireLegacyCommands` itself in dry-run
+ * mode — identical existence/hash logic to what `migrate` uses to decide
+ * whether to delete, with `dryRun: true` guaranteeing no unlink runs.
  *
- * Only `left-modified` is reported: a plain `migrate` retires anything else
- * (matching hash or `already-absent`) on its own, so warning there would just
- * be noise ahead of a self-healing state. This is the backstop for the
- * duplicate-command-menu failure mode regardless of whether the leftover came
- * from `migrate` (declined without `--force`) or `setup --force` (never
- * retires — see `docs/architecture/migrations.md`).
+ * Both `left-modified` (hand-edited, or a pre-ledger install with no recorded
+ * hash — needs `--force`) and `retired` (hash matches; a plain `migrate`
+ * would clean it up) are reported. `retired` isn't noise here: doctor can't
+ * assume the user's next command is `migrate` — `setup --force` is a
+ * documented repair/upgrade path that never retires legacy files (see
+ * `docs/architecture/migrations.md`), so a hash-matching leftover can sit on
+ * disk causing the duplicate-command-menu problem indefinitely unless
+ * flagged. `already-absent` stays unreported — nothing left to act on.
  */
 async function checkLegacyCommands(
   agents: AgentAdapter[],
@@ -459,15 +463,28 @@ async function checkLegacyCommands(
   });
   const nameById = new Map(agents.map((agent) => [agent.id, agent.name]));
 
-  return results
-    .filter((result) => result.status === "left-modified")
-    .map((result) =>
-      warnCheck(
-        `agent-${result.agentId}-legacy-commands`,
-        `${nameById.get(result.agentId) ?? result.agentId}: leftover pre-skill command file (superseded by skill, may duplicate the menu entry): ${result.path}`,
-        MIGRATE_FORCE,
-      ),
-    );
+  const checks: CheckResult[] = [];
+  for (const result of results) {
+    const agentName = nameById.get(result.agentId) ?? result.agentId;
+    if (result.status === "left-modified") {
+      checks.push(
+        warnCheck(
+          `agent-${result.agentId}-legacy-commands`,
+          `${agentName}: leftover pre-skill command file (superseded by skill, may duplicate the menu entry): ${result.path}`,
+          MIGRATE_FORCE,
+        ),
+      );
+    } else if (result.status === "retired") {
+      checks.push(
+        warnCheck(
+          `agent-${result.agentId}-legacy-commands`,
+          `${agentName}: leftover pre-skill command file, safe to clean up (superseded by skill, may duplicate the menu entry): ${result.path}`,
+          MIGRATE,
+        ),
+      );
+    }
+  }
+  return checks;
 }
 
 /**

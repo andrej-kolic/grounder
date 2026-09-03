@@ -596,6 +596,11 @@ describe("commands/migrate", () => {
 
       expect(code).toBe(0);
       expect(hasRow(out, "deleted", legacyPath)).toBe(false);
+      // The file was already gone, so nothing was created/updated/deleted on
+      // disk — but the ledger's stale hash for it was dropped, which is what
+      // makes the trailing `state` row report "updated". Surface that here so
+      // the state-row change isn't unexplained.
+      expect(hasRow(out, "updated", `${legacyPath} (stale ledger entry)`)).toBe(true);
       const state = await readGrounderState(env.home);
       expect(state?.agents.cursor?.files ?? {}).not.toHaveProperty(legacyPath);
     });

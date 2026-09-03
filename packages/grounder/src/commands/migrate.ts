@@ -141,21 +141,33 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
     // after that same agent's own command/hook rows (see `rowsFromApplyResult`)
     // instead of every agent's rows followed by every agent's legacy rows.
     const legacyRowsByAgent = new Map<string, Row[]>();
+    const addLegacyRow = (agentId: string, row: Row): void => {
+      const existing = legacyRowsByAgent.get(agentId);
+      if (existing) {
+        existing.push(row);
+      } else {
+        legacyRowsByAgent.set(agentId, [row]);
+      }
+    };
     for (const result of migrationResults) {
       const rowStatus = toLegacyRowStatus(result.status);
       if (rowStatus) {
-        const row: Row = {
+        addLegacyRow(result.agentId, {
           status: rowStatus,
           target: result.agentId,
           path: result.path,
           forceAction: result.status === "left-modified" ? "delete" : undefined,
-        };
-        const existing = legacyRowsByAgent.get(result.agentId);
-        if (existing) {
-          existing.push(row);
-        } else {
-          legacyRowsByAgent.set(result.agentId, [row]);
-        }
+        });
+      } else if (result.status === "already-absent" && result.ledgerChanged) {
+        // File's already gone, so no create/update/delete happened to it — but
+        // the ledger's stale hash for it was (or would be) dropped, which is
+        // what feeds the trailing `state` row below. Surface that here so
+        // "state updated" isn't unexplained.
+        addLegacyRow(result.agentId, {
+          status: "update",
+          target: result.agentId,
+          path: `${result.path} (stale ledger entry)`,
+        });
       }
     }
 

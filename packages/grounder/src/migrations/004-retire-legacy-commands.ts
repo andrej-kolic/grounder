@@ -61,6 +61,12 @@ async function retireOne(
 
   const onDiskHash = hashContent(await readFile(filePath, "utf8"));
   const recorded = recordedFileHash(ctx.state, agentId, filePath);
+  // `--force` overrides unconditionally — no content check, same as
+  // `installCommandFile`'s own `--force` path for the opposite direction
+  // (overwrite instead of delete). Both trust the flag's documented meaning
+  // ("accepts losing a local edit") rather than trying to verify the file was
+  // ever Grounder's; that verification isn't possible for a pre-ledger
+  // install with no recorded hash anyway, which `--force` exists to cover.
   const safeToRetire = ctx.force || (recorded !== undefined && recorded === onDiskHash);
 
   if (!safeToRetire) {

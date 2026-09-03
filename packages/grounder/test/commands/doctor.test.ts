@@ -14,6 +14,7 @@ import { runSetupWithOptions } from "../../src/commands/setup.js";
 import { writeRepoConfig } from "../../src/connector/repo.js";
 import { readGrounderState, statePath, writeGrounderState } from "../../src/connector/state.js";
 import { VERSION } from "../../src/index.js";
+import { hashContent } from "../../src/util/hash.js";
 import { captureStdout, createTempEnv } from "../helpers.js";
 
 /** Rewrite the Cursor sessionStart hook command's baked Node interpreter path. */
@@ -243,7 +244,7 @@ describe("commands/doctor", () => {
     expect(code).toBe(1);
     expect(out).toContain("fail  agent-cursor");
     expect(out).toContain("grounder-task/SKILL.md");
-    expect(out).toContain("grounder migrate --force");
+    expect(out).toContain("grounder migrate (or --agent=cursor)");
     expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).toContain("ok    hook-runtime");
   });
@@ -275,6 +276,60 @@ describe("commands/doctor", () => {
     expect(out).toContain(legacyPath);
     expect(out).toContain("grounder migrate --force");
     expect(out).toContain("ok    agent-cursor");
+    expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
+  });
+
+  it("warns about a legacy command file setup left behind that migrate would clean up on its own", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    // Simulates a schema-3 install upgraded via `setup --force` (which never
+    // retires legacy files, unlike `migrate`): the file is still on disk and
+    // its ledger hash still matches — a plain `migrate` would retire it with
+    // no conflict, but nothing has run that migration yet.
+    const legacyPath = path.join(env.home, ".cursor", "commands", "grounder-note.md");
+    const legacyContent = "leftover from a schema-3 install\n";
+    await mkdir(path.dirname(legacyPath), { recursive: true });
+    await writeFile(legacyPath, legacyContent, "utf8");
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
+    await writeGrounderState(
+      {
+        ...state,
+        agents: {
+          ...state.agents,
+          cursor: {
+            ...state.agents.cursor,
+            files: {
+              ...state.agents.cursor?.files,
+              [legacyPath]: { hash: hashContent(legacyContent) },
+            },
+          },
+        },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("warn  agent-cursor-legacy-commands");
+    expect(out).toContain(legacyPath);
+    expect(out).toContain("safe to clean up");
+    expect(out).toContain("→ grounder migrate\n");
+    expect(out).not.toContain("grounder migrate --force");
     expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
   });
 

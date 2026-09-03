@@ -104,12 +104,16 @@ be wrong, write a new corrective migration, not an automated rollback of the old
 
 ### State updates happen per-migration, not batched
 
-`004-retire-legacy-commands.ts` doesn't currently write anything to `state.json` — it only deletes
-files, and the ledger's own bookkeeping (`commandsSchema`, per-file hashes) is entirely
-`apply-agent-installs.ts`'s concern, unaffected by legacy retirement. But if a *future* migration
-ever needs to persist something to the ledger, do it immediately after that migration's own success
-inside `run()`, not batched after the full `runMigrations()` loop. A mid-run crash should leave the
-ledger consistent with whatever migrations actually completed, not silently behind them.
+`004-retire-legacy-commands.ts` does write to `state.json`: `retireOne` calls `forgetRecordedFile`
+to drop a retired path's stale hash entry, both right after a successful delete and when the file
+is already gone but the ledger still holds a hash for it (removed outside `migrate`). This is
+narrower than the ledger bookkeeping `apply-agent-installs.ts` owns for the *current* schema's
+files (`commandsSchema`, per-file hashes on write) — retirement only ever drops one key so a deleted
+path doesn't linger, it never rewrites a hash for a live artifact. The write happens immediately
+after that migration's own success inside `run()`, not batched after the full `runMigrations()`
+loop — a mid-run crash should leave the ledger consistent with whatever migrations actually
+completed, not silently behind them. Any *future* migration that needs to persist something new to
+the ledger should follow the same immediate-write shape.
 
 ## Maintainer checklist
 
