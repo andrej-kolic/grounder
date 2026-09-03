@@ -1,19 +1,18 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  assertAgentSchemasSupported,
-  type GrounderState,
-  grounderStatesEqual,
-  isHooksSchemaAhead,
-  isInstallSchemaStale,
+  assertVersionSupportsWrite,
+  forgetLedgerFile,
+  LEDGER_SCHEMA,
+  ledgerFilesFor,
   readGrounderState,
-  recordAgentInstall,
-  recordedCommandsSchema,
   recordedFileHash,
-  recordedHooksSchema,
+  recordedHooksEnabled,
+  setHooksEnabled,
+  setLedgerFileHash,
   statePath,
-  wouldChangeGrounderState,
+  touchGrounderVersion,
   writeGrounderState,
 } from "../../src/connector/state.js";
 import { UnsupportedSchemaError } from "../../src/connector/unsupported-schema.js";
@@ -35,9 +34,10 @@ describe("connector/state", () => {
 
     await writeGrounderState(
       {
+        ledgerSchema: LEDGER_SCHEMA,
         grounderVersion: "0.3.0",
         agents: {
-          cursor: { commandsSchema: 1, hooksSchema: 1, files: {} },
+          cursor: { files: {} },
         },
       },
       env.home,
@@ -45,9 +45,10 @@ describe("connector/state", () => {
 
     const state = await readGrounderState(env.home);
     expect(state).toEqual({
+      ledgerSchema: LEDGER_SCHEMA,
       grounderVersion: "0.3.0",
       agents: {
-        cursor: { commandsSchema: 1, hooksSchema: 1, files: {} },
+        cursor: { files: {} },
       },
     });
     expect(statePath(env.home)).toBe(path.join(env.home, ".grounder", "state.json"));
@@ -59,153 +60,196 @@ describe("connector/state", () => {
     cleanup = env.cleanup;
 
     expect(await readGrounderState(env.home)).toBeNull();
-    expect(recordedCommandsSchema(null, "cursor")).toBe(0);
-    expect(recordedHooksSchema(null, "cursor")).toBe(0);
+    expect(ledgerFilesFor(null, "cursor")).toBeUndefined();
+    expect(recordedHooksEnabled(null, "cursor")).toBeUndefined();
   });
 
-  it("merges agent install records without clobbering siblings", async () => {
+  it("tolerates the pre-rewrite on-disk shape (commandsSchema/hooksSchema, no ledgerSchema)", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await recordAgentInstall({
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(path.dirname(statePath(env.home)), { recursive: true });
+    await writeFile(
+      statePath(env.home),
+      `${JSON.stringify(
+        {
+          grounderVersion: "0.6.0-dev.1",
+          agents: {
+            cursor: {
+              commandsSchema: 4,
+              hooksSchema: 1,
+              files: { "/a/SKILL.md": { hash: "sha256:aaa" } },
+            },
+            claude: {
+              commandsSchema: 4,
+              files: {},
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const state = await readGrounderState(env.home);
+    expect(state).toEqual({
+      ledgerSchema: 0,
+      grounderVersion: "0.6.0-dev.1",
+      agents: {
+        cursor: { files: { "/a/SKILL.md": { hash: "sha256:aaa" } }, hooksEnabled: true },
+        claude: { files: {} },
+      },
+    });
+  });
+
+  it("prefers hooksEnabled over legacy hooksSchema when both are present", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(path.dirname(statePath(env.home)), { recursive: true });
+    await writeFile(
+      statePath(env.home),
+      `${JSON.stringify(
+        {
+          grounderVersion: "0.6.0-dev.1",
+          agents: { cursor: { hooksSchema: 1, hooksEnabled: false, files: {} } },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    expect(recordedHooksEnabled(await readGrounderState(env.home), "cursor")).toBe(false);
+  });
+
+  it("setLedgerFileHash merges without clobbering siblings, and is a no-op when unchanged", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await setLedgerFileHash({
       agentId: "cursor",
-      commandsSchema: 1,
+      filePath: "/a/SKILL.md",
+      hash: "sha256:aaa",
       grounderVersion: "0.3.0",
       homeDir: env.home,
     });
-    await recordAgentInstall({
+    await setLedgerFileHash({
       agentId: "claude",
-      commandsSchema: 1,
-      hooksSchema: 1,
+      filePath: "/b/SKILL.md",
+      hash: "sha256:bbb",
       grounderVersion: "0.3.1",
       homeDir: env.home,
     });
-    // Commands-only re-record for cursor must preserve absence of hooksSchema
-    // and must not wipe claude.
-    await recordAgentInstall({
+    await setLedgerFileHash({
       agentId: "cursor",
-      commandsSchema: 2,
+      filePath: "/a2/SKILL.md",
+      hash: "sha256:ccc",
       grounderVersion: "0.3.2",
       homeDir: env.home,
     });
 
     const state = await readGrounderState(env.home);
     expect(state).toEqual({
+      ledgerSchema: LEDGER_SCHEMA,
       grounderVersion: "0.3.2",
       agents: {
-        cursor: { commandsSchema: 2, files: {} },
-        claude: { commandsSchema: 1, hooksSchema: 1, files: {} },
+        cursor: {
+          files: { "/a/SKILL.md": { hash: "sha256:aaa" }, "/a2/SKILL.md": { hash: "sha256:ccc" } },
+        },
+        claude: { files: { "/b/SKILL.md": { hash: "sha256:bbb" } } },
       },
     });
-    expect(recordedCommandsSchema(state, "cursor")).toBe(2);
-    expect(recordedHooksSchema(state, "cursor")).toBe(0);
-    expect(recordedHooksSchema(state, "claude")).toBe(1);
+    expect(recordedFileHash(state, "cursor", "/a/SKILL.md")).toBe("sha256:aaa");
+
+    const before = await readFile(statePath(env.home), "utf8");
+    await setLedgerFileHash({
+      agentId: "cursor",
+      filePath: "/a/SKILL.md",
+      hash: "sha256:aaa",
+      grounderVersion: "9.9.9",
+      homeDir: env.home,
+    });
+    expect(await readFile(statePath(env.home), "utf8")).toBe(before);
   });
 
-  it("preserves hooksSchema when a later commands-only record omits it", async () => {
+  it("forgetLedgerFile drops one path, no-ops when absent", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await recordAgentInstall({
+    await setLedgerFileHash({
       agentId: "cursor",
-      commandsSchema: 1,
-      hooksSchema: 1,
-      grounderVersion: "0.3.0",
+      filePath: "/a/legacy.md",
+      hash: "sha256:aaa",
+      grounderVersion: "0.5.0",
       homeDir: env.home,
     });
-    await recordAgentInstall({
+    await forgetLedgerFile({
       agentId: "cursor",
-      commandsSchema: 1,
-      grounderVersion: "0.3.0",
+      filePath: "/a/legacy.md",
+      grounderVersion: "0.6.0",
       homeDir: env.home,
     });
+    expect(
+      recordedFileHash(await readGrounderState(env.home), "cursor", "/a/legacy.md"),
+    ).toBeUndefined();
 
-    const state = await readGrounderState(env.home);
-    expect(state?.agents.cursor).toEqual({
-      commandsSchema: 1,
-      hooksSchema: 1,
-      files: {},
+    // No-op when there's nothing to forget (no state file at all).
+    const env2 = await createTempEnv({ initGit: false });
+    await forgetLedgerFile({
+      agentId: "cursor",
+      filePath: "/a/legacy.md",
+      grounderVersion: "0.6.0",
+      homeDir: env2.home,
     });
+    expect(await readGrounderState(env2.home)).toBeNull();
+    await env2.cleanup();
   });
 
-  it("preserves commandsSchema when a later record omits it", async () => {
+  it("setHooksEnabled records the tri-state and is a no-op when unchanged", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await recordAgentInstall({
+    await setHooksEnabled({
       agentId: "cursor",
-      commandsSchema: 0,
-      hooksSchema: 1,
-      grounderVersion: "0.2.0",
+      enabled: true,
+      grounderVersion: "0.6.0",
       homeDir: env.home,
     });
-    await recordAgentInstall({
-      agentId: "cursor",
-      hooksSchema: 1,
-      grounderVersion: "0.3.0",
-      homeDir: env.home,
-    });
+    expect(recordedHooksEnabled(await readGrounderState(env.home), "cursor")).toBe(true);
 
-    const state = await readGrounderState(env.home);
-    expect(state).toMatchObject({
-      grounderVersion: "0.3.0",
-      agents: {
-        cursor: { commandsSchema: 0, hooksSchema: 1 },
-      },
+    await setHooksEnabled({
+      agentId: "cursor",
+      enabled: false,
+      grounderVersion: "0.6.1",
+      homeDir: env.home,
     });
+    expect(recordedHooksEnabled(await readGrounderState(env.home), "cursor")).toBe(false);
   });
 
-  it("defaults omitted commandsSchema to 0 for a new agent entry", async () => {
+  it("touchGrounderVersion stamps the version even with no agent changes, no-ops when already current", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    await recordAgentInstall({
-      agentId: "cursor",
-      grounderVersion: "0.3.0",
-      homeDir: env.home,
-    });
+    await touchGrounderVersion("0.6.0", env.home);
+    expect((await readGrounderState(env.home))?.grounderVersion).toBe("0.6.0");
 
-    expect(await readGrounderState(env.home)).toMatchObject({
-      agents: { cursor: { commandsSchema: 0, files: {} } },
-    });
-  });
+    const before = await readFile(statePath(env.home), "utf8");
+    await touchGrounderVersion("0.6.0", env.home);
+    expect(await readFile(statePath(env.home), "utf8")).toBe(before);
 
-  it("merges files map when recording install metadata", async () => {
-    const env = await createTempEnv({ initGit: false });
-    cleanup = env.cleanup;
-
-    await recordAgentInstall({
-      agentId: "cursor",
-      commandsSchema: 1,
-      grounderVersion: "0.3.0",
-      files: {
-        "/tmp/a.md": { hash: "sha256:aaa" },
-      },
-      homeDir: env.home,
-    });
-    await recordAgentInstall({
-      agentId: "cursor",
-      commandsSchema: 1,
-      grounderVersion: "0.3.0",
-      files: {
-        "/tmp/b.md": { hash: "sha256:bbb" },
-      },
-      homeDir: env.home,
-    });
-
-    const state = await readGrounderState(env.home);
-    expect(state?.agents.cursor?.files).toEqual({
-      "/tmp/a.md": { hash: "sha256:aaa" },
-      "/tmp/b.md": { hash: "sha256:bbb" },
-    });
-    expect(recordedFileHash(state, "cursor", "/tmp/a.md")).toBe("sha256:aaa");
+    await touchGrounderVersion("0.6.1", env.home);
+    expect((await readGrounderState(env.home))?.grounderVersion).toBe("0.6.1");
   });
 
   it("throws on corrupt state", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    const { mkdir, writeFile } = await import("node:fs/promises");
+    const { mkdir } = await import("node:fs/promises");
     await mkdir(path.dirname(statePath(env.home)), { recursive: true });
     await writeFile(statePath(env.home), '{"agents":{}}\n', "utf8");
 
@@ -216,7 +260,7 @@ describe("connector/state", () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
-    const { mkdir, writeFile } = await import("node:fs/promises");
+    const { mkdir } = await import("node:fs/promises");
     await mkdir(path.dirname(statePath(env.home)), { recursive: true });
     await writeFile(statePath(env.home), "{/\n", "utf8");
 
@@ -225,194 +269,35 @@ describe("connector/state", () => {
     );
   });
 
-  it("isInstallSchemaStale compares recorded schemas without treating missing state as stale", async () => {
-    expect(isInstallSchemaStale(null, [{ id: "cursor", name: "Cursor", commandsSchema: 1 }])).toBe(
-      false,
-    );
-
-    expect(
-      isInstallSchemaStale(
-        {
-          grounderVersion: "0.3.0",
-          agents: { cursor: { commandsSchema: 1, hooksSchema: 1, files: {} } },
-        },
-        [{ id: "cursor", name: "Cursor", commandsSchema: 1, hooksSchema: 1 }],
-      ),
-    ).toBe(false);
-
-    expect(
-      isInstallSchemaStale(
-        {
-          grounderVersion: "0.3.0",
-          agents: { cursor: { commandsSchema: 0, files: {} } },
-        },
-        [{ id: "cursor", name: "Cursor", commandsSchema: 1 }],
-      ),
-    ).toBe(true);
-
-    expect(
-      isInstallSchemaStale(
-        {
-          grounderVersion: "0.3.0",
-          agents: { cursor: { commandsSchema: 1, hooksSchema: 0, files: {} } },
-        },
-        [{ id: "cursor", name: "Cursor", commandsSchema: 1, hooksSchema: 1 }],
-      ),
-    ).toBe(true);
-
-    // No hooks version in state = hooks were never enabled → not "behind" for
-    // peek/status. Doctor only treats that as behind when hook files exist.
-    expect(
-      isInstallSchemaStale(
-        {
-          grounderVersion: "0.3.0",
-          agents: { cursor: { commandsSchema: 1, files: {} } },
-        },
-        [{ id: "cursor", name: "Cursor", commandsSchema: 1, hooksSchema: 1 }],
-      ),
-    ).toBe(false);
-
-    // Agent not in state → ignore (don't flag agents that were never installed).
-    expect(
-      isInstallSchemaStale(
-        {
-          grounderVersion: "0.3.0",
-          agents: { cursor: { commandsSchema: 1, files: {} } },
-        },
-        [
-          { id: "cursor", name: "Cursor", commandsSchema: 1 },
-          { id: "claude", name: "Claude Code", commandsSchema: 1 },
-        ],
-      ),
-    ).toBe(false);
-  });
-
-  it("isHooksSchemaAhead ignores a missing hooks version", () => {
-    expect(isHooksSchemaAhead(undefined, 1)).toBe(false);
-    expect(isHooksSchemaAhead(2, 1)).toBe(true);
-    expect(isHooksSchemaAhead(1, 1)).toBe(false);
-  });
-
-  it("hard-stops when recorded agent schemas are ahead of this binary", async () => {
-    const state = {
-      grounderVersion: "9.9.9",
-      agents: {
-        cursor: { commandsSchema: 99, hooksSchema: 1, files: {} },
-      },
-    };
-
-    expect(() =>
-      assertAgentSchemasSupported(state, [
-        { id: "cursor", name: "Cursor", commandsSchema: 1, hooksSchema: 1 },
-      ]),
-    ).toThrow(UnsupportedSchemaError);
-
-    expect(() =>
-      assertAgentSchemasSupported(
-        {
-          grounderVersion: "9.9.9",
-          agents: {
-            cursor: { commandsSchema: 1, hooksSchema: 50, files: {} },
-          },
-        },
-        [{ id: "cursor", name: "Cursor", commandsSchema: 1, hooksSchema: 1 }],
-      ),
-    ).toThrow(/hooks schema 50.*Upgrade grounder/);
-
-    expect(() =>
-      assertAgentSchemasSupported(state, [
-        { id: "claude", name: "Claude Code", commandsSchema: 1 },
-      ]),
-    ).not.toThrow();
-  });
-
-  // Pure — no I/O, no homeDir/createTempEnv needed. This is the single
-  // predicate migrate.ts's real and `--dry-run` paths both consult for
-  // "would this change state.json", so its edge cases are worth pinning down
-  // directly rather than only through migrate.test.ts's integration coverage.
-  describe("grounderStatesEqual / wouldChangeGrounderState", () => {
-    const base: GrounderState = {
-      grounderVersion: "0.6.0",
-      agents: {
-        cursor: {
-          commandsSchema: 4,
-          hooksSchema: 1,
-          files: { "/a/SKILL.md": { hash: "sha256:aaa" } },
-        },
-      },
-    };
-
-    it("treats identical data in a different key order as equal", () => {
-      const reordered: GrounderState = {
-        agents: {
-          cursor: {
-            files: { "/a/SKILL.md": { hash: "sha256:aaa" } },
-            hooksSchema: 1,
-            commandsSchema: 4,
-          },
-        },
-        grounderVersion: "0.6.0",
-      };
-      expect(grounderStatesEqual(base, reordered)).toBe(true);
-    });
-
-    it("null equals only null", () => {
-      expect(grounderStatesEqual(null, null)).toBe(true);
-      expect(grounderStatesEqual(base, null)).toBe(false);
-    });
-
-    it("a different grounderVersion would change state", () => {
-      expect(
-        wouldChangeGrounderState(base, {
-          agentId: "cursor",
-          commandsSchema: 4,
-          hooksSchema: 1,
-          files: { "/a/SKILL.md": { hash: "sha256:aaa" } },
-          grounderVersion: "0.6.1",
-        }),
-      ).toBe(true);
-    });
-
-    it("re-recording identical data is a no-op, even with fields omitted", () => {
-      // commandsSchema/hooksSchema omitted -> falls back to the recorded
-      // values, which already match `base` exactly.
-      expect(
-        wouldChangeGrounderState(base, {
-          agentId: "cursor",
-          files: { "/a/SKILL.md": { hash: "sha256:aaa" } },
+  describe("assertVersionSupportsWrite", () => {
+    it("hard-stops only when the running binary is behind the ledger's recorded version", () => {
+      expect(() =>
+        assertVersionSupportsWrite("0.5.0", {
+          ledgerSchema: LEDGER_SCHEMA,
           grounderVersion: "0.6.0",
+          agents: {},
         }),
-      ).toBe(false);
-    });
+      ).toThrow(UnsupportedSchemaError);
 
-    it("a files-only change is detected with schema/version unchanged", () => {
-      expect(
-        wouldChangeGrounderState(base, {
-          agentId: "cursor",
-          files: { "/a/SKILL.md": { hash: "sha256:bbb" } },
+      // "ahead" (normal upgrade) and "differs" (same x.y.z, different suffix)
+      // both proceed — only "behind" is a write-path hard stop.
+      expect(() =>
+        assertVersionSupportsWrite("0.7.0", {
+          ledgerSchema: LEDGER_SCHEMA,
           grounderVersion: "0.6.0",
+          agents: {},
         }),
-      ).toBe(true);
-    });
+      ).not.toThrow();
+      expect(() =>
+        assertVersionSupportsWrite("0.6.0-dev.2", {
+          ledgerSchema: LEDGER_SCHEMA,
+          grounderVersion: "0.6.0-dev.1",
+          agents: {},
+        }),
+      ).not.toThrow();
 
-    it("a schema-only change is detected with files/version unchanged", () => {
-      expect(
-        wouldChangeGrounderState(base, {
-          agentId: "cursor",
-          commandsSchema: 5,
-          grounderVersion: "0.6.0",
-        }),
-      ).toBe(true);
-    });
-
-    it("any write against a missing ledger is always a change", () => {
-      expect(
-        wouldChangeGrounderState(null, {
-          agentId: "cursor",
-          commandsSchema: 4,
-          grounderVersion: "0.6.0",
-        }),
-      ).toBe(true);
+      // No state at all → nothing to protect against.
+      expect(() => assertVersionSupportsWrite("0.5.0", null)).not.toThrow();
     });
   });
 });

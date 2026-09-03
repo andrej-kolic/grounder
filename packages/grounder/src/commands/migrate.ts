@@ -1,19 +1,17 @@
 import { type AgentAdapter, ALL_AGENTS, resolveAgents } from "../agents/index.js";
 import { readHomeConfig, withHomeDir } from "../connector/home.js";
-import { assertAgentSchemasSupported, readGrounderState, statePath } from "../connector/state.js";
+import { readGrounderState, statePath } from "../connector/state.js";
 import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
 import { helpExitCode } from "../help.js";
-import { runMigrations } from "../migrations/index.js";
+import { VERSION } from "../index.js";
 import { flagBool, flagStrings, parseArgs } from "../util/parse-args.js";
-import { applyAgentInstalls } from "./apply-agent-installs.js";
+import { applyAgentInstalls } from "./apply.js";
 import {
-  type Row,
   renderModifiedNote,
   renderSummary,
   renderTable,
   rowsFromApplyResult,
   stateRow,
-  toLegacyRowStatus,
 } from "./render-artifact-table.js";
 
 export interface MigrateOptions {
@@ -32,8 +30,8 @@ export interface MigrateOptions {
  * 3. Else auto-detect installed agents (legacy / pre-ledger)
  *
  * Ledger keys from a newer Grounder (agents this binary does not know) are
- * skipped with a stderr warning — same forward-compat idea as schema hard-stops,
- * but migrate can still refresh the agents it understands.
+ * skipped with a stderr warning — same forward-compat idea as the version
+ * hard stop, but migrate can still refresh the agents it understands.
  */
 export async function resolveMigrateAgents(
   explicitIds: string[] | undefined,
@@ -93,7 +91,6 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
     let state: Awaited<ReturnType<typeof readGrounderState>>;
     try {
       state = await readGrounderState(homeDir);
-      assertAgentSchemasSupported(state, agents);
     } catch (error: unknown) {
       if (isUnsupportedSchemaError(error)) {
         process.stderr.write(`${error.message}\n`);
@@ -120,78 +117,34 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
     }
     process.stdout.write("\n");
 
-    const applyResult = await applyAgentInstalls({
-      agents,
-      force,
-      hooks,
-      refreshInstalledHooks: true,
-      dryRun,
-      homeDir,
-    });
-
-    const migrationResults = await runMigrations({
-      homeDir,
-      force,
-      dryRun,
-      agentIds: agents.map((agent) => agent.id),
-      state: await readGrounderState(homeDir),
-    });
-
-    // Grouped by agent id so each agent's legacy-retirement rows land right
-    // after that same agent's own command/hook rows (see `rowsFromApplyResult`)
-    // instead of every agent's rows followed by every agent's legacy rows.
-    const legacyRowsByAgent = new Map<string, Row[]>();
-    const addLegacyRow = (agentId: string, row: Row): void => {
-      const existing = legacyRowsByAgent.get(agentId);
-      if (existing) {
-        existing.push(row);
-      } else {
-        legacyRowsByAgent.set(agentId, [row]);
+    let applyResult: Awaited<ReturnType<typeof applyAgentInstalls>>;
+    try {
+      applyResult = await applyAgentInstalls({
+        agents,
+        force,
+        hooks,
+        refreshInstalledHooks: true,
+        dryRun,
+        homeDir,
+        grounderVersion: VERSION,
+      });
+    } catch (error: unknown) {
+      if (isUnsupportedSchemaError(error)) {
+        process.stderr.write(`${error.message}\n`);
+        return 1;
       }
-    };
-    for (const result of migrationResults) {
-      const rowStatus = toLegacyRowStatus(result.status);
-      if (rowStatus) {
-        addLegacyRow(result.agentId, {
-          status: rowStatus,
-          target: result.agentId,
-          path: result.path,
-          forceAction: result.status === "left-modified" ? "delete" : undefined,
-        });
-      } else if (result.status === "already-absent" && result.ledgerChanged) {
-        // File's already gone, so no create/update/delete happened to it — but
-        // the ledger's stale hash for it was (or would be) dropped, which is
-        // what feeds the trailing `state` row below. Surface that here so
-        // "state updated" isn't unexplained.
-        addLegacyRow(result.agentId, {
-          status: "update",
-          target: result.agentId,
-          path: `${result.path} (stale ledger entry)`,
-        });
-      }
+      throw error;
     }
 
-    const rows: Row[] = rowsFromApplyResult(
-      applyResult,
-      (agentId) => legacyRowsByAgent.get(agentId) ?? [],
-    );
+    const rows = rowsFromApplyResult(applyResult);
 
     // `ledgerChanged` is computed once, by the same code, whether or not this
-    // is `--dry-run` — `applyAgentInstalls`/`recordAgentInstallState` and
-    // `004-retire-legacy-commands` each decide "would this write change the
-    // ledger" via `wouldChangeGrounderState` up front, and only actually
-    // write when it's real *and* the answer was yes. So there's no separate
-    // prediction to keep in sync here: real and dry-run report the exact same
-    // thing for the exact same reason.
+    // is `--dry-run` — `applyAgentInstalls` decides "would this write change
+    // the ledger" from the reconciled plan itself, and only actually writes
+    // when it's real. So there's no separate prediction to keep in sync here:
+    // real and dry-run report the exact same thing for the exact same reason.
     const ledgerChanged =
-      applyResult.agents.some((a) => a.ledgerChanged) ||
-      migrationResults.some((r) => r.ledgerChanged);
-    // `stateRow` is driven entirely by `ledgerChanged` — `state` only picks
-    // the word ("create" vs "update"), it can't force a change that isn't
-    // there. In practice `!state && agents.length > 0` always yields
-    // `ledgerChanged` (any write against a missing ledger changes it), but
-    // this stays correct even if a future adapter path could reach here
-    // without writing.
+      applyResult.agents.some((a) => a.ledgerChanged) || VERSION !== state?.grounderVersion;
     rows.push(stateRow(ledgerChanged, state, statePath(homeDir)));
 
     renderTable(rows);

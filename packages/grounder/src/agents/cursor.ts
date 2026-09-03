@@ -9,8 +9,8 @@ import {
   isGrounderPeekHookCommand,
   isHookRuntimeStale,
   peekHookCommand,
+  runtimeInvocation,
 } from "./hook-runtime.js";
-import { installCommandFile, recordCommandFileHashes } from "./install-command.js";
 import type {
   AgentAdapter,
   AgentInstallOptions,
@@ -30,6 +30,25 @@ const SKILLS = [
 ] as const;
 
 const COMMANDS = SKILLS.map((name) => path.join(name, "SKILL.md"));
+
+/**
+ * Frozen historical fact about the schema-3 (pre-skill) install layout —
+ * deliberately hardcoded, not derived from {@link expectedArtifacts} (which
+ * describes today's Agent Skills layout). Safe to delete once schema-3
+ * installs are assumed extinct in the wild — a maintainer call, not
+ * something to automate via a version check.
+ */
+const LEGACY_COMMAND_FILENAMES = [
+  "grounder-note.md",
+  "grounder-search.md",
+  "grounder-plan.md",
+  "grounder-task-handoff.md",
+  "grounder-task.md",
+] as const;
+
+function legacyCommandsDir(homeDir?: string): string {
+  return path.join(resolveHomeDir(homeDir), ".cursor", "commands");
+}
 
 /**
  * Canonical sessionStart command for Cursor (home-local runtime, not `npx`).
@@ -260,8 +279,6 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
 export const cursor: AgentAdapter = {
   id: "cursor",
   name: "Cursor",
-  commandsSchema: 4,
-  hooksSchema: 1,
 
   async isInstalled(): Promise<boolean> {
     return fileExists(path.join(resolveHomeDir(), ".cursor"));
@@ -270,30 +287,20 @@ export const cursor: AgentAdapter = {
   expectedArtifacts,
   expectedHookArtifacts,
 
-  async install(opts: AgentInstallOptions): Promise<AgentInstallResult> {
-    const artifacts: Record<string, ArtifactStatus> = {};
-    const files: Record<string, { hash: string }> = {};
+  async desiredArtifacts(homeDir?: string): Promise<Record<string, string>> {
+    const cli = runtimeInvocation(homeDir);
+    const skillsDir = cursorSkillsDir(homeDir);
+    const desired: Record<string, string> = {};
     for (const filename of COMMANDS) {
-      const { dest, status, hash } = await installCommandFile({
-        ...opts,
-        agentId: cursor.id,
-        templateDir,
-        skillsDir: cursorSkillsDir(opts.homeDir),
-        filename,
-      });
-      artifacts[dest] = status;
-      if (hash) {
-        files[dest] = { hash };
-      }
+      const template = await readFile(path.join(templateDir, filename), "utf8");
+      desired[path.join(skillsDir, filename)] = template.replaceAll("{{GROUNDER_CLI}}", cli);
     }
-    const ledgerChanged = await recordCommandFileHashes({
-      agentId: cursor.id,
-      commandsSchema: cursor.commandsSchema,
-      files,
-      homeDir: opts.homeDir,
-      dryRun: opts.dryRun,
-    });
-    return { artifacts, ledgerChanged };
+    return desired;
+  },
+
+  tombstones(homeDir?: string): string[] {
+    const dir = legacyCommandsDir(homeDir);
+    return LEGACY_COMMAND_FILENAMES.map((filename) => path.join(dir, filename));
   },
 
   installHooks,

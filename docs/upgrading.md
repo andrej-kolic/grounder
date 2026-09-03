@@ -42,7 +42,7 @@ re-run with `--force`. Note that `grounder setup` never does this cleanup, even 
 `--force` — only `migrate` retires old install shapes.
 
 Contributor detail on the install ledger and hash drift:
-[Schema versioning and install migration](architecture/schema-versioning.md).
+[State reconciliation](architecture/state-reconciliation.md).
 
 ## The shared runtime
 

@@ -8,7 +8,7 @@ import { runMigrateWithOptions } from "../../src/commands/migrate.js";
 import { runSetupWithOptions } from "../../src/commands/setup.js";
 import {
   readGrounderState,
-  recordAgentInstall,
+  setLedgerFileHash,
   statePath,
   writeGrounderState,
 } from "../../src/connector/state.js";
@@ -69,7 +69,7 @@ describe("commands/migrate", () => {
     expect(out).toContain(`Vault root: ${env.vault}`);
     expect(out).toContain("unchanged");
     expect(await readGrounderState(env.home)).toMatchObject({
-      agents: { cursor: { commandsSchema: 4 } },
+      agents: { cursor: { files: expect.any(Object) } },
     });
   });
 
@@ -92,45 +92,6 @@ describe("commands/migrate", () => {
     expect(hasRow(out, "unchanged", runtimeCliPath(env.home))).toBe(true);
   });
 
-  it("does not report state.json as updated when only its on-disk key order differs", async () => {
-    const env = await createTempEnv({ initGit: false });
-    cleanup = env.cleanup;
-
-    await runSetupWithOptions({
-      vaultPath: env.vault,
-      yes: true,
-      hooks: true,
-      homeDir: env.home,
-      agents: ["cursor"],
-    });
-
-    const state = await readGrounderState(env.home);
-    const cursorAgent = state?.agents.cursor;
-    if (!cursorAgent) {
-      throw new Error("expected cursor agent in install state after setup");
-    }
-    // Same data, `hooksSchema` before `files` — simulates a ledger entry
-    // written by an older Grounder whose field order doesn't match today's
-    // `recordAgentInstall` (which writes `files` before `hooksSchema`).
-    const reordered = {
-      ...state,
-      agents: {
-        ...state.agents,
-        cursor: {
-          commandsSchema: cursorAgent.commandsSchema,
-          hooksSchema: cursorAgent.hooksSchema,
-          files: cursorAgent.files,
-        },
-      },
-    };
-    await writeFile(statePath(env.home), `${JSON.stringify(reordered, null, 2)}\n`, "utf8");
-
-    const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
-
-    expect(code).toBe(0);
-    expect(hasRow(out, "unchanged", statePath(env.home))).toBe(true);
-  });
-
   it("dry-run reports state.json as unchanged when the only pending row is a conflict", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
@@ -141,8 +102,8 @@ describe("commands/migrate", () => {
       homeDir: env.home,
       agents: ["cursor"],
     });
-    // A left-alone conflict never calls any `recordAgentInstall*` — it must
-    // not make the ledger row look like it's about to change either.
+    // A left-alone conflict never writes to the ledger — it must not make the
+    // ledger row look like it's about to change either.
     await writeFile(grounderNoteCommandPath(env.home), "my local edits\n", "utf8");
 
     const { code, out } = await captureStdout(() =>
@@ -191,7 +152,7 @@ describe("commands/migrate", () => {
     expect(await readFile(noteDest, "utf8")).not.toBe("my local edits\n");
   });
 
-  it("does not advance commandsSchema when plain migrate skips all locally-modified skill files", async () => {
+  it("does not record a hash for a skill file plain migrate leaves as a conflict", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
@@ -220,19 +181,12 @@ describe("commands/migrate", () => {
     expect(out).toContain("grounder migrate --force");
 
     const state = await readGrounderState(env.home);
-    expect(state).toMatchObject({
-      grounderVersion: expect.any(String),
-      agents: { cursor: { commandsSchema: 0 } },
-    });
     expect(state?.agents.cursor?.files ?? {}).toEqual({});
 
     const forced = await captureStdout(() =>
       runMigrateWithOptions({ homeDir: env.home, force: true }),
     );
     expect(forced.code).toBe(0);
-    expect(await readGrounderState(env.home)).toMatchObject({
-      agents: { cursor: { commandsSchema: 4 } },
-    });
     expect(
       Object.keys((await readGrounderState(env.home))?.agents.cursor?.files ?? {}).length,
     ).toBeGreaterThan(0);
@@ -355,7 +309,7 @@ describe("commands/migrate", () => {
         agents: {
           ...state.agents,
           // Future Grounder agent — older binary must not crash migrate.
-          windsurf: { commandsSchema: 1, files: {} },
+          windsurf: { files: {} },
         },
       },
       env.home,
@@ -378,8 +332,8 @@ describe("commands/migrate", () => {
 
     expect(await readGrounderState(env.home)).toMatchObject({
       agents: {
-        cursor: { commandsSchema: 4 },
-        windsurf: { commandsSchema: 1 },
+        cursor: { files: expect.any(Object) },
+        windsurf: { files: {} },
       },
     });
   });
@@ -400,7 +354,7 @@ describe("commands/migrate", () => {
     ).rejects.toThrow("Unknown agent id(s): windsurf");
   });
 
-  it("refuses to migrate when recorded schemas are newer than this grounder", async () => {
+  it("hard-stops (write path) when this Grounder is older than the ledger's recorded version", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
@@ -410,15 +364,11 @@ describe("commands/migrate", () => {
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await writeGrounderState(
-      {
-        grounderVersion: "9.9.9",
-        agents: {
-          cursor: { commandsSchema: 99, files: {} },
-        },
-      },
-      env.home,
-    );
+    const before = await readGrounderState(env.home);
+    if (!before) {
+      throw new Error("expected install state after setup");
+    }
+    await writeGrounderState({ ...before, grounderVersion: "999.0.0" }, env.home);
 
     const chunks: string[] = [];
     const spy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
@@ -428,15 +378,14 @@ describe("commands/migrate", () => {
     try {
       const { code } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
       expect(code).toBe(1);
-      expect(chunks.join("")).toContain("Upgrade grounder");
-      expect(chunks.join("")).toContain("commands schema 99");
+      expect(chunks.join("")).toContain("older than your configuration");
+      expect(chunks.join("")).toContain("Install a newer Grounder");
     } finally {
       spy.mockRestore();
     }
 
-    expect(await readGrounderState(env.home)).toMatchObject({
-      agents: { cursor: { commandsSchema: 99 } },
-    });
+    // Refused before any write — the ledger's recorded version is untouched.
+    expect((await readGrounderState(env.home))?.grounderVersion).toBe("999.0.0");
   });
 
   it("refuses to migrate when install state JSON is corrupt", async () => {
@@ -471,10 +420,11 @@ describe("commands/migrate", () => {
       await mkdir(path.dirname(legacyPath), { recursive: true });
       const legacyContent = "old pre-skill note command\n";
       await writeFile(legacyPath, legacyContent, "utf8");
-      await recordAgentInstall({
+      await setLedgerFileHash({
         agentId: "cursor",
+        filePath: legacyPath,
+        hash: hashContent(legacyContent),
         grounderVersion: "0.5.0",
-        files: { [legacyPath]: { hash: hashContent(legacyContent) } },
         homeDir: env.home,
       });
 
@@ -530,10 +480,11 @@ describe("commands/migrate", () => {
       await mkdir(path.dirname(legacyPath), { recursive: true });
       const legacyContent = "old pre-skill note command\n";
       await writeFile(legacyPath, legacyContent, "utf8");
-      await recordAgentInstall({
+      await setLedgerFileHash({
         agentId: "cursor",
+        filePath: legacyPath,
+        hash: hashContent(legacyContent),
         grounderVersion: "0.5.0",
-        files: { [legacyPath]: { hash: hashContent(legacyContent) } },
         homeDir: env.home,
       });
 
@@ -584,10 +535,11 @@ describe("commands/migrate", () => {
       const legacyPath = legacyCursorNotePath(env.home);
       // Ledger still remembers a hash for this path, but the file itself is
       // already gone (e.g. removed outside `migrate`).
-      await recordAgentInstall({
+      await setLedgerFileHash({
         agentId: "cursor",
+        filePath: legacyPath,
+        hash: hashContent("old pre-skill note command\n"),
         grounderVersion: "0.5.0",
-        files: { [legacyPath]: { hash: hashContent("old pre-skill note command\n") } },
         homeDir: env.home,
       });
       expect(await fileExists(legacyPath)).toBe(false);
@@ -595,12 +547,11 @@ describe("commands/migrate", () => {
       const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
 
       expect(code).toBe(0);
+      // Nothing was created/updated/deleted on disk (already gone) — but the
+      // stale hash is dropped from the ledger, so `state` still reports
+      // "updated" even though no per-path row explains why.
       expect(hasRow(out, "deleted", legacyPath)).toBe(false);
-      // The file was already gone, so nothing was created/updated/deleted on
-      // disk — but the ledger's stale hash for it was dropped, which is what
-      // makes the trailing `state` row report "updated". Surface that here so
-      // the state-row change isn't unexplained.
-      expect(hasRow(out, "updated", `${legacyPath} (stale ledger entry)`)).toBe(true);
+      expect(hasRow(out, "updated", statePath(env.home))).toBe(true);
       const state = await readGrounderState(env.home);
       expect(state?.agents.cursor?.files ?? {}).not.toHaveProperty(legacyPath);
     });
@@ -616,18 +567,22 @@ describe("commands/migrate", () => {
         agents: ["cursor"],
       });
       const legacyPath = legacyCursorNotePath(env.home);
-      await recordAgentInstall({
+      await setLedgerFileHash({
         agentId: "cursor",
+        filePath: legacyPath,
+        hash: hashContent("old pre-skill note command\n"),
         grounderVersion: "0.5.0",
-        files: { [legacyPath]: { hash: hashContent("old pre-skill note command\n") } },
         homeDir: env.home,
       });
 
-      const { code } = await captureStdout(() =>
+      const { code, out } = await captureStdout(() =>
         runMigrateWithOptions({ homeDir: env.home, dryRun: true }),
       );
 
       expect(code).toBe(0);
+      // Predicts the same "state updated" outcome a real run would report,
+      // without actually writing.
+      expect(hasRow(out, "updated", statePath(env.home))).toBe(true);
       const state = await readGrounderState(env.home);
       expect(state?.agents.cursor?.files ?? {}).toHaveProperty(legacyPath);
     });
@@ -671,10 +626,11 @@ describe("commands/migrate", () => {
         await mkdir(path.dirname(legacyPath), { recursive: true });
         const legacyContent = `old pre-skill ${agentId} note command\n`;
         await writeFile(legacyPath, legacyContent, "utf8");
-        await recordAgentInstall({
+        await setLedgerFileHash({
           agentId,
+          filePath: legacyPath,
+          hash: hashContent(legacyContent),
           grounderVersion: "0.5.0",
-          files: { [legacyPath]: { hash: hashContent(legacyContent) } },
           homeDir: env.home,
         });
       }

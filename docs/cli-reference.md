@@ -111,7 +111,7 @@ Searches `*.md` under that folder — not the git repo, not sibling projects.
 
 ```bash
 grounder search "handling migrations of slash commands" \
-  --terms "slash commands,grounder migrate,commandsSchema,state.json,hash drift" \
+  --terms "slash commands,grounder migrate,hooksEnabled,state.json,hash drift" \
   --json
 ```
 

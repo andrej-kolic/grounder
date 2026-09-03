@@ -13,7 +13,7 @@ import {
 import { runtimeCliPath, runtimeInvocation } from "../../src/agents/hook-runtime.js";
 import { runSetup, runSetupWithOptions } from "../../src/commands/setup.js";
 import { homeConfigPath } from "../../src/connector/home.js";
-import { readGrounderState, statePath } from "../../src/connector/state.js";
+import { LEDGER_SCHEMA, readGrounderState, statePath } from "../../src/connector/state.js";
 import { VERSION } from "../../src/index.js";
 import { fileExists } from "../../src/util/fs.js";
 import { hashContent } from "../../src/util/hash.js";
@@ -88,10 +88,10 @@ describe("commands/setup", () => {
       'required_permissions: ["all"]',
     );
     expect(await readGrounderState(env.home)).toEqual({
+      ledgerSchema: LEDGER_SCHEMA,
       grounderVersion: VERSION,
       agents: {
         cursor: {
-          commandsSchema: 4,
           files: await expectedFileLedger(cursor.expectedArtifacts(env.home)),
         },
       },
@@ -482,16 +482,15 @@ describe("commands/setup", () => {
         },
       });
       expect(await readGrounderState(env.home)).toEqual({
+        ledgerSchema: LEDGER_SCHEMA,
         grounderVersion: VERSION,
         agents: {
           cursor: {
-            commandsSchema: 4,
-            hooksSchema: 1,
+            hooksEnabled: true,
             files: await expectedFileLedger(cursor.expectedArtifacts(env.home)),
           },
           claude: {
-            commandsSchema: 4,
-            hooksSchema: 1,
+            hooksEnabled: true,
             files: await expectedFileLedger(claude.expectedArtifacts(env.home)),
           },
         },

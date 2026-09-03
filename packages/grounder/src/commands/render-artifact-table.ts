@@ -1,7 +1,7 @@
 import type { ArtifactStatus } from "../agents/types.js";
 import type { GrounderState } from "../connector/state.js";
-import type { LegacyRetireStatus } from "../migrations/types.js";
-import type { ApplyAgentInstallsResult } from "./apply-agent-installs.js";
+import type { PlanAction, PlanEntry } from "../reconcile/core.js";
+import type { ApplyAgentInstallsResult } from "./apply.js";
 
 /** A row's plan status, independent of tense — "current" never changes wording; the
  * others are rendered as an infinitive in a dry run and past tense in a real one. */
@@ -15,6 +15,7 @@ export interface Row {
   forceAction?: "overwrite" | "delete";
 }
 
+/** For hook/runtime rows, still reported via the old imperative `ArtifactStatus` shape. */
 export function toRowStatus(status: ArtifactStatus): RowStatus {
   switch (status) {
     case "skipped":
@@ -28,15 +29,30 @@ export function toRowStatus(status: ArtifactStatus): RowStatus {
   }
 }
 
-export function toLegacyRowStatus(status: LegacyRetireStatus): RowStatus | undefined {
-  switch (status) {
-    case "retired":
+/** Whole-file artifact rows come straight from the reconciler's own plan vocabulary. */
+export function rowStatusFromPlanAction(action: PlanAction): RowStatus {
+  switch (action) {
+    case "noop":
+    case "forget":
+      return "current";
+    case "create":
+      return "create";
+    case "update":
+      return "update";
+    case "delete":
       return "delete";
-    case "left-modified":
+    case "conflict":
       return "modified";
-    case "already-absent":
-      return undefined;
   }
+}
+
+export function rowFromPlanEntry(target: string, entry: PlanEntry): Row {
+  return {
+    status: rowStatusFromPlanAction(entry.action),
+    target,
+    path: entry.path,
+    forceAction: entry.blockedAction,
+  };
 }
 
 export const VERB: Record<RowStatus, { dry: string; real: string }> = {
@@ -70,20 +86,13 @@ export const TABLE_LABEL: Record<RowStatus, string> = {
 };
 
 /**
- * Runtime + per-agent command/hook rows shared by `setup` and `migrate` —
+ * Runtime + per-agent whole-file/hook rows shared by `setup` and `migrate` —
  * both callers add the trailing state/ledger row on top since that isn't
- * part of `applyAgentInstalls`'s result.
- *
- * @param extraRowsForAgent Rows to splice in right after one agent's own
- * command/hook rows, keyed by agent id — e.g. migrate's legacy-retirement
- * rows, so a two-agent run reads as one block per agent (cursor rows, cursor
- * legacy deletes, claude rows, claude legacy deletes) instead of every
- * agent's rows followed by every agent's legacy rows.
+ * part of `applyAgentInstalls`'s result. Tombstone retirement is already
+ * folded into each agent's own `plan`, so it lands right after that agent's
+ * own artifact rows with no separate grouping step needed.
  */
-export function rowsFromApplyResult(
-  applyResult: ApplyAgentInstallsResult,
-  extraRowsForAgent?: (agentId: string) => Row[],
-): Row[] {
+export function rowsFromApplyResult(applyResult: ApplyAgentInstallsResult): Row[] {
   const rows: Row[] = [];
   if (applyResult.runtime) {
     rows.push({
@@ -93,13 +102,8 @@ export function rowsFromApplyResult(
     });
   }
   for (const agentResult of applyResult.agents) {
-    for (const [path, status] of Object.entries(agentResult.commands.artifacts)) {
-      rows.push({
-        status: toRowStatus(status),
-        target: agentResult.agent.id,
-        path,
-        forceAction: status === "modified" ? "overwrite" : undefined,
-      });
+    for (const entry of agentResult.plan) {
+      rows.push(rowFromPlanEntry(agentResult.agent.id, entry));
     }
     if (agentResult.hooks) {
       for (const [path, status] of Object.entries(agentResult.hooks.artifacts)) {
@@ -114,9 +118,6 @@ export function rowsFromApplyResult(
         });
       }
     }
-    if (extraRowsForAgent) {
-      rows.push(...extraRowsForAgent(agentResult.agent.id));
-    }
   }
   return rows;
 }
@@ -125,8 +126,8 @@ export function rowsFromApplyResult(
  * The trailing `state` row both `setup` and `migrate` append — same
  * create/update/current rule either way, so the two callers can't drift on
  * how a ledger write is reported. `ledgerChanged` is each caller's own
- * computation (migrate also folds in legacy-retirement writes); this only
- * owns turning that bit plus prior-state nullness into a `Row`.
+ * computation; this only owns turning that bit plus prior-state nullness
+ * into a `Row`.
  */
 export function stateRow(
   ledgerChanged: boolean,

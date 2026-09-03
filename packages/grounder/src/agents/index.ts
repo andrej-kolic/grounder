@@ -1,9 +1,3 @@
-import {
-  readGrounderState,
-  recordAgentInstall,
-  wouldChangeGrounderState,
-} from "../connector/state.js";
-import { VERSION } from "../index.js";
 import { claude } from "./claude.js";
 import { cursor } from "./cursor.js";
 import type { AgentAdapter } from "./types.js";
@@ -39,46 +33,4 @@ export async function resolveAgents(ids?: string[]): Promise<AgentAdapter[]> {
     ALL_AGENTS.map(async (a) => ({ adapter: a, ok: await a.isInstalled() })),
   );
   return results.filter((r) => r.ok).map((r) => r.adapter);
-}
-
-/**
- * Write this agent's install version info into `~/.grounder/state.json` after
- * install. If hooks were installed and the agent supports them, store the hooks
- * version; otherwise leave any existing hooks version as-is.
- *
- * When `advanceCommandsSchema` is false (every skill file was left alone
- * because it looked locally edited or from an old install), do not bump the
- * commands version in state — otherwise doctor/peek would stop warning even
- * though the files were never updated. Use `--force` (or a real write) first.
- *
- * Returns whether the ledger would change (real run: did change). Callable
- * under `--dry-run` too — same {@link wouldChangeGrounderState} predicate
- * decides both whether to write and what to report, so a preview can never
- * disagree with what a real run would do.
- */
-export async function recordAgentInstallState(
-  agent: AgentAdapter,
-  opts: {
-    hooksInstalled?: boolean;
-    homeDir?: string;
-    /** Default true. Pass false when no skill file was written or already up to date. */
-    advanceCommandsSchema?: boolean;
-    dryRun?: boolean;
-  } = {},
-): Promise<boolean> {
-  const advanceCommandsSchema = opts.advanceCommandsSchema !== false;
-  const installOpts = {
-    agentId: agent.id,
-    ...(advanceCommandsSchema ? { commandsSchema: agent.commandsSchema } : {}),
-    hooksSchema:
-      opts.hooksInstalled && agent.hooksSchema !== undefined ? agent.hooksSchema : undefined,
-    grounderVersion: VERSION,
-    homeDir: opts.homeDir,
-  };
-  const existing = await readGrounderState(opts.homeDir);
-  const changed = wouldChangeGrounderState(existing, installOpts);
-  if (changed && !opts.dryRun) {
-    await recordAgentInstall(installOpts);
-  }
-  return changed;
 }

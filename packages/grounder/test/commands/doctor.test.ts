@@ -385,7 +385,7 @@ describe("commands/doctor", () => {
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });
 
-  it("warns when skill file hashes are missing (legacy / wiped ledger files)", async () => {
+  it("stays ok when the ledger's file hashes are wiped but on-disk content still matches", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -401,13 +401,7 @@ describe("commands/doctor", () => {
       throw new Error("expected cursor install state after setup");
     }
     await writeGrounderState(
-      {
-        ...state,
-        agents: {
-          ...state.agents,
-          cursor: { ...state.agents.cursor, commandsSchema: 0, files: {} },
-        },
-      },
+      { ...state, agents: { ...state.agents, cursor: { files: {} } } },
       env.home,
     );
 
@@ -415,14 +409,13 @@ describe("commands/doctor", () => {
       runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
     );
 
+    // The reconciler compares on-disk content directly against the current
+    // template, not through a ledger schema int — content still matches, so
+    // there is nothing to warn about (a real migrate silently re-hydrates
+    // the ledger hash on its own noop pass).
     expect(code).toBe(0);
-    expect(out).toContain("warn  agent-cursor ");
-    // Skill file content still matches the current template exactly — the
-    // ledger just hasn't caught up, so a plain migrate (no --force) fixes it.
-    expect(out).toContain(
-      "Cursor: commands schema behind in ledger (recorded 0, current 4; files match)",
-    );
-    expect(out).toContain("grounder migrate");
+    expect(out).toContain("ok    agent-cursor ");
+    expect(out).toContain("Cursor skill files up to date");
     expect(out).not.toContain("package-version");
     expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
   });
@@ -542,88 +535,6 @@ describe("commands/doctor", () => {
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });
 
-  it("warns when ledger commands schema lags but skill files already match", async () => {
-    const env = await createTempEnv({ packageName: "my-app" });
-    cleanup = env.cleanup;
-
-    await runSetupWithOptions({
-      vaultPath: env.vault,
-      yes: true,
-      hooks: true,
-      homeDir: env.home,
-      agents: ["cursor"],
-    });
-    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
-    const state = await readGrounderState(env.home);
-    if (!state?.agents.cursor) {
-      throw new Error("expected cursor install state after setup");
-    }
-    await writeGrounderState(
-      {
-        ...state,
-        agents: {
-          ...state.agents,
-          cursor: { ...state.agents.cursor, commandsSchema: 1 },
-        },
-      },
-      env.home,
-    );
-
-    const { code, out } = await captureStdout(() =>
-      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
-    );
-
-    expect(code).toBe(0);
-    expect(out).toContain("warn  agent-cursor");
-    expect(out).toContain(
-      "Cursor: commands schema behind in ledger (recorded 1, current 4; files match)",
-    );
-    expect(out).toContain("→ grounder migrate");
-    expect(out).toContain("ok    agent-cursor-hooks");
-    expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
-  });
-
-  it("warns when ledger hooks schema lags but session hook already matches", async () => {
-    const env = await createTempEnv({ packageName: "my-app" });
-    cleanup = env.cleanup;
-
-    await runSetupWithOptions({
-      vaultPath: env.vault,
-      yes: true,
-      hooks: true,
-      homeDir: env.home,
-      agents: ["cursor"],
-    });
-    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
-    const state = await readGrounderState(env.home);
-    if (!state?.agents.cursor) {
-      throw new Error("expected cursor install state after setup");
-    }
-    await writeGrounderState(
-      {
-        ...state,
-        agents: {
-          ...state.agents,
-          cursor: { ...state.agents.cursor, hooksSchema: 0 },
-        },
-      },
-      env.home,
-    );
-
-    const { code, out } = await captureStdout(() =>
-      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
-    );
-
-    expect(code).toBe(0);
-    expect(out).toContain("ok    agent-cursor");
-    expect(out).toContain("warn  agent-cursor-hooks");
-    expect(out).toContain(
-      "Cursor: hooks schema behind in ledger (recorded 0, current 1; files match)",
-    );
-    expect(out).toContain("→ grounder migrate");
-    expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
-  });
-
   it("warns when skill drift dry-run throws", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
@@ -637,7 +548,9 @@ describe("commands/doctor", () => {
     });
     await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
-    const install = vi.spyOn(cursor, "install").mockRejectedValue(new Error("boom"));
+    const desiredArtifacts = vi
+      .spyOn(cursor, "desiredArtifacts")
+      .mockRejectedValue(new Error("boom"));
     try {
       const { code, out } = await captureStdout(() =>
         runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -650,11 +563,11 @@ describe("commands/doctor", () => {
       expect(out).toContain("ok    agent-cursor-hooks");
       expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
     } finally {
-      install.mockRestore();
+      desiredArtifacts.mockRestore();
     }
   });
 
-  it("warns when command dry-run reports created artifacts", async () => {
+  it("warns when a skill file would auto-update on next migrate (ledger hash matches, on-disk stale)", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -667,26 +580,43 @@ describe("commands/doctor", () => {
     });
     await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
-    const install = vi.spyOn(cursor, "install").mockResolvedValue({
-      artifacts: {
-        "/tmp/grounder-note.md": "created",
-        "/tmp/grounder-task.md": "skipped",
-      },
-    });
-    try {
-      const { code, out } = await captureStdout(() =>
-        runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
-      );
-
-      expect(code).toBe(0);
-      expect(out).toContain("warn  agent-cursor");
-      expect(out).toContain("Cursor: 1 skill file(s) would install on next migrate");
-      expect(out).toContain("→ grounder migrate");
-      expect(out).toContain("ok    agent-cursor-hooks");
-      expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
-    } finally {
-      install.mockRestore();
+    // Simulate a prior Grounder write that's now stale relative to the
+    // current template: on-disk content differs from the template, but the
+    // ledger's recorded hash matches on-disk exactly — safe to auto-update.
+    const notePath = grounderNoteCommandPath(env.home);
+    const staleContent = "stale rendered content from a prior version\n";
+    await writeFile(notePath, staleContent, "utf8");
+    const state = await readGrounderState(env.home);
+    if (!state?.agents.cursor) {
+      throw new Error("expected cursor install state after setup");
     }
+    await writeGrounderState(
+      {
+        ...state,
+        agents: {
+          ...state.agents,
+          cursor: {
+            ...state.agents.cursor,
+            files: {
+              ...state.agents.cursor.files,
+              [notePath]: { hash: hashContent(staleContent) },
+            },
+          },
+        },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("warn  agent-cursor");
+    expect(out).toContain("Cursor: 1 skill file(s) would update on next migrate");
+    expect(out).toContain("→ grounder migrate");
+    expect(out).toContain("ok    agent-cursor-hooks");
+    expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });
 
   it("warns when session hook drift dry-run throws", async () => {
@@ -750,7 +680,10 @@ describe("commands/doctor", () => {
     expect(out).not.toContain("would update on next migrate");
   });
 
-  it("fails when recorded schemas are newer than this grounder", async () => {
+  it("warns (never fails) when the ledger's grounderVersion is newer than this binary", async () => {
+    // The version hard stop is write-path only (inside applyPlan) — doctor
+    // is a read path and keeps today's warning, staying fully functional
+    // against a newer ledger.
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -763,36 +696,20 @@ describe("commands/doctor", () => {
     });
     await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
     const state = await readGrounderState(env.home);
-    if (!state?.agents.cursor) {
-      throw new Error("expected cursor install state after setup");
+    if (!state) {
+      throw new Error("expected install state after setup");
     }
-    await writeGrounderState(
-      {
-        ...state,
-        grounderVersion: "9.9.9",
-        agents: {
-          ...state.agents,
-          cursor: {
-            ...state.agents.cursor,
-            commandsSchema: 99,
-            hooksSchema: 50,
-          },
-        },
-      },
-      env.home,
-    );
+    await writeGrounderState({ ...state, grounderVersion: "9.9.9" }, env.home);
 
     const { code, out } = await captureStdout(() =>
       runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
     );
 
-    expect(code).toBe(1);
-    expect(out).toContain("fail  agent-cursor");
-    expect(out).toContain("commands schema newer than this grounder (recorded 99, supported 4)");
-    expect(out).toContain("fail  agent-cursor-hooks");
-    expect(out).toContain("hooks schema newer than this grounder (recorded 50, supported 1)");
-    expect(out).toContain("upgrade grounder");
-    expect(out).not.toContain("locally modified");
+    expect(code).toBe(0);
+    expect(out).toContain("warn  package-version");
+    expect(out).toContain("older than your configuration (9.9.9)");
+    expect(out).toContain("ok    agent-cursor");
+    expect(out).toContain("ok    agent-cursor-hooks");
   });
 
   it("fails when repo config version is newer than this grounder", async () => {

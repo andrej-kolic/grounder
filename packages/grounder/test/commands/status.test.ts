@@ -6,7 +6,12 @@ import { runSetupWithOptions } from "../../src/commands/setup.js";
 import { runStatusWithOptions } from "../../src/commands/status.js";
 import { homeConfigPath, writeHomeConfig } from "../../src/connector/home.js";
 import { writeRepoConfig } from "../../src/connector/repo.js";
-import { statePath, writeGrounderState } from "../../src/connector/state.js";
+import {
+  LEDGER_SCHEMA,
+  readGrounderState,
+  statePath,
+  writeGrounderState,
+} from "../../src/connector/state.js";
 import { VERSION } from "../../src/index.js";
 import { captureStdout, createTempEnv } from "../helpers.js";
 
@@ -42,7 +47,7 @@ describe("commands/status", () => {
     expect(out).toContain(`  Vault:      ${env.vault}`);
     expect(out).toContain(`  State:      ${statePath(env.home)}`);
     expect(out).not.toContain("Package:");
-    expect(out).toContain("  Schemas:    current");
+    expect(out).toContain("  Install:    current");
     expect(out).toContain("Project\n");
     expect(out).toContain("  Linked:     yes");
     expect(out).toContain(`  Folder:     ${env.repo}`);
@@ -118,15 +123,13 @@ describe("commands/status", () => {
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await writeGrounderState(
-      {
-        grounderVersion: "0.1.0",
-        agents: {
-          cursor: { commandsSchema: 4, hooksSchema: 1, files: {} },
-        },
-      },
-      env.home,
-    );
+    // Only the version lags — file hashes still match the current templates,
+    // so `Install:` (content drift) must stay independent of `Package:`.
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
+    await writeGrounderState({ ...state, grounderVersion: "0.1.0" }, env.home);
 
     const { code, out } = await captureStdout(() =>
       runStatusWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -135,7 +138,7 @@ describe("commands/status", () => {
     expect(code).toBe(0);
     expect(out).toContain(`  State:      ${statePath(env.home)}`);
     expect(out).toContain("  Package:    configuration outdated — run: grounder migrate");
-    expect(out).toContain("  Schemas:    current");
+    expect(out).toContain("  Install:    current");
     expect(VERSION).not.toBe("0.1.0");
   });
 
@@ -149,15 +152,11 @@ describe("commands/status", () => {
       homeDir: env.home,
       agents: ["cursor"],
     });
-    await writeGrounderState(
-      {
-        grounderVersion: "99.0.0",
-        agents: {
-          cursor: { commandsSchema: 4, hooksSchema: 1, files: {} },
-        },
-      },
-      env.home,
-    );
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
+    await writeGrounderState({ ...state, grounderVersion: "99.0.0" }, env.home);
 
     const { code, out } = await captureStdout(() =>
       runStatusWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -167,7 +166,7 @@ describe("commands/status", () => {
     expect(out).toContain("  Package:    older than configuration — install a newer Grounder");
   });
 
-  it("reports schema lag when recorded schemas are behind adapters", async () => {
+  it("reports install drift when the ledger has an agent entry but no recorded file hashes", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -179,9 +178,10 @@ describe("commands/status", () => {
     });
     await writeGrounderState(
       {
+        ledgerSchema: LEDGER_SCHEMA,
         grounderVersion: VERSION,
         agents: {
-          cursor: { commandsSchema: 0, files: {} },
+          cursor: { files: {} },
         },
       },
       env.home,
@@ -194,7 +194,7 @@ describe("commands/status", () => {
     expect(code).toBe(0);
     expect(out).toContain(`  State:      ${statePath(env.home)}`);
     expect(out).not.toContain("Package:");
-    expect(out).toContain("  Schemas:    ledger stale → grounder migrate");
+    expect(out).toContain("  Install:    outdated → grounder migrate");
   });
 
   it("reports missing vault when neither vault nor project is configured", async () => {

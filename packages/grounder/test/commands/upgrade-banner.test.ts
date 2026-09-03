@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { notifyUpgradeIfNeeded } from "../../src/commands/upgrade-banner.js";
-import { writeGrounderState } from "../../src/connector/state.js";
+import { LEDGER_SCHEMA, writeGrounderState } from "../../src/connector/state.js";
 import { VERSION } from "../../src/index.js";
 import { createTempEnv } from "../helpers.js";
 
@@ -21,8 +21,9 @@ describe("commands/upgrade-banner", () => {
 
     await writeGrounderState(
       {
+        ledgerSchema: LEDGER_SCHEMA,
         grounderVersion: "0.1.0",
-        agents: { cursor: { commandsSchema: 1, files: {} } },
+        agents: { cursor: { files: {} } },
       },
       env.home,
     );
@@ -48,8 +49,9 @@ describe("commands/upgrade-banner", () => {
 
     await writeGrounderState(
       {
+        ledgerSchema: LEDGER_SCHEMA,
         grounderVersion: "99.0.0",
-        agents: { cursor: { commandsSchema: 1, files: {} } },
+        agents: { cursor: { files: {} } },
       },
       env.home,
     );
@@ -72,8 +74,9 @@ describe("commands/upgrade-banner", () => {
 
     await writeGrounderState(
       {
+        ledgerSchema: LEDGER_SCHEMA,
         grounderVersion: VERSION,
-        agents: { cursor: { commandsSchema: 1, files: {} } },
+        agents: { cursor: { files: {} } },
       },
       env.home,
     );

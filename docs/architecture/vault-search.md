@@ -154,7 +154,7 @@ Do not recycle the query as a `--terms` item. Template counterexamples use a **d
 
 1. Product noun/phrase (`slash commands`) — skip if it would duplicate the query
 2. Product verb or CLI name (`grounder migrate` — never lone `migrate`)
-3. One on-disk identifier (`commandsSchema`, `state.json`, `hash drift`, …)
+3. One on-disk identifier (`hooksEnabled`, `state.json`, `hash drift`, …)
 4–5. Another vault/product token
 
 **Never as terms** (unless the user asked about code layout): repo paths, `packages/…`, source module / file stems (`install-command`, `apply-agent-installs`, `hook-runtime`, `vault/search.ts`). Lone high-df words (`plan`, `command`, `cli`) flatten rank. Those match code-ish plan checklists and **reorder the head**.
@@ -243,7 +243,7 @@ Healthy `query` / `--terms`:
 ```text
 class: topic leftover
 query: handling migrations of slash commands
-terms: slash commands,grounder migrate,hash drift,commandsSchema,state.json
+terms: slash commands,grounder migrate,hash drift,hooksEnabled,state.json
 ```
 
 Second probe (request-shaped; **do not** put this utterance or its terms CSV in the template):
@@ -286,7 +286,7 @@ Evaluate **one change at a time** (CLI xor template). Migrating templates mid-ex
 | Help text | `packages/grounder/src/help.ts` (`id: "search"`) |
 | Project vault root | `connector/vault.ts` `resolveProjectVaultRoot` → `vault/layout.ts` `projectDir` |
 | Cursor / Claude templates | `templates/agents/{cursor,claude}/skills/grounder-search/SKILL.md` |
-| `{{GROUNDER_CLI}}` bake | `agents/install-command.ts` |
+| `{{GROUNDER_CLI}}` bake | `desiredArtifacts()` in `agents/cursor.ts` / `agents/claude.ts` |
 | Command file list | `agents/cursor.ts`, `agents/claude.ts` (`grounder-search/SKILL.md`) |
 | Template contract tests | `test/templates/grounder-search.test.ts` |
 | Rank unit tests | `test/vault/search.test.ts` |

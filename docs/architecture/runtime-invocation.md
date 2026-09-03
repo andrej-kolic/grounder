@@ -2,7 +2,7 @@
 
 How Grounder invokes itself from session hooks and slash commands — and why the absolute Node path is intentional.
 
-User-facing steps (`grounder migrate`, doctor hints) live in [packages/grounder/README.md](../../packages/grounder/README.md). Schema / ledger upgrades are covered in [schema-versioning.md](./schema-versioning.md). This doc is for contributors.
+User-facing steps (`grounder migrate`, doctor hints) live in [packages/grounder/README.md](../../packages/grounder/README.md). Ledger / reconciliation details are covered in [state-reconciliation.md](./state-reconciliation.md). This doc is for contributors.
 
 ## Problem
 
@@ -61,14 +61,14 @@ When an already-installed Grounder hook entry or slash-command file matches the 
 
 Same split as schema checks: present-but-broken fails; never-installed warns.
 
-This is a read-only diagnostic over artifact content. It does not bump `commandsSchema` / `hooksSchema` — the generated string *shape* did not change.
+This is a read-only diagnostic over artifact content. It does not change the rendered template's hash — the generated string *shape* did not change, so the reconciler still sees the file as current (or as a normal drift case, if it also differs from the template).
 
 ## Key code map
 
 | Concern | Location |
 | --- | --- |
 | Runtime materialization + quoting + parsers | `agents/hook-runtime.ts` |
-| Command template `{{GROUNDER_CLI}}` substitution | `agents/install-command.ts`, adapters |
+| Command template `{{GROUNDER_CLI}}` substitution | `desiredArtifacts()` in `agents/cursor.ts` / `agents/claude.ts` |
 | Doctor dangling-Node checks | `commands/doctor.ts` |
 | Executability helper | `util/fs.ts` (`isExecutable`) |
 

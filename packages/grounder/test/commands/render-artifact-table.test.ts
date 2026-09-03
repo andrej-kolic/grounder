@@ -6,8 +6,8 @@ import {
   renderModifiedNote,
   renderSummary,
   renderTable,
+  rowFromPlanEntry,
   rowsFromApplyResult,
-  toLegacyRowStatus,
   toRowStatus,
 } from "../../src/commands/render-artifact-table.js";
 import { captureSyncStdout as captureStdout } from "../helpers.js";
@@ -22,23 +22,41 @@ describe("commands/render-artifact-table", () => {
     });
   });
 
-  describe("toLegacyRowStatus", () => {
-    it("maps retired/left-modified, and drops already-absent", () => {
-      expect(toLegacyRowStatus("retired")).toBe("delete");
-      expect(toLegacyRowStatus("left-modified")).toBe("modified");
-      expect(toLegacyRowStatus("already-absent")).toBeUndefined();
+  describe("rowFromPlanEntry", () => {
+    it("maps every PlanAction to a RowStatus, carrying blockedAction as forceAction", () => {
+      expect(rowFromPlanEntry("cursor", { path: "/a", action: "noop" })).toEqual({
+        status: "current",
+        target: "cursor",
+        path: "/a",
+        forceAction: undefined,
+      });
+      expect(rowFromPlanEntry("cursor", { path: "/a", action: "forget" })).toMatchObject({
+        status: "current",
+      });
+      expect(rowFromPlanEntry("cursor", { path: "/a", action: "create" })).toMatchObject({
+        status: "create",
+      });
+      expect(rowFromPlanEntry("cursor", { path: "/a", action: "update" })).toMatchObject({
+        status: "update",
+      });
+      expect(rowFromPlanEntry("cursor", { path: "/a", action: "delete" })).toMatchObject({
+        status: "delete",
+      });
+      expect(
+        rowFromPlanEntry("cursor", { path: "/a", action: "conflict", blockedAction: "delete" }),
+      ).toEqual({ status: "modified", target: "cursor", path: "/a", forceAction: "delete" });
     });
   });
 
   describe("rowsFromApplyResult", () => {
-    it("labels runtime, command, and hook rows distinctly, hooks suffixed with ' hook'", () => {
+    it("labels runtime, whole-file, and hook rows distinctly, hooks suffixed with ' hook'", () => {
       const agent = { id: "cursor" } as AgentAdapter;
       const rows = rowsFromApplyResult({
         runtime: { cliPath: "/runtime", status: "created", mode: "symlink" },
         agents: [
           {
             agent,
-            commands: { artifacts: { "/note.md": "created" } },
+            plan: [{ path: "/note.md", action: "create" }],
             hooks: { artifacts: { "/hooks.json": "modified" } },
             ledgerChanged: true,
           },

@@ -11,13 +11,13 @@ import {
 } from "../connector/home.js";
 import { readGrounderState, statePath } from "../connector/state.js";
 import { helpExitCode } from "../help.js";
+import { VERSION } from "../index.js";
 import { flagBool, flagStrings, parseArgs } from "../util/parse-args.js";
 import { resolveUserPath } from "../util/path.js";
 import { confirm } from "../util/prompt.js";
 import { projectsParent } from "../vault/layout.js";
-import { applyAgentInstalls } from "./apply-agent-installs.js";
+import { applyAgentInstalls } from "./apply.js";
 import {
-  type Row,
   renderModifiedNote,
   renderSummary,
   renderTable,
@@ -154,7 +154,14 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
       let applyResult: Awaited<ReturnType<typeof applyAgentInstalls>>;
       try {
         priorState = await readGrounderState(homeDir);
-        applyResult = await applyAgentInstalls({ agents, force, hooks, dryRun: true, homeDir });
+        applyResult = await applyAgentInstalls({
+          agents,
+          force,
+          hooks,
+          dryRun: true,
+          homeDir,
+          grounderVersion: VERSION,
+        });
       } catch (error: unknown) {
         const detail = error instanceof Error ? error.message : String(error);
         process.stderr.write(`Dry run failed: agent install would not succeed:\n  ${detail}\n`);
@@ -201,6 +208,7 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
         force,
         hooks,
         homeDir,
+        grounderVersion: VERSION,
       });
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -234,8 +242,9 @@ function reportAgentInstalls(
   dryRun: boolean,
   forceCommand: string,
 ): void {
-  const rows: Row[] = rowsFromApplyResult(applyResult);
-  const ledgerChanged = applyResult.agents.some((a) => a.ledgerChanged);
+  const rows = rowsFromApplyResult(applyResult);
+  const ledgerChanged =
+    applyResult.agents.some((a) => a.ledgerChanged) || VERSION !== priorState?.grounderVersion;
   rows.push(stateRow(ledgerChanged, priorState, statePath(homeDir)));
 
   process.stdout.write("\n");
