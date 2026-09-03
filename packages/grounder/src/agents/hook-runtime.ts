@@ -373,6 +373,15 @@ export async function isHookRuntimeStale(
 }
 
 /**
+ * Materialization mode this source would use — symlink (durable) or copy
+ * (ephemeral `npx` cache) — without touching disk. Lets callers label a
+ * skipped/dry-run install the same way {@link installHookRuntime} would.
+ */
+export function runtimeMode(packageRoot: string = defaultPackageRoot): "symlink" | "copy" {
+  return isEphemeralSource(packageRoot) ? "copy" : "symlink";
+}
+
+/**
  * Materialize this package's `dist/` at `~/.grounder/runtime/dist/` — symlinked
  * when the source is durable, copied when it's an ephemeral `npx` cache — and
  * write a manifest recording how.
@@ -410,7 +419,7 @@ export async function installHookRuntime(options: {
   await rm(stagingDist, { recursive: true, force: true });
   await rm(backupDist, { recursive: true, force: true });
 
-  const mode: "symlink" | "copy" = isEphemeralSource(packageRoot) ? "copy" : "symlink";
+  const mode: "symlink" | "copy" = runtimeMode(packageRoot);
   try {
     if (mode === "symlink") {
       const resolvedSource = await realpath(sourceDistDir).catch(() => path.resolve(sourceDistDir));

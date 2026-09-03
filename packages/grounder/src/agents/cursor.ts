@@ -278,7 +278,7 @@ export const cursor: AgentAdapter = {
         ...opts,
         agentId: cursor.id,
         templateDir,
-        commandsDir: cursorSkillsDir(opts.homeDir),
+        skillsDir: cursorSkillsDir(opts.homeDir),
         filename,
       });
       artifacts[dest] = status;
@@ -286,14 +286,14 @@ export const cursor: AgentAdapter = {
         files[dest] = { hash };
       }
     }
-    await recordCommandFileHashes({
+    const ledgerChanged = await recordCommandFileHashes({
       agentId: cursor.id,
       commandsSchema: cursor.commandsSchema,
       files,
       homeDir: opts.homeDir,
       dryRun: opts.dryRun,
     });
-    return { artifacts };
+    return { artifacts, ledgerChanged };
   },
 
   installHooks,

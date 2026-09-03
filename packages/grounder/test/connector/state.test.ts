@@ -3,6 +3,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   assertAgentSchemasSupported,
+  type GrounderState,
+  grounderStatesEqual,
   isHooksSchemaAhead,
   isInstallSchemaStale,
   readGrounderState,
@@ -11,6 +13,7 @@ import {
   recordedFileHash,
   recordedHooksSchema,
   statePath,
+  wouldChangeGrounderState,
   writeGrounderState,
 } from "../../src/connector/state.js";
 import { UnsupportedSchemaError } from "../../src/connector/unsupported-schema.js";
@@ -321,5 +324,95 @@ describe("connector/state", () => {
         { id: "claude", name: "Claude Code", commandsSchema: 1 },
       ]),
     ).not.toThrow();
+  });
+
+  // Pure — no I/O, no homeDir/createTempEnv needed. This is the single
+  // predicate migrate.ts's real and `--dry-run` paths both consult for
+  // "would this change state.json", so its edge cases are worth pinning down
+  // directly rather than only through migrate.test.ts's integration coverage.
+  describe("grounderStatesEqual / wouldChangeGrounderState", () => {
+    const base: GrounderState = {
+      grounderVersion: "0.6.0",
+      agents: {
+        cursor: {
+          commandsSchema: 4,
+          hooksSchema: 1,
+          files: { "/a/SKILL.md": { hash: "sha256:aaa" } },
+        },
+      },
+    };
+
+    it("treats identical data in a different key order as equal", () => {
+      const reordered: GrounderState = {
+        agents: {
+          cursor: {
+            files: { "/a/SKILL.md": { hash: "sha256:aaa" } },
+            hooksSchema: 1,
+            commandsSchema: 4,
+          },
+        },
+        grounderVersion: "0.6.0",
+      };
+      expect(grounderStatesEqual(base, reordered)).toBe(true);
+    });
+
+    it("null equals only null", () => {
+      expect(grounderStatesEqual(null, null)).toBe(true);
+      expect(grounderStatesEqual(base, null)).toBe(false);
+    });
+
+    it("a different grounderVersion would change state", () => {
+      expect(
+        wouldChangeGrounderState(base, {
+          agentId: "cursor",
+          commandsSchema: 4,
+          hooksSchema: 1,
+          files: { "/a/SKILL.md": { hash: "sha256:aaa" } },
+          grounderVersion: "0.6.1",
+        }),
+      ).toBe(true);
+    });
+
+    it("re-recording identical data is a no-op, even with fields omitted", () => {
+      // commandsSchema/hooksSchema omitted -> falls back to the recorded
+      // values, which already match `base` exactly.
+      expect(
+        wouldChangeGrounderState(base, {
+          agentId: "cursor",
+          files: { "/a/SKILL.md": { hash: "sha256:aaa" } },
+          grounderVersion: "0.6.0",
+        }),
+      ).toBe(false);
+    });
+
+    it("a files-only change is detected with schema/version unchanged", () => {
+      expect(
+        wouldChangeGrounderState(base, {
+          agentId: "cursor",
+          files: { "/a/SKILL.md": { hash: "sha256:bbb" } },
+          grounderVersion: "0.6.0",
+        }),
+      ).toBe(true);
+    });
+
+    it("a schema-only change is detected with files/version unchanged", () => {
+      expect(
+        wouldChangeGrounderState(base, {
+          agentId: "cursor",
+          commandsSchema: 5,
+          grounderVersion: "0.6.0",
+        }),
+      ).toBe(true);
+    });
+
+    it("any write against a missing ledger is always a change", () => {
+      expect(
+        wouldChangeGrounderState(null, {
+          agentId: "cursor",
+          commandsSchema: 4,
+          grounderVersion: "0.6.0",
+        }),
+      ).toBe(true);
+    });
   });
 });

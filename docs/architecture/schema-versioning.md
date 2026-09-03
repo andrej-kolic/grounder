@@ -42,7 +42,7 @@ We do **not** pin a per-project Grounder version (Corepack-style). Install state
 ### Two migration strategies
 
 1. **Owned fragments** (hooks entry, runtime, ledger): always refresh on `setup` / `migrate`. No `--force` required.
-2. **Command markdown**: chezmoi-style drift detection.
+2. **Skill markdown**: chezmoi-style drift detection.
    - On write, record per file: `hash` (exact rendered bytes Grounder wrote — not the raw template).
    - Later: on-disk hash == recorded hash → file untouched → safe auto-update without `--force`.
    - On-disk hash != recorded (or no recorded hash) → treat as user-edited / legacy → leave alone; report; require `--force` to overwrite.
@@ -98,7 +98,7 @@ Invariants:
 - Agent schema **greater than** this binary’s adapter → **forward-compat hard stop** (`UnsupportedSchemaError`: upgrade grounder). Same idea for `.grounder.json`’s `version` vs `SUPPORTED_REPO_VERSION` in [`connector/repo.ts`](../../packages/grounder/src/connector/repo.ts).
 - Ledger agent ids this binary does not know → skip with a stderr warning on `migrate` (still refresh known agents); explicit `--agent=<unknown>` still errors.
 - Corrupt ledger → fail with a clear “fix or remove, then migrate” message (distinct from “newer than me”).
-- `migrate` / setup **must not** advance `commandsSchema` when every command artifact was left as `modified` (legacy or local edits). Runtime/`grounderVersion` (and hooks, when refreshed) may still update; doctor keeps the schema-stale / `--force` hint until a real command write lands.
+- `migrate` / setup **must not** advance `commandsSchema` when every skill artifact was left as `modified` (legacy or local edits). Runtime/`grounderVersion` (and hooks, when refreshed) may still update; doctor keeps the schema-stale / `--force` hint until a real skill write lands.
 ### `grounder migrate` (not only `setup --force`)
 
 `setup` is “point this machine at a vault and install.” Reusing it as the routine post-upgrade action forces retyping a path and mixes first-time setup with keep-current.
@@ -147,9 +147,9 @@ flowchart TD
   Warn --> Migrate
   Banner --> Migrate
   Migrate --> Owned["Owned JSON / runtime: always refresh"]
-  Migrate --> Cmds["Command markdown: per-file hash"]
-  Cmds -->|"hash matches ledger"| Auto["Auto-update"]
-  Cmds -->|"no hash or hash differs"| Skip["Skip unless --force"]
+  Migrate --> Skills["Skill markdown: per-file hash"]
+  Skills -->|"hash matches ledger"| Auto["Auto-update"]
+  Skills -->|"no hash or hash differs"| Skip["Skip unless --force"]
 ```
 
 ## Key code map
@@ -159,7 +159,7 @@ flowchart TD
 | Install "out of date?" helpers | `connector/state.ts` — `isInstallSchemaStale` for peek/status (state file only; hooks never enabled ≠ out of date). Doctor uses migrate dry-run for on-disk drift, plus ledger schema-lag when files already match |
 | Shared “newer schema” error type | `connector/unsupported-schema.ts` |
 | Repo marker version guard | `connector/repo.ts` |
-| Hash of rendered command bytes | `util/hash.ts` + `agents/install-command.ts` |
+| Hash of rendered skill bytes | `util/hash.ts` + `agents/install-command.ts` |
 | Adapter schema fields | `agents/types.ts`, `cursor.ts`, `claude.ts` |
 | Shared install + ledger update | `commands/apply-agent-installs.ts`, `agents/index.ts` (`recordAgentInstallState`) |
 | `grounder migrate` | `commands/migrate.ts` |
@@ -181,7 +181,7 @@ flowchart TD
 When changing install output:
 
 1. Bump `commandsSchema` and/or `hooksSchema` on the affected adapter(s). Peek only warns after a schema bump — not after a package bump alone.
-2. Ensure install still records per-file hashes for command markdown.
+2. Ensure install still records per-file hashes for skill markdown.
 3. Extend doctor messages if a new failure mode needs a distinct hint.
 4. Run `pnpm check`.
 5. After release, users with an existing ledger run plain `grounder migrate`; pre-ledger installs may need one `migrate --force`.

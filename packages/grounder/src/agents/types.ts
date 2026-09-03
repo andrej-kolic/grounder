@@ -16,6 +16,12 @@ export interface AgentInstallOptions {
 export interface AgentInstallResult {
   /** Map of installed file path → what happened to it. */
   artifacts: Record<string, ArtifactStatus>;
+  /**
+   * Would/did this call change `~/.grounder/state.json`? Omitted (treated as
+   * `false`) by adapters whose result never touches the ledger (e.g.
+   * `installHooks()` — the hooks schema bump is recorded separately).
+   */
+  ledgerChanged?: boolean;
 }
 
 export interface AgentAdapter {

@@ -20,6 +20,8 @@ export interface MigrationArtifactResult {
   agentId: string;
   path: string;
   status: LegacyRetireStatus;
+  /** Would/did retiring this path change `~/.grounder/state.json` (forget a stale hash)? */
+  ledgerChanged: boolean;
 }
 
 export interface MigrationContext {

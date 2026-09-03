@@ -132,12 +132,15 @@ export interface RecordAgentInstallOptions {
 }
 
 /**
- * Merge one agent's install info into `~/.grounder/state.json`. Creates the
- * file when missing. Keeps other agents and merges any provided `files` over
- * this agent's existing map.
+ * The ledger state after merging in `opts` — pure, no reading or writing.
+ * Both the real write path ({@link recordAgentInstall}) and a `--dry-run`
+ * preview call this same function, so they can never disagree about whether
+ * a write is a no-op.
  */
-export async function recordAgentInstall(opts: RecordAgentInstallOptions): Promise<GrounderState> {
-  const existing = await readGrounderState(opts.homeDir);
+function withAgentInstall(
+  existing: GrounderState | null,
+  opts: RecordAgentInstallOptions,
+): GrounderState {
   const prev = existing?.agents[opts.agentId];
   const nextEntry: AgentState = {
     commandsSchema:
@@ -153,13 +156,63 @@ export async function recordAgentInstall(opts: RecordAgentInstallOptions): Promi
     nextEntry.hooksSchema = prev.hooksSchema;
   }
 
-  const next: GrounderState = {
+  return {
     grounderVersion: opts.grounderVersion,
     agents: {
       ...(existing?.agents ?? {}),
       [opts.agentId]: nextEntry,
     },
   };
+}
+
+/** Deterministic stringify, keys sorted at every level — order-independent structural compare. */
+function canonicalJson(value: unknown): string {
+  const sort = (v: unknown): unknown => {
+    if (Array.isArray(v)) {
+      return v.map(sort);
+    }
+    if (v && typeof v === "object") {
+      const sorted: Record<string, unknown> = {};
+      for (const key of Object.keys(v as Record<string, unknown>).sort()) {
+        sorted[key] = sort((v as Record<string, unknown>)[key]);
+      }
+      return sorted;
+    }
+    return v;
+  };
+  return JSON.stringify(sort(value));
+}
+
+/**
+ * Structural equality between two ledger states — immune to incidental JSON
+ * key-order differences (e.g. a ledger entry written by an older Grounder
+ * whose field order doesn't match what the current code produces).
+ */
+export function grounderStatesEqual(a: GrounderState | null, b: GrounderState | null): boolean {
+  return canonicalJson(a) === canonicalJson(b);
+}
+
+/**
+ * Would persisting `opts` actually change `state.json`? Pure — reads nothing,
+ * writes nothing. Callers use this to decide whether a real write is needed
+ * (and skip it when it's a no-op) and to predict the outcome under
+ * `--dry-run`, from the exact same computation.
+ */
+export function wouldChangeGrounderState(
+  existing: GrounderState | null,
+  opts: RecordAgentInstallOptions,
+): boolean {
+  return !grounderStatesEqual(existing, withAgentInstall(existing, opts));
+}
+
+/**
+ * Merge one agent's install info into `~/.grounder/state.json`. Creates the
+ * file when missing. Keeps other agents and merges any provided `files` over
+ * this agent's existing map.
+ */
+export async function recordAgentInstall(opts: RecordAgentInstallOptions): Promise<GrounderState> {
+  const existing = await readGrounderState(opts.homeDir);
+  const next = withAgentInstall(existing, opts);
   await writeGrounderState(next, opts.homeDir);
   return next;
 }

@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cursorHooksJsonPath, grounderNoteCommandPath } from "../../src/agents/cursor.js";
+import { runtimeCliPath } from "../../src/agents/hook-runtime.js";
 import { runMigrateWithOptions } from "../../src/commands/migrate.js";
 import { runSetupWithOptions } from "../../src/commands/setup.js";
 import {
@@ -78,6 +79,87 @@ describe("commands/migrate", () => {
     });
   });
 
+  it("reports nothing to do when the install is already current", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+
+    const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+
+    expect(code).toBe(0);
+    expect(out).toContain("Nothing to do");
+    expect(hasRow(out, "unchanged", statePath(env.home))).toBe(true);
+    expect(hasRow(out, "unchanged", runtimeCliPath(env.home))).toBe(true);
+  });
+
+  it("does not report state.json as updated when only its on-disk key order differs", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+
+    const state = await readGrounderState(env.home);
+    const cursorAgent = state?.agents.cursor;
+    if (!cursorAgent) {
+      throw new Error("expected cursor agent in install state after setup");
+    }
+    // Same data, `hooksSchema` before `files` — simulates a ledger entry
+    // written by an older Grounder whose field order doesn't match today's
+    // `recordAgentInstall` (which writes `files` before `hooksSchema`).
+    const reordered = {
+      ...state,
+      agents: {
+        ...state.agents,
+        cursor: {
+          commandsSchema: cursorAgent.commandsSchema,
+          hooksSchema: cursorAgent.hooksSchema,
+          files: cursorAgent.files,
+        },
+      },
+    };
+    await writeFile(statePath(env.home), `${JSON.stringify(reordered, null, 2)}\n`, "utf8");
+
+    const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+
+    expect(code).toBe(0);
+    expect(hasRow(out, "unchanged", statePath(env.home))).toBe(true);
+  });
+
+  it("dry-run reports state.json as unchanged when the only pending row is a conflict", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    // A left-alone conflict never calls any `recordAgentInstall*` — it must
+    // not make the ledger row look like it's about to change either.
+    await writeFile(grounderNoteCommandPath(env.home), "my local edits\n", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runMigrateWithOptions({ homeDir: env.home, dryRun: true }),
+    );
+
+    expect(code).toBe(0);
+    expect(hasRow(out, "conflict", grounderNoteCommandPath(env.home))).toBe(true);
+    expect(hasRow(out, "unchanged", statePath(env.home))).toBe(true);
+  });
+
   it("reports locally modified files and overwrites with --force", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
@@ -106,7 +188,7 @@ describe("commands/migrate", () => {
     expect(await readFile(noteDest, "utf8")).not.toBe("my local edits\n");
   });
 
-  it("does not advance commandsSchema when plain migrate skips all legacy command files", async () => {
+  it("does not advance commandsSchema when plain migrate skips all locally-modified skill files", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
 
@@ -116,14 +198,14 @@ describe("commands/migrate", () => {
       homeDir: env.home,
       agents: ["cursor"],
     });
-    // Pre-0.3 / pre-ledger: command files exist with drift Grounder can't
+    // Pre-0.3 / pre-ledger: skill files exist with drift Grounder can't
     // verify (no per-file hashes) — content differing from the current
     // template is what actually needs protecting, so simulate that rather
     // than leaving the freshly-installed (already-matching) content in place.
     const { cursor } = await import("../../src/agents/cursor.js");
     for (const filePath of cursor.expectedArtifacts(env.home)) {
       const original = await readFile(filePath, "utf8");
-      await writeFile(filePath, `${original}\n<!-- legacy -->\n`, "utf8");
+      await writeFile(filePath, `${original}\n<!-- local edit -->\n`, "utf8");
     }
     const { rm } = await import("node:fs/promises");
     await rm(statePath(env.home), { force: true });
@@ -219,7 +301,12 @@ describe("commands/migrate", () => {
         "Refresh Grounder after an upgrade (slash commands/hooks; vault path unchanged).",
       ),
     ).toBeLessThan(out.indexOf("Dry run — no files will be written."));
-    expect(hasRow(out, "updated", statePath(env.home))).toBe(true);
+    // The ledger already recorded the template's hash for this path from the
+    // original `setup` (the test only rewrote the file on disk, not via
+    // Grounder) — force-restoring it to that same template content changes
+    // the file but not what the ledger would record for it, so `state` is
+    // correctly `unchanged` here, not `updated`.
+    expect(hasRow(out, "unchanged", statePath(env.home))).toBe(true);
     expect(out).not.toContain("grounder migrate --force");
     expect(await readFile(noteDest, "utf8")).toBe(before);
   });
@@ -454,6 +541,31 @@ describe("commands/migrate", () => {
       expect(code).toBe(0);
       expect(hasRow(out, "deleted", legacyPath)).toBe(true);
       expect(await fileExists(legacyPath)).toBe(true);
+    });
+
+    it("distinguishes overwrite vs delete in the --force footer for a mixed run", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      await runSetupWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      });
+      const noteDest = grounderNoteCommandPath(env.home);
+      await writeFile(noteDest, "my local edits\n", "utf8");
+
+      const legacyPath = legacyCursorNotePath(env.home);
+      await mkdir(path.dirname(legacyPath), { recursive: true });
+      await writeFile(legacyPath, "hand-edited legacy command\n", "utf8");
+
+      const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+
+      expect(code).toBe(0);
+      expect(out).toContain(`  ${noteDest} (would be overwritten)`);
+      expect(out).toContain(`  ${legacyPath} (would be deleted)`);
+      expect(out).toContain("Run 'grounder migrate --force' to overwrite or delete them");
     });
 
     it("forgets a stale ledger entry for a legacy file already gone from disk", async () => {

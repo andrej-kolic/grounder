@@ -1,4 +1,8 @@
-import { recordAgentInstall } from "../connector/state.js";
+import {
+  readGrounderState,
+  recordAgentInstall,
+  wouldChangeGrounderState,
+} from "../connector/state.js";
 import { VERSION } from "../index.js";
 import { claude } from "./claude.js";
 import { cursor } from "./cursor.js";
@@ -46,6 +50,11 @@ export async function resolveAgents(ids?: string[]): Promise<AgentAdapter[]> {
  * because it looked locally edited or from an old install), do not bump the
  * commands version in state — otherwise doctor/peek would stop warning even
  * though the files were never updated. Use `--force` (or a real write) first.
+ *
+ * Returns whether the ledger would change (real run: did change). Callable
+ * under `--dry-run` too — same {@link wouldChangeGrounderState} predicate
+ * decides both whether to write and what to report, so a preview can never
+ * disagree with what a real run would do.
  */
 export async function recordAgentInstallState(
   agent: AgentAdapter,
@@ -54,15 +63,22 @@ export async function recordAgentInstallState(
     homeDir?: string;
     /** Default true. Pass false when no skill file was written or already up to date. */
     advanceCommandsSchema?: boolean;
+    dryRun?: boolean;
   } = {},
-): Promise<void> {
+): Promise<boolean> {
   const advanceCommandsSchema = opts.advanceCommandsSchema !== false;
-  await recordAgentInstall({
+  const installOpts = {
     agentId: agent.id,
     ...(advanceCommandsSchema ? { commandsSchema: agent.commandsSchema } : {}),
     hooksSchema:
       opts.hooksInstalled && agent.hooksSchema !== undefined ? agent.hooksSchema : undefined,
     grounderVersion: VERSION,
     homeDir: opts.homeDir,
-  });
+  };
+  const existing = await readGrounderState(opts.homeDir);
+  const changed = wouldChangeGrounderState(existing, installOpts);
+  if (changed && !opts.dryRun) {
+    await recordAgentInstall(installOpts);
+  }
+  return changed;
 }

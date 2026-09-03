@@ -1,6 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { readGrounderState, recordAgentInstall, recordedFileHash } from "../connector/state.js";
+import {
+  readGrounderState,
+  recordAgentInstall,
+  recordedFileHash,
+  wouldChangeGrounderState,
+} from "../connector/state.js";
 import { VERSION } from "../index.js";
 import { fileExists } from "../util/fs.js";
 import { hashContent } from "../util/hash.js";
@@ -10,7 +15,7 @@ import type { AgentInstallOptions, ArtifactStatus } from "./types.js";
 export interface InstallCommandFileOptions extends AgentInstallOptions {
   agentId: string;
   templateDir: string;
-  commandsDir: string;
+  skillsDir: string;
   filename: string;
 }
 
@@ -35,7 +40,7 @@ export interface InstallCommandFileResult {
 export async function installCommandFile(
   opts: InstallCommandFileOptions,
 ): Promise<InstallCommandFileResult> {
-  const dest = path.join(opts.commandsDir, opts.filename);
+  const dest = path.join(opts.skillsDir, opts.filename);
   const existed = await fileExists(dest);
 
   const template = await readFile(path.join(opts.templateDir, opts.filename), "utf8");
@@ -74,8 +79,11 @@ export async function installCommandFile(
 }
 
 /**
- * Persist per-file hashes after a command install. No-op when `files` is empty
- * or `dryRun` is set.
+ * Persist per-file hashes after a command install. Returns whether the ledger
+ * would change (or did — under `--dry-run` nothing is written either way, but
+ * the same {@link wouldChangeGrounderState} predicate answers the question so
+ * a preview and a real run can't disagree about it). A no-op write (content
+ * already matches what's recorded) is skipped even for a real run.
  */
 export async function recordCommandFileHashes(opts: {
   agentId: string;
@@ -83,15 +91,21 @@ export async function recordCommandFileHashes(opts: {
   files: Record<string, { hash: string }>;
   homeDir?: string;
   dryRun?: boolean;
-}): Promise<void> {
-  if (opts.dryRun || Object.keys(opts.files).length === 0) {
-    return;
+}): Promise<boolean> {
+  if (Object.keys(opts.files).length === 0) {
+    return false;
   }
-  await recordAgentInstall({
+  const installOpts = {
     agentId: opts.agentId,
     commandsSchema: opts.commandsSchema,
     files: opts.files,
     grounderVersion: VERSION,
     homeDir: opts.homeDir,
-  });
+  };
+  const existing = await readGrounderState(opts.homeDir);
+  const changed = wouldChangeGrounderState(existing, installOpts);
+  if (changed && !opts.dryRun) {
+    await recordAgentInstall(installOpts);
+  }
+  return changed;
 }

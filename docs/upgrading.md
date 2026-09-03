@@ -27,7 +27,7 @@ See also: [CLI reference](cli-reference.md) · [Configuration](configuration.md)
 | `--agent <id>` | Limit to a specific agent (repeatable)                                                                         |
 | `--hooks`      | Install hooks even if they were never installed before                                                          |
 
-Untouched command files update automatically; locally edited ones (and pre-0.3 installs
+Untouched skill files update automatically; locally edited ones (and pre-0.3 installs
 with no ledger) are skipped unless you pass `--force`. `setup --force` still works for
 scripts that already use it — it shares the same install path as `migrate`.
 
@@ -61,7 +61,7 @@ Hooks *and* slash commands both run `~/.grounder/runtime/dist/cli.js` directly (
 If you want the runtime to stay current with zero maintenance, install Grounder rather
 than using bare `npx` for this step.
 
-That refresh only touches the shared runtime, not installed command files — if `doctor`
-flags command drift, that's the `migrate` above.
+That refresh only touches the shared runtime, not installed skill files — if `doctor`
+flags skill drift, that's the `migrate` above.
 
 Contributor detail: [Runtime invocation](architecture/runtime-invocation.md).

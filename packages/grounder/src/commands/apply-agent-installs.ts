@@ -1,7 +1,9 @@
 import {
   hookFileHasGrounderEntry,
   installHookRuntime,
+  isHookRuntimeStale,
   runtimeCliPath,
+  runtimeMode,
 } from "../agents/hook-runtime.js";
 import { recordAgentInstallState } from "../agents/index.js";
 import type { AgentAdapter, AgentInstallResult, ArtifactStatus } from "../agents/types.js";
@@ -13,6 +15,7 @@ import {
   statePath,
 } from "../connector/state.js";
 import { fileExists } from "../util/fs.js";
+
 export interface ApplyAgentInstallsOptions {
   agents: AgentAdapter[];
   force?: boolean;
@@ -34,6 +37,8 @@ export interface AgentApplyResult {
   agent: AgentAdapter;
   commands: AgentInstallResult;
   hooks?: AgentInstallResult;
+  /** Would/did this agent's install change `~/.grounder/state.json`? */
+  ledgerChanged: boolean;
 }
 
 export interface ApplyAgentInstallsResult {
@@ -153,12 +158,20 @@ export async function applyAgentInstalls(
 
   let runtime: ApplyAgentInstallsResult["runtime"];
   if (agents.length > 0) {
-    if (dryRun) {
-      const cliPath = runtimeCliPath(homeDir);
+    const cliPath = runtimeCliPath(homeDir);
+    // Grounder owns this directory outright (no user edits to protect), so
+    // `force` isn't needed to justify a reinstall — only actual staleness is.
+    // Gating here (rather than always reinstalling) is what lets a fully
+    // current machine report the runtime row as unchanged instead of
+    // "overwritten" on every single `migrate`.
+    const stale = await isHookRuntimeStale(homeDir);
+    if (!stale) {
+      runtime = { cliPath, status: "skipped", mode: runtimeMode() };
+    } else if (dryRun) {
       runtime = {
         cliPath,
         status: (await fileExists(cliPath)) ? "overwritten" : "created",
-        mode: "symlink",
+        mode: runtimeMode(),
       };
     } else {
       runtime = await installHookRuntime({ homeDir });
@@ -194,28 +207,38 @@ export async function applyAgentInstalls(
       }
     }
 
-    if (!dryRun) {
-      const statuses = Object.values(commands.artifacts);
-      // Only bump the commands version in state when at least one file was
-      // written or already up to date. If every file was skipped as locally
-      // edited (or from before Grounder tracked hashes), do not mark state as
-      // current — otherwise plain migrate would silence doctor while leaving
-      // those skill files untouched.
-      const advanceCommandsSchema =
-        statuses.length === 0 || statuses.some((status) => status !== "modified");
-      await recordAgentInstallState(agent, {
-        hooksInstalled,
-        homeDir,
-        advanceCommandsSchema,
-      });
-    }
+    const statuses = Object.values(commands.artifacts);
+    // Only bump the commands version in state when at least one file was
+    // written or already up to date. If every file was skipped as locally
+    // edited (or from before Grounder tracked hashes), do not mark state as
+    // current — otherwise plain migrate would silence doctor while leaving
+    // those skill files untouched.
+    const advanceCommandsSchema =
+      statuses.length === 0 || statuses.some((status) => status !== "modified");
+    // Called unconditionally (dry or real) — the same predicate that decides
+    // whether to write also answers "would this change the ledger", so a
+    // `--dry-run` preview can't disagree with what a real run would report.
+    const stateChanged = await recordAgentInstallState(agent, {
+      hooksInstalled,
+      homeDir,
+      advanceCommandsSchema,
+      dryRun,
+    });
 
-    results.push({ agent, commands, hooks: hooksResult });
+    results.push({
+      agent,
+      commands,
+      hooks: hooksResult,
+      ledgerChanged: (commands.ledgerChanged ?? false) || stateChanged,
+    });
   }
 
+  const ledgerChanged = results.some((r) => r.ledgerChanged);
   if (agents.length > 0 && !quiet) {
     const ledger = statePath(homeDir);
-    if (dryRun) {
+    if (!ledgerChanged) {
+      process.stdout.write(`✓ Install state already up to date: ${ledger}\n`);
+    } else if (dryRun) {
       process.stdout.write(
         state
           ? `✓ Install state would update: ${ledger}\n`

@@ -40,13 +40,23 @@ async function retireOne(
   filePath: string,
   ctx: MigrationContext,
 ): Promise<MigrationArtifactResult> {
+  // Does the ledger have a hash recorded for this path?
+  //
+  // Checked up front so dry-run can report whether forgetting it would change
+  // the ledger, without actually calling `forgetRecordedFile`. This mirrors
+  // that function's own no-op check rather than reusing `wouldChangeGrounderState`
+  // (state.ts), because that models a different write (`withAgentInstall`'s
+  // merge-in-hashes), not a single-key delete like this one — reconcile the
+  // two if forgetting ever grows past removing one key.
+  const hasStaleHash = recordedFileHash(ctx.state, agentId, filePath) !== undefined;
+
   if (!(await fileExists(filePath))) {
     // File's already gone, but the ledger may still hold a stale hash for it
     // (e.g. removed outside `migrate`) — drop that entry so it doesn't linger.
-    if (!ctx.dryRun) {
+    if (hasStaleHash && !ctx.dryRun) {
       await forgetRecordedFile(agentId, filePath, ctx.homeDir);
     }
-    return { agentId, path: filePath, status: "already-absent" };
+    return { agentId, path: filePath, status: "already-absent", ledgerChanged: hasStaleHash };
   }
 
   const onDiskHash = hashContent(await readFile(filePath, "utf8"));
@@ -54,7 +64,7 @@ async function retireOne(
   const safeToRetire = ctx.force || (recorded !== undefined && recorded === onDiskHash);
 
   if (!safeToRetire) {
-    return { agentId, path: filePath, status: "left-modified" };
+    return { agentId, path: filePath, status: "left-modified", ledgerChanged: false };
   }
 
   if (!ctx.dryRun) {
@@ -62,9 +72,11 @@ async function retireOne(
     // Deleted outright, not rewritten — recordAgentInstall's merge has no new
     // hash to overwrite this path with, so drop it explicitly or it lingers
     // in the ledger forever pointing at a file that no longer exists.
-    await forgetRecordedFile(agentId, filePath, ctx.homeDir);
+    if (hasStaleHash) {
+      await forgetRecordedFile(agentId, filePath, ctx.homeDir);
+    }
   }
-  return { agentId, path: filePath, status: "retired" };
+  return { agentId, path: filePath, status: "retired", ledgerChanged: hasStaleHash };
 }
 
 export const retireLegacyCommands: Migration = {

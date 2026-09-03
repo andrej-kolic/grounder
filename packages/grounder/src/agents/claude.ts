@@ -325,7 +325,7 @@ export const claude: AgentAdapter = {
         ...opts,
         agentId: claude.id,
         templateDir,
-        commandsDir: claudeSkillsDir(opts.homeDir),
+        skillsDir: claudeSkillsDir(opts.homeDir),
         filename,
       });
       artifacts[dest] = status;
@@ -333,14 +333,14 @@ export const claude: AgentAdapter = {
         files[dest] = { hash };
       }
     }
-    await recordCommandFileHashes({
+    const ledgerChanged = await recordCommandFileHashes({
       agentId: claude.id,
       commandsSchema: claude.commandsSchema,
       files,
       homeDir: opts.homeDir,
       dryRun: opts.dryRun,
     });
-    return { artifacts };
+    return { artifacts, ledgerChanged };
   },
 
   installHooks,

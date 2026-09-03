@@ -79,9 +79,13 @@ automate via a version check.
 Both flags carry the same meaning they already have for command install:
 
 - `--force` accepts losing a local edit. A `left-modified` legacy file is deleted under `--force`
-  the same way a locally-modified command file is overwritten under `--force`.
-- `--dry-run` previews (`would retire: <path>` / `would leave (locally modified): <path>`) without
-  touching disk. `already-absent` never prints — it's not a decision, it's nothing happening.
+  the same way a locally-modified skill file is overwritten under `--force` — `migrate`'s output
+  distinguishes the two (delete vs. overwrite) since `--force` does something different to each.
+- `--dry-run` previews without touching disk: a retirable legacy file shows as `deleted` in the
+  STATUS/TARGET/PATH table (dry-run and a real run use the same table word — see
+  `commands/migrate.ts`'s `TABLE_LABEL`), and a `left-modified` one shows as `conflict`, listed in
+  the "left alone" footer below the table. `already-absent` never appears in either — it's not a
+  decision, it's nothing happening.
 
 ### Wired into `migrate` only, never `setup`
 
@@ -118,9 +122,11 @@ ledger consistent with whatever migrations actually completed, not silently behi
    locations for a migration's own bookkeeping — hardcode the old paths directly in the migration
    file, same as `legacyCommandArtifacts`.
 4. Respect `--force` / `--dry-run` the same way command install does.
-5. Format output for humans, not for exhaustiveness: a result that's identical whether or not
-   `--dry-run` was passed (e.g. "left alone, still needs `--force`") should say the same thing in
-   both cases — don't invent a "would leave" / "left" tense pair for an outcome that never actually
-   differs. And a status that can repeat across many files (e.g. `left-modified`) belongs in one
-   grouped block listing every path once, not a per-file line — a per-file line is for something
-   that actually happened to that specific file (created, overwritten, deleted).
+5. Format output for humans, not for exhaustiveness: `migrate`'s STATUS/TARGET/PATH table uses one
+   word per outcome, identical in `--dry-run` and a real run (`unchanged`/`created`/`updated`/
+   `deleted`/`conflict`) — don't invent a "would leave" / "left" tense pair for an outcome that
+   never actually differs; dry-run-ness is announced once above the table, not re-conjugated per
+   row. And a status that can repeat across many files (e.g. `left-modified`, shown as `conflict`)
+   belongs in one grouped footer block listing every path once (`renderModifiedNote` in
+   `commands/migrate.ts`), not a second per-file line beyond its table row — a per-file line is for
+   something that actually happened to that specific file (created, overwritten, deleted).
