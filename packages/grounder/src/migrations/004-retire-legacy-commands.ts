@@ -41,6 +41,11 @@ async function retireOne(
   ctx: MigrationContext,
 ): Promise<MigrationArtifactResult> {
   if (!(await fileExists(filePath))) {
+    // File's already gone, but the ledger may still hold a stale hash for it
+    // (e.g. removed outside `migrate`) — drop that entry so it doesn't linger.
+    if (!ctx.dryRun) {
+      await forgetRecordedFile(agentId, filePath, ctx.homeDir);
+    }
     return { agentId, path: filePath, status: "already-absent" };
   }
 

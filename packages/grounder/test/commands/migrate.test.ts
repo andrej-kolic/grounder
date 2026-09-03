@@ -456,6 +456,62 @@ describe("commands/migrate", () => {
       expect(await fileExists(legacyPath)).toBe(true);
     });
 
+    it("forgets a stale ledger entry for a legacy file already gone from disk", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      await runSetupWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      });
+      const legacyPath = legacyCursorNotePath(env.home);
+      // Ledger still remembers a hash for this path, but the file itself is
+      // already gone (e.g. removed outside `migrate`).
+      await recordAgentInstall({
+        agentId: "cursor",
+        grounderVersion: "0.5.0",
+        files: { [legacyPath]: { hash: hashContent("old pre-skill note command\n") } },
+        homeDir: env.home,
+      });
+      expect(await fileExists(legacyPath)).toBe(false);
+
+      const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+
+      expect(code).toBe(0);
+      expect(hasRow(out, "deleted", legacyPath)).toBe(false);
+      const state = await readGrounderState(env.home);
+      expect(state?.agents.cursor?.files ?? {}).not.toHaveProperty(legacyPath);
+    });
+
+    it("dry-run leaves a stale ledger entry untouched for an already-absent legacy file", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      await runSetupWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      });
+      const legacyPath = legacyCursorNotePath(env.home);
+      await recordAgentInstall({
+        agentId: "cursor",
+        grounderVersion: "0.5.0",
+        files: { [legacyPath]: { hash: hashContent("old pre-skill note command\n") } },
+        homeDir: env.home,
+      });
+
+      const { code } = await captureStdout(() =>
+        runMigrateWithOptions({ homeDir: env.home, dryRun: true }),
+      );
+
+      expect(code).toBe(0);
+      const state = await readGrounderState(env.home);
+      expect(state?.agents.cursor?.files ?? {}).toHaveProperty(legacyPath);
+    });
+
     it("grounder setup never touches legacy command files", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
