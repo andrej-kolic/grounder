@@ -125,3 +125,8 @@ Root scripts are the quality contract — CI and agents should call these entryp
 - Templates ship in `packages/grounder/templates/` (included in npm `files`)
 - Idempotent file generation — never clobber user-edited vault content without `--force`
 - New agents: add `src/agents/<id>.ts` + `templates/agents/<id>/`, register in `agents/index.ts`
+- Lead with the plain statement — in comments/docblocks *and* in chat replies to the user.
+  Sentence one says what the thing is, does, or is about; caveats, exceptions, and
+  cross-references come after, never before and never tangled into it. If sentence one is a
+  "not X because Y" clause, the reader has to decrypt the whole paragraph before learning the
+  subject — rewrite it so the plain statement leads.
