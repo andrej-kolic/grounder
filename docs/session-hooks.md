@@ -8,7 +8,9 @@ it exists. You (or the agent) still decide whether to run `/grounder-task`.
 grounder setup <path-to-your-vault> --hooks
 ```
 
-Already set up without hooks? `grounder migrate --hooks` adds them.
+Already set up without hooks? `grounder migrate --hooks` adds them. Turn them back off with
+`grounder migrate --no-hooks` — this removes the installed hook entry and is sticky (a
+later plain `migrate` will not silently re-enable it).
 
 Example teaser:
 

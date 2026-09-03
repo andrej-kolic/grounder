@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { resolveHomeDir } from "../connector/home.js";
 import { fileExists } from "../util/fs.js";
 import { mergeJsonFile } from "../util/merge-json.js";
+import { isAlreadyConverged, removeMatchingEntries } from "./hook-fragment.js";
 import {
   installHookRuntime,
   isGrounderPeekHookCommand,
@@ -128,67 +129,79 @@ export function expectedHookArtifacts(homeDir?: string): string[] {
 //   - matcher group      → { matcher, hooks: Hook[] }
 //   - hook entry         → { type: "command", command: string }
 //
-// Idempotency: {@link isGrounderPeekHookCommand} (runtime path or legacy npx).
+// Idempotency / recognizer: {@link isGrounderPeekHookCommand} (runtime path
+// or legacy npx). Always-converge (Ansible `blockinfile` / Kubernetes
+// Server-Side Apply sole-owner model): every recognizer match — however many,
+// wherever they live across matcher groups — is removed and replaced with
+// exactly one canonical entry. No conflict / `--force` gate.
 // ---------------------------------------------------------------------------
 
 function peekHookEntry(homeDir?: string): { type: "command"; command: string } {
   return { type: "command", command: claudePeekHookCommand(homeDir) };
 }
 
-/**
- * Locate Grounder's peek command inside a `hooks.SessionStart` array.
- *
- * @param sessionStart - `settings.hooks.SessionStart` — array of matcher groups
- * @returns Indices into that array / the group's `hooks` array, or `null` if absent
- */
-function findPeekHook(sessionStart: unknown[]): { groupIdx: number; hookIdx: number } | null {
-  for (let groupIdx = 0; groupIdx < sessionStart.length; groupIdx++) {
-    const group = sessionStart[groupIdx];
-    if (!group || typeof group !== "object" || Array.isArray(group)) {
+function isClaudeHookEntry(hook: unknown): hook is { type: "command"; command: string } {
+  return (
+    hook !== null &&
+    typeof hook === "object" &&
+    !Array.isArray(hook) &&
+    isGrounderPeekHookCommand((hook as { command?: unknown }).command)
+  );
+}
+
+function isMatcherGroup(group: unknown): group is Record<string, unknown> {
+  return group !== null && typeof group === "object" && !Array.isArray(group);
+}
+
+/** Every Grounder hook entry across every matcher group, flattened. */
+function findAllPeekHooks(sessionStart: readonly unknown[]): unknown[] {
+  const found: unknown[] = [];
+  for (const group of sessionStart) {
+    if (!isMatcherGroup(group) || !Array.isArray(group.hooks)) {
       continue;
     }
-    const hooks = (group as { hooks?: unknown }).hooks;
-    if (!Array.isArray(hooks)) {
-      continue;
-    }
-    for (let hookIdx = 0; hookIdx < hooks.length; hookIdx++) {
-      const hook = hooks[hookIdx];
-      if (
-        hook &&
-        typeof hook === "object" &&
-        !Array.isArray(hook) &&
-        isGrounderPeekHookCommand((hook as { command?: unknown }).command)
-      ) {
-        return { groupIdx, hookIdx };
-      }
-    }
+    found.push(...group.hooks.filter(isClaudeHookEntry));
   }
-  return null;
+  return found;
+}
+
+/** Remove every Grounder hook entry from every matcher group's `hooks` array. */
+function removeAllPeekHooks(sessionStart: readonly unknown[]): unknown[] {
+  return sessionStart.map((group) => {
+    if (!isMatcherGroup(group) || !Array.isArray(group.hooks)) {
+      return group;
+    }
+    return { ...group, hooks: removeMatchingEntries(group.hooks, isClaudeHookEntry) };
+  });
+}
+
+function readSessionStart(parsed: unknown): unknown[] | null {
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const hooks = (parsed as Record<string, unknown>).hooks;
+  if (!hooks || typeof hooks !== "object" || Array.isArray(hooks)) {
+    return null;
+  }
+  const sessionStart = (hooks as Record<string, unknown>).SessionStart;
+  return Array.isArray(sessionStart) ? sessionStart : null;
 }
 
 /** Whether `settings.json` already lists any Grounder peek command (for status labeling). */
 async function peekHookHadGrounderEntry(filePath: string): Promise<boolean> {
   try {
-    const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return false;
-    }
-    const hooks = (parsed as Record<string, unknown>).hooks;
-    if (!hooks || typeof hooks !== "object" || Array.isArray(hooks)) {
-      return false;
-    }
-    const sessionStart = (hooks as Record<string, unknown>).SessionStart;
-    return Array.isArray(sessionStart) && findPeekHook(sessionStart) !== null;
+    const sessionStart = readSessionStart(JSON.parse(await readFile(filePath, "utf8")));
+    return (sessionStart ? findAllPeekHooks(sessionStart) : []).length > 0;
   } catch {
     return false;
   }
 }
 
 /**
- * Skip only when the canonical command is already present *and* the runtime is
- * current for the running grounder version/source. Legacy `npx` entries or a
- * stale runtime (missing, or symlinked/copied from a different source) always
- * refresh — no `--force` required to migrate or to pick up an upgrade.
+ * Skip only when exactly one canonical entry is already present *and* the
+ * runtime is current for the running grounder version/source. Anything else
+ * — no entry, a legacy `npx` form, a drifted command, more than one match
+ * (however scattered across matcher groups) — always converges.
  */
 async function peekHookUpToDate(filePath: string, homeDir?: string): Promise<boolean> {
   if (!(await fileExists(filePath))) {
@@ -198,37 +211,26 @@ async function peekHookUpToDate(filePath: string, homeDir?: string): Promise<boo
     return false;
   }
   try {
-    const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    const sessionStart = readSessionStart(JSON.parse(await readFile(filePath, "utf8")));
+    if (!sessionStart) {
       return false;
     }
-    const hooks = (parsed as Record<string, unknown>).hooks;
-    if (!hooks || typeof hooks !== "object" || Array.isArray(hooks)) {
-      return false;
-    }
-    const sessionStart = (hooks as Record<string, unknown>).SessionStart;
-    if (!Array.isArray(sessionStart)) {
-      return false;
-    }
-    const found = findPeekHook(sessionStart);
-    if (!found) {
-      return false;
-    }
-    const group = sessionStart[found.groupIdx] as { hooks: Array<{ command?: unknown }> };
-    return group.hooks[found.hookIdx]?.command === claudePeekHookCommand(homeDir);
+    return isAlreadyConverged(findAllPeekHooks(sessionStart), () => true, peekHookEntry(homeDir));
   } catch {
     return false;
   }
 }
 
 /**
- * Deep-merge Grounder's SessionStart hook into an existing settings object.
+ * Converge Grounder's SessionStart hook into an existing settings object:
+ * remove every recognizer match from every matcher group, then insert
+ * exactly one canonical entry.
  *
- * Preserves every key except the nested path it owns. Strategy:
- * 1. If a Grounder peek hook already exists (runtime or legacy npx) → replace in place.
- * 2. Else if a matcher group with `matcher === CLAUDE_SESSION_START_MATCHER` exists →
- *    append Grounder's hook to that group's `hooks` array.
- * 3. Else → push a new matcher group with Grounder's hook.
+ * Preserves every key except the nested path it owns. Insertion strategy
+ * (after removal, so this always runs against a Grounder-free tree):
+ * 1. A matcher group with `matcher === CLAUDE_SESSION_START_MATCHER` exists
+ *    (possibly the very one a match was just removed from) → append there.
+ * 2. Else → push a new matcher group with Grounder's hook.
  *
  * @param current - Parsed settings.json root (object). Other top-level keys untouched.
  * @param homeDir - Home override for the canonical command path
@@ -242,52 +244,44 @@ function mergeClaudeHooks(
     current.hooks && typeof current.hooks === "object" && !Array.isArray(current.hooks)
       ? { ...(current.hooks as Record<string, unknown>) }
       : {};
-  const sessionStart = Array.isArray(hooks.SessionStart) ? [...hooks.SessionStart] : [];
-  const found = findPeekHook(sessionStart);
+  const sessionStart = Array.isArray(hooks.SessionStart) ? hooks.SessionStart : [];
+  const cleaned = removeAllPeekHooks(sessionStart);
   const entry = peekHookEntry(homeDir);
 
-  if (found) {
-    // Path 1: refresh existing Grounder hook entry in place
-    const group = { ...(sessionStart[found.groupIdx] as Record<string, unknown>) };
+  const matcherIdx = cleaned.findIndex(
+    (group) => isMatcherGroup(group) && group.matcher === CLAUDE_SESSION_START_MATCHER,
+  );
+  let nextSessionStart: unknown[];
+  if (matcherIdx >= 0) {
+    const group = { ...(cleaned[matcherIdx] as Record<string, unknown>) };
     const groupHooks = Array.isArray(group.hooks) ? [...group.hooks] : [];
-    groupHooks[found.hookIdx] = entry;
+    groupHooks.push(entry);
     group.hooks = groupHooks;
-    sessionStart[found.groupIdx] = group;
+    nextSessionStart = [...cleaned];
+    nextSessionStart[matcherIdx] = group;
   } else {
-    const matcherIdx = sessionStart.findIndex(
-      (group) =>
-        group &&
-        typeof group === "object" &&
-        !Array.isArray(group) &&
-        (group as { matcher?: unknown }).matcher === CLAUDE_SESSION_START_MATCHER,
-    );
-    if (matcherIdx >= 0) {
-      // Path 2: same matcher group already exists (e.g. user hooks) — append ours
-      const group = { ...(sessionStart[matcherIdx] as Record<string, unknown>) };
-      const groupHooks = Array.isArray(group.hooks) ? [...group.hooks] : [];
-      groupHooks.push(entry);
-      group.hooks = groupHooks;
-      sessionStart[matcherIdx] = group;
-    } else {
-      // Path 3: no matching group — create the canonical SessionStart entry
-      sessionStart.push({
-        matcher: CLAUDE_SESSION_START_MATCHER,
-        hooks: [entry],
-      });
-    }
+    nextSessionStart = [...cleaned, { matcher: CLAUDE_SESSION_START_MATCHER, hooks: [entry] }];
   }
 
-  return { ...current, hooks: { ...hooks, SessionStart: sessionStart } };
+  return { ...current, hooks: { ...hooks, SessionStart: nextSessionStart } };
+}
+
+/** Remove every Grounder hook entry from every matcher group, touching nothing else. */
+function removeClaudeHooks(current: Record<string, unknown>): Record<string, unknown> {
+  const hooks =
+    current.hooks && typeof current.hooks === "object" && !Array.isArray(current.hooks)
+      ? { ...(current.hooks as Record<string, unknown>) }
+      : {};
+  const sessionStart = Array.isArray(hooks.SessionStart) ? hooks.SessionStart : [];
+  return { ...current, hooks: { ...hooks, SessionStart: removeAllPeekHooks(sessionStart) } };
 }
 
 /**
- * Install (or refresh) Grounder's SessionStart teaser hook into `~/.claude/settings.json`.
+ * Install (or converge) Grounder's SessionStart teaser hook into `~/.claude/settings.json`.
  *
  * Also materializes `~/.grounder/runtime` (see {@link installHookRuntime}).
- *
- * Force semantics:
- * - Up-to-date canonical entry + fresh runtime and `force` false → skip
- * - Otherwise → refresh runtime + merge host config
+ * Always converges — no `--force` gate; `force` only affects whole-file
+ * skill artifacts, never this shared-JSON fragment.
  *
  * Unparseable settings.json: {@link mergeJsonFile} backs off and this throws (never clobbers).
  */
@@ -295,7 +289,7 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
   const dest = claudeSettingsJsonPath(opts.homeDir);
   const upToDate = await peekHookUpToDate(dest, opts.homeDir);
 
-  if (upToDate && !opts.force) {
+  if (upToDate) {
     return { artifacts: { [dest]: "skipped" } };
   }
 
@@ -312,15 +306,30 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
     throw new Error(result.message);
   }
 
-  // `force` can land here even when nothing would actually change (e.g. the
-  // canonical entry is correct but the runtime symlink was stale) — trust
-  // the merge's own before/after comparison, not just "did we run it."
   const status: ArtifactStatus = !result.changed
     ? "skipped"
     : hadGrounderEntry
       ? "overwritten"
       : "created";
   return { artifacts: { [dest]: status } };
+}
+
+/**
+ * Remove Grounder's SessionStart hook entry entirely (`--no-hooks`) — the
+ * opt-out must also remove the fragment, not just flip `hooksEnabled` false,
+ * or the session hook keeps firing and the tri-state's stickiness against
+ * the next plain `migrate` would have nothing to rest on.
+ */
+async function removeHooks(opts: AgentInstallOptions): Promise<AgentInstallResult> {
+  const dest = claudeSettingsJsonPath(opts.homeDir);
+  if (!(await fileExists(dest))) {
+    return { artifacts: {} };
+  }
+  const result = await mergeJsonFile(dest, removeClaudeHooks, { dryRun: opts.dryRun });
+  if (!result.ok) {
+    throw new Error(result.message);
+  }
+  return result.changed ? { artifacts: { [dest]: "overwritten" } } : { artifacts: {} };
 }
 
 export const claude: AgentAdapter = {
@@ -351,4 +360,5 @@ export const claude: AgentAdapter = {
   },
 
   installHooks,
+  removeHooks,
 };

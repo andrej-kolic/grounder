@@ -32,9 +32,9 @@ functions instead of each maintaining its own opinion about what changed.
   condition, not something inferred from side effects.
 - **Kubernetes controllers** — level-triggered reconcile: full state recomputed every run,
   nothing "stepped." No migration ever "already ran" in a way a future run can't re-derive.
-- **Ansible `blockinfile`** / Kubernetes Server-Side Apply (sole-owner case) — the target
-  model for session hooks specifically (see below): always-converge on a solely-owned region
-  inside a shared file, no conflict gate. Not yet the *implementation* — see "Session hooks."
+- **Ansible `blockinfile`** / Kubernetes Server-Side Apply (sole-owner case) — the model for
+  session hooks specifically (see below): always-converge on a solely-owned region inside a
+  shared file, no conflict gate.
 
 Sequential versioned migrations (Flyway/Rails-style) were considered and dropped —
 grounder's artifacts are fully re-derivable from templates every run, so there is no state
@@ -45,7 +45,7 @@ that genuinely needs a one-way, ordered transform.
 | Artifact | Owner | Mechanism |
 | --- | --- | --- |
 | Agent skill markdown | Grounder-generated, user-editable | Whole-file reconciler (`reconcile()`) |
-| Hook config fragment | Grounder-owned key in a shared file | Imperative merge-in-place (`installHooks()`); fragment reconciler planned — see "Session hooks" |
+| Hook config fragment | Grounder-owned key in a shared file | Fragment reconciler (always-converge) — see "Session hooks" |
 | Runtime materialization (`~/.grounder/runtime/`) | Grounder-owned | Own health check, not modeled as reconciler state (see below) |
 | Install ledger (`~/.grounder/state.json`) | Grounder-owned | `ledgerSchema` int, file-format only |
 | Home config (`~/.grounder/config.json`) | Grounder-owned | Not reconciler-managed — see "Out of scope" |
@@ -160,29 +160,45 @@ content regressions.
 purely for forward-compat of the ledger's own JSON *shape*, should that ever need to change
 independently of install content.
 
-## Session hooks
+## Session hooks: a fragment reconciler
 
 Hook config lives in a file the user (or other tools) can also write to
 (`~/.cursor/hooks.json`, `~/.claude/settings.json`), and Grounder owns exactly one nested
 entry inside it — not a whole-file artifact, so it is not modeled through `reconcile()`.
-`agents/claude.ts` / `agents/cursor.ts`'s `installHooks()` still owns this imperatively
-(merge-in-place on `~/.cursor/hooks.json` / `~/.claude/settings.json`), orchestrated
-alongside the whole-file plan by `commands/apply.ts`.
+Instead it's Ansible `blockinfile` / Kubernetes Server-Side Apply's sole-owner case:
+`agents/hook-fragment.ts` supplies two small pure primitives —
+`removeMatchingEntries(entries, isMatch)` and `isAlreadyConverged(entries, isMatch,
+canonical)` — that `cursor.ts`/`claude.ts` use inside `installHooks()` to **always
+converge**: locate every entry Grounder's recognizer matches (there can be more than one —
+a legacy `npx grounder handoff peek` entry alongside a runtime-form one, say), remove all of
+them, and insert exactly one canonical entry. No conflict / `--force` gate — there's nothing
+a user could have "locally edited" the way a whole skill file can be, so unlike whole-file
+artifacts this never reports `modified`.
 
-The ledger's `hooksEnabled` field is a tri-state (`undefined` / `true` / `false`), not a
-plain boolean: `undefined` means "never recorded" (legacy ledger, or hooks simply never
-touched — hydrate from an on-disk recognizer match on the next `setup`/`migrate`), `true` /
-`false` are explicit. It replaces the old per-agent `hooksSchema` int one-for-one as the
-"are hooks on for this agent" signal; `apply-agent-installs.ts`'s old `hooksSchema > 0 OR an
-on-disk recognizer match` derivation becomes `hooksEnabled === true`, or (when
-`hooksEnabled === undefined`) the same on-disk recognizer fallback.
+Claude's shape (`hooks.SessionStart`, an array of `{ matcher, hooks: [...] }` groups) needs
+matches collected and removed across *every* group before the single canonical entry is
+reinserted; Cursor's shape (`hooks.sessionStart`, a flat array) applies the same primitives
+directly. Both funnel through `util/merge-json.ts`'s existing diff-before-write behavior, so
+a run that's already converged never touches the file.
 
-A follow-up replaces the imperative hook install with its own fragment reconciler
-(always-converge on a solely-owned region inside a shared file, modeled on Ansible
-`blockinfile` / Kubernetes Server-Side Apply's sole-owner case) and adds a `--no-hooks`
-opt-out that makes `hooksEnabled: false` sticky. That's tracked separately from the
-whole-file reconciler landed here, since it rewrites merging into shared user-owned JSON —
-riskier work that should be revertable independently.
+`removeHooks()` (new on `AgentAdapter`, alongside `installHooks()`) is the `--no-hooks`
+opt-out: it removes every recognizer match without reinserting a canonical entry. The reason
+this has to be a real removal, not just a `hooksEnabled: false` flag flip: the ledger's
+`hooksEnabled` tri-state (`undefined` / `true` / `false`) drives *hydration* — when
+`undefined` and setup/migrate finds an on-disk recognizer match, it's treated as enabled and
+persisted as `true`. If `--no-hooks` only flipped the flag without removing the fragment, the
+next plain `migrate` would see the still-present entry, treat it as an "already installed,
+never explicitly recorded" case, and silently re-hydrate `hooksEnabled` back to `true` — the
+exact failure mode a tri-state (vs. a plain boolean, which can't distinguish "never touched"
+from "explicitly off") exists to prevent. `commands/apply.ts` routes to `removeHooks()`
+instead of `installHooks()` when `--no-hooks` is passed, and persists `hooksEnabled: false`
+in the same call.
+
+`hooksEnabled` replaces the old per-agent `hooksSchema` int one-for-one as the "are hooks on
+for this agent" signal: `apply-agent-installs.ts`'s old `hooksSchema > 0 OR an on-disk
+recognizer match` derivation becomes `hooksEnabled === true`, or (when `hooksEnabled ===
+undefined`) the same on-disk recognizer fallback — `false` never falls back to the
+recognizer, which is what makes the opt-out sticky.
 
 ## Out of scope
 
@@ -213,7 +229,8 @@ is — a future shape change to either needs its own mechanism, not an extension
 | `grounder setup` | `src/commands/setup.ts` |
 | `grounder doctor` (dry-run `reconcile()` per agent) | `src/commands/doctor.ts` |
 | Cheap drift check shared by `status`/`peek` | `src/commands/install-drift.ts` |
-| Session hooks (still imperative, see above) | `src/agents/hook-runtime.ts`, `installHooks()` in `src/agents/cursor.ts` / `src/agents/claude.ts` |
+| Fragment reconciler primitives | `src/agents/hook-fragment.ts` |
+| Fragment reconciler use (`installHooks`/`removeHooks`) | `src/agents/cursor.ts`, `src/agents/claude.ts` |
 
 ## Rejected alternatives
 

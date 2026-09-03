@@ -12,6 +12,7 @@ import {
   readGrounderState,
   recordedHooksEnabled,
   setHooksEnabled,
+  touchGrounderVersion,
 } from "../connector/state.js";
 import { applyPlan } from "../reconcile/apply.js";
 import { type PlanEntry, planChangesLedger, reconcile } from "../reconcile/core.js";
@@ -24,6 +25,14 @@ export interface ApplyAgentInstallsOptions {
   force?: boolean;
   /** Explicitly install/refresh session hooks (setup --hooks / migrate --hooks). */
   hooks?: boolean;
+  /**
+   * Explicitly turn hooks off (`migrate --no-hooks`) — removes the fragment
+   * and flips `hooksEnabled` to `false` (sticky: a later plain `migrate`
+   * will not re-hydrate it). Mutually exclusive with `hooks` in practice
+   * (the CLI layer rejects both at once); if both are somehow set, `hooks`
+   * wins for that one call.
+   */
+  noHooks?: boolean;
   /**
    * When true (migrate), also refresh hooks that were previously enabled or
    * already present on disk — without installing hooks for agents that never
@@ -169,7 +178,23 @@ export async function applyAgentInstalls(
     const hooksEnabled = recordedHooksEnabled(state, agent.id);
     let hooksResult: AgentInstallResult | undefined;
     let hooksLedgerChanged = false;
-    if (await shouldInstallHooks(agent, opts, hooksEnabled)) {
+    if (opts.noHooks && !opts.hooks) {
+      const removeHooksFn = agent.removeHooks;
+      if (removeHooksFn) {
+        hooksResult = await removeHooksFn({ force, dryRun, homeDir });
+        if (hooksEnabled !== false) {
+          hooksLedgerChanged = true;
+          if (!dryRun) {
+            await setHooksEnabled({
+              agentId: agent.id,
+              enabled: false,
+              grounderVersion: opts.grounderVersion,
+              homeDir,
+            });
+          }
+        }
+      }
+    } else if (await shouldInstallHooks(agent, opts, hooksEnabled)) {
       const installHooksFn = agent.installHooks;
       if (installHooksFn) {
         hooksResult = await installHooksFn({ force, dryRun, homeDir });
@@ -190,6 +215,15 @@ export async function applyAgentInstalls(
     const ledgerChanged = planChangesLedger(plan, ledgerFiles, desiredHashes) || hooksLedgerChanged;
 
     results.push({ agent, plan: visiblePlan, hooks: hooksResult, ledgerChanged });
+  }
+
+  // Per-artifact writes above have no hook for an all-noop plan — stamp
+  // grounderVersion unconditionally at the end of a real run so the upgrade
+  // banner still clears on a fully-current machine (matches the old
+  // recordAgentInstallState's every-real-run behavior). A no-op write when
+  // already current.
+  if (!dryRun && agents.length > 0) {
+    await touchGrounderVersion(opts.grounderVersion, homeDir);
   }
 
   return { runtime, agents: results };

@@ -15,6 +15,7 @@ import {
   type GrounderState,
   ledgerFilesFor,
   readGrounderState,
+  recordedHooksEnabled,
   statePath,
 } from "../connector/state.js";
 import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
@@ -491,7 +492,11 @@ async function checkLegacyCommands(
  * installed — stale mainly for bare-npx copy installs after an upgrade
  * (symlink installs stay current without re-init).
  */
-async function checkAgentHooks(stateReadable: boolean, homeDir?: string): Promise<CheckResult[]> {
+async function checkAgentHooks(
+  state: GrounderState | null,
+  stateReadable: boolean,
+  homeDir?: string,
+): Promise<CheckResult[]> {
   const agents = await resolveAgents();
   const checks: CheckResult[] = [];
   let anyHooksInstalled = false;
@@ -564,6 +569,9 @@ async function checkAgentHooks(stateReadable: boolean, homeDir?: string): Promis
       } else {
         checks.push(okCheck(id, `${agent.name} session hook installed`));
       }
+    } else if (recordedHooksEnabled(state, agent.id) === false) {
+      // Explicitly turned off via `--no-hooks` — nothing to warn about.
+      checks.push(okCheck(id, `${agent.name} session hooks disabled (--no-hooks)`));
     } else {
       checks.push(
         warnCheck(id, `${agent.name} detected but no Grounder session hook`, MIGRATE_HOOKS),
@@ -625,7 +633,7 @@ async function runAgentChecks(
   const agentPlans = await computeAgentPlansSafe(agents, state, homeDir);
   const agentChecks = await checkAgentArtifacts(agentPlans, stateReadable, homeDir);
   const legacyChecks = await checkLegacyCommands(agents, agentPlans);
-  const hookChecks = await checkAgentHooks(stateReadable, homeDir);
+  const hookChecks = await checkAgentHooks(state, stateReadable, homeDir);
   return [...agentChecks, ...legacyChecks, ...hookChecks];
 }
 

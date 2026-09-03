@@ -791,6 +791,32 @@ describe("commands/doctor", () => {
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
   });
 
+  it("stays ok (does not nag) when session hooks were explicitly turned off via --no-hooks", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      hooks: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const { runMigrateWithOptions } = await import("../../src/commands/migrate.js");
+    await runMigrateWithOptions({ homeDir: env.home, noHooks: true });
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("ok    agent-cursor-hooks");
+    expect(out).toContain("session hooks disabled (--no-hooks)");
+    expect(out).not.toContain("warn  agent-cursor-hooks");
+    expect(out).toMatch(/^\d+ passed, 0 failed, 0 warned$/m);
+  });
+
   it("warns (never fails) when hook runtime is stale", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;

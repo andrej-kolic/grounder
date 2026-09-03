@@ -26,6 +26,7 @@ See also: [CLI reference](cli-reference.md) · [Configuration](configuration.md)
 | `--dry-run`    | Preview without writing                                                                                        |
 | `--agent <id>` | Limit to a specific agent (repeatable)                                                                         |
 | `--hooks`      | Install hooks even if they were never installed before                                                          |
+| `--no-hooks`   | Turn hooks off and remove the installed hook entry (sticky — a later plain `migrate` will not re-enable it)     |
 
 Untouched skill files update automatically; locally edited ones (and pre-0.3 installs
 with no ledger) are skipped unless you pass `--force`. `setup --force` still works for

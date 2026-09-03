@@ -2,9 +2,9 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { grounderNoteCommandPath as claudeNoteCommandPath } from "../../src/agents/claude.js";
-import { cursorHooksJsonPath, grounderNoteCommandPath } from "../../src/agents/cursor.js";
+import { cursor, cursorHooksJsonPath, grounderNoteCommandPath } from "../../src/agents/cursor.js";
 import { runtimeCliPath } from "../../src/agents/hook-runtime.js";
-import { runMigrateWithOptions } from "../../src/commands/migrate.js";
+import { runMigrate, runMigrateWithOptions } from "../../src/commands/migrate.js";
 import { runSetupWithOptions } from "../../src/commands/setup.js";
 import {
   readGrounderState,
@@ -90,6 +90,40 @@ describe("commands/migrate", () => {
     expect(out).toContain("Nothing to do");
     expect(hasRow(out, "unchanged", statePath(env.home))).toBe(true);
     expect(hasRow(out, "unchanged", runtimeCliPath(env.home))).toBe(true);
+  });
+
+  it("stamps grounderVersion on an all-noop real run when the ledger version lags (dry-run/real agreement)", async () => {
+    // Regression: per-artifact writes have no hook for a plan with zero
+    // create/update/delete/forget entries — without an explicit final stamp,
+    // a real migrate on an already-current machine would report "state
+    // updated" but never actually write it, and the upgrade banner would
+    // nag forever.
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
+    await writeGrounderState({ ...state, grounderVersion: "0.0.1" }, env.home);
+
+    const dry = await captureStdout(() =>
+      runMigrateWithOptions({ homeDir: env.home, dryRun: true }),
+    );
+    expect(hasRow(dry.out, "updated", statePath(env.home))).toBe(true);
+    expect((await readGrounderState(env.home))?.grounderVersion).toBe("0.0.1");
+
+    const real = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+    expect(hasRow(real.out, "updated", statePath(env.home))).toBe(true);
+    const after = await readGrounderState(env.home);
+    expect(after?.grounderVersion).not.toBe("0.0.1");
+    expect(after?.agents.cursor?.files).toEqual(state.agents.cursor?.files);
   });
 
   it("dry-run reports state.json as unchanged when the only pending row is a conflict", async () => {
@@ -227,6 +261,100 @@ describe("commands/migrate", () => {
     expect(code).toBe(0);
     expect(out).not.toContain(cursorHooksJsonPath(env.home));
     expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(false);
+  });
+
+  it("hydrates hooksEnabled from an on-disk recognizer match when the ledger never recorded hooks at all", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    // Simulate hooks installed before the ledger ever tracked them (or by
+    // hand) — present on disk, but the ledger has no hooksEnabled entry.
+    await cursor.installHooks?.({ homeDir: env.home });
+    expect((await readGrounderState(env.home))?.agents.cursor?.hooksEnabled).toBeUndefined();
+
+    const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+
+    expect(code).toBe(0);
+    expect(hasRow(out, "unchanged", cursorHooksJsonPath(env.home), "cursor hook")).toBe(true);
+    expect((await readGrounderState(env.home))?.agents.cursor?.hooksEnabled).toBe(true);
+  });
+
+  describe("--no-hooks", () => {
+    it("removes the fragment and flips hooksEnabled to false", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      await runSetupWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        hooks: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      });
+      expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(true);
+
+      const { code, out } = await captureStdout(() =>
+        runMigrateWithOptions({ homeDir: env.home, noHooks: true }),
+      );
+
+      expect(code).toBe(0);
+      expect(out).toContain(cursorHooksJsonPath(env.home));
+      expect((await readGrounderState(env.home))?.agents.cursor?.hooksEnabled).toBe(false);
+      expect(JSON.parse(await readFile(cursorHooksJsonPath(env.home), "utf8"))).toMatchObject({
+        hooks: { sessionStart: [] },
+      });
+    });
+
+    it("is sticky — a later plain migrate does not re-enable it", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      await runSetupWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        hooks: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      });
+      await runMigrateWithOptions({ homeDir: env.home, noHooks: true });
+
+      const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+
+      expect(code).toBe(0);
+      expect(out).not.toContain(cursorHooksJsonPath(env.home));
+      expect((await readGrounderState(env.home))?.agents.cursor?.hooksEnabled).toBe(false);
+      expect(JSON.parse(await readFile(cursorHooksJsonPath(env.home), "utf8"))).toMatchObject({
+        hooks: { sessionStart: [] },
+      });
+    });
+
+    it("rejects --hooks and --no-hooks together from argv", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+      const prevHome = process.env.GROUNDER_HOME;
+      process.env.GROUNDER_HOME = env.home;
+
+      const chunks: string[] = [];
+      const spy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+        chunks.push(String(chunk));
+        return true;
+      });
+      try {
+        const code = await runMigrate(["--hooks", "--no-hooks"]);
+        expect(code).toBe(1);
+        expect(chunks.join("")).toContain("Cannot pass both --hooks and --no-hooks");
+      } finally {
+        spy.mockRestore();
+        if (prevHome === undefined) delete process.env.GROUNDER_HOME;
+        else process.env.GROUNDER_HOME = prevHome;
+      }
+    });
   });
 
   it("dry-run previews without writing", async () => {

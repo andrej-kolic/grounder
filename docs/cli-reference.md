@@ -71,6 +71,7 @@ in place (preserving `created`), while `note` and `handoff` always write a new d
 | `--vault <path>` | `link`                          | Override home vault root for this run                                                             |
 | `--agent <id>`   | `setup`, `migrate`              | Install for a specific agent (repeatable; default: auto-detect). Supported: `cursor`, `claude`    |
 | `--hooks`        | `setup`, `migrate`              | Also install session-start teaser hooks (opt-in; see [Session-start hooks](session-hooks.md)) |
+| `--no-hooks`     | `migrate`                       | Turn hooks off and remove the installed hook entry (sticky — a later plain `migrate` will not re-enable it) |
 
 Both `setup` and `link` preview what they'll write and ask to confirm; add `--yes` to
 skip the prompt (e.g. in scripts), or `--dry-run` to print the same preview without

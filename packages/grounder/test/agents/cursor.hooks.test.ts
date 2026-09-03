@@ -8,6 +8,7 @@ import {
   expectedHookArtifacts,
 } from "../../src/agents/cursor.js";
 import { runtimeCliPath } from "../../src/agents/hook-runtime.js";
+import { fileExists } from "../../src/util/fs.js";
 import { createTempEnv } from "../helpers.js";
 
 describe("agents/cursor hooks", () => {
@@ -239,6 +240,99 @@ describe("agents/cursor hooks", () => {
 
       await expect(cursor.installHooks?.({ homeDir: env.home })).rejects.toThrow(/invalid JSON/i);
       expect(await readFile(dest, "utf8")).toBe(original);
+    });
+
+    it("dedupes a legacy npx entry and a drifted runtime entry into exactly one canonical entry", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = cursorHooksJsonPath(env.home);
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(
+        dest,
+        `${JSON.stringify(
+          {
+            version: 1,
+            hooks: {
+              sessionStart: [
+                { command: "npx grounder handoff peek --json" },
+                { command: cursorPeekHookCommand(env.home, []) },
+                { command: "echo unrelated" },
+              ],
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const result = await cursor.installHooks?.({ homeDir: env.home });
+
+      expect(result?.artifacts[dest]).toBe("overwritten");
+      const written = JSON.parse(await readFile(dest, "utf8")) as {
+        hooks: { sessionStart: Array<{ command: string }> };
+      };
+      const commands = written.hooks.sessionStart.map((h) => h.command);
+      expect(commands.filter((c) => c === cursorPeekHookCommand(env.home))).toHaveLength(1);
+      expect(commands).toContain("echo unrelated");
+      expect(commands).toHaveLength(2);
+    });
+  });
+
+  describe("removeHooks", () => {
+    it("removes the Grounder entry and nothing else", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = cursorHooksJsonPath(env.home);
+      await cursor.installHooks?.({ homeDir: env.home });
+
+      const result = await cursor.removeHooks?.({ homeDir: env.home });
+      expect(result?.artifacts[dest]).toBe("overwritten");
+      expect(JSON.parse(await readFile(dest, "utf8"))).toEqual({
+        version: 1,
+        hooks: { sessionStart: [] },
+      });
+    });
+
+    it("is a no-op when the file does not exist", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const result = await cursor.removeHooks?.({ homeDir: env.home });
+      expect(result?.artifacts).toEqual({});
+      expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(false);
+    });
+
+    it("preserves unrelated sessionStart hooks", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = cursorHooksJsonPath(env.home);
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(
+        dest,
+        `${JSON.stringify(
+          {
+            version: 1,
+            hooks: {
+              sessionStart: [
+                { command: cursorPeekHookCommand(env.home) },
+                { command: "echo keep-me" },
+              ],
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      await cursor.removeHooks?.({ homeDir: env.home });
+
+      expect(JSON.parse(await readFile(dest, "utf8"))).toEqual({
+        version: 1,
+        hooks: { sessionStart: [{ command: "echo keep-me" }] },
+      });
     });
   });
 });

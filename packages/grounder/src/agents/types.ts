@@ -41,8 +41,19 @@ export interface AgentAdapter {
    * even when the ledger never recorded them (pre-hash-tracking installs).
    */
   tombstones(homeDir?: string): string[];
-  /** Optional: install session hooks (separate from whole-file artifact install). */
+  /**
+   * Optional: converge session hooks (separate from whole-file artifact
+   * install) — always-converge, no conflict/`--force` gate: removes every
+   * recognizer match and inserts exactly one canonical entry.
+   */
   installHooks?(opts: AgentInstallOptions): Promise<AgentInstallResult>;
+  /**
+   * Optional: remove Grounder's hook fragment entirely (`--no-hooks`). Must
+   * actually delete the entry, not just report it as absent — an opt-out
+   * that leaves the fragment in place isn't sticky against the next
+   * `migrate`.
+   */
+  removeHooks?(opts: AgentInstallOptions): Promise<AgentInstallResult>;
   /** Optional: absolute path(s) of hook config this adapter would touch. */
   expectedHookArtifacts?(homeDir?: string): string[];
 }

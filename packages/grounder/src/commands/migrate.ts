@@ -17,6 +17,8 @@ import {
 export interface MigrateOptions {
   force?: boolean;
   hooks?: boolean;
+  /** Turn hooks off (sticky — removes the fragment, flips hooksEnabled false). */
+  noHooks?: boolean;
   dryRun?: boolean;
   homeDir?: string;
   /** Agent ids to migrate. Defaults to ledger keys, else auto-detect. */
@@ -65,9 +67,16 @@ export async function runMigrate(argv: string[]): Promise<number> {
 
   const { flags, repeated } = parseArgs(argv);
   const agents = flagStrings(repeated, "agent");
+  const hooks = flagBool(flags, "hooks");
+  const noHooks = flagBool(flags, "no-hooks");
+  if (hooks && noHooks) {
+    process.stderr.write("Cannot pass both --hooks and --no-hooks.\n");
+    return 1;
+  }
   return runMigrateWithOptions({
     force: flagBool(flags, "force", "f"),
-    hooks: flagBool(flags, "hooks"),
+    hooks,
+    noHooks,
     dryRun: flagBool(flags, "dry-run"),
     agents: agents.length > 0 ? agents : undefined,
   });
@@ -78,6 +87,7 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
     const homeDir = options.homeDir;
     const force = options.force ?? false;
     const hooks = options.hooks ?? false;
+    const noHooks = options.noHooks ?? false;
     const dryRun = options.dryRun ?? false;
 
     const home = await readHomeConfig();
@@ -123,6 +133,7 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
         agents,
         force,
         hooks,
+        noHooks,
         refreshInstalledHooks: true,
         dryRun,
         homeDir,

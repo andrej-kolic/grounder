@@ -8,6 +8,7 @@ import {
   claudeSettingsJsonPath,
   expectedHookArtifacts,
 } from "../../src/agents/claude.js";
+import { fileExists } from "../../src/util/fs.js";
 import { createTempEnv } from "../helpers.js";
 
 describe("agents/claude hooks", () => {
@@ -291,6 +292,115 @@ describe("agents/claude hooks", () => {
 
       await expect(claude.installHooks?.({ homeDir: env.home })).rejects.toThrow(/invalid JSON/i);
       expect(await readFile(dest, "utf8")).toBe(original);
+    });
+
+    it("dedupes a legacy npx entry and a runtime-form entry scattered across two matcher groups into exactly one canonical entry", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(
+        dest,
+        `${JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                {
+                  matcher: CLAUDE_SESSION_START_MATCHER,
+                  hooks: [{ type: "command", command: "npx grounder handoff peek" }],
+                },
+                {
+                  matcher: "custom",
+                  hooks: [
+                    { type: "command", command: claudePeekHookCommand(env.home) },
+                    { type: "command", command: "echo unrelated" },
+                  ],
+                },
+              ],
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const result = await claude.installHooks?.({ homeDir: env.home });
+
+      expect(result?.artifacts[dest]).toBe("overwritten");
+      const written = JSON.parse(await readFile(dest, "utf8")) as {
+        hooks: { SessionStart: Array<{ matcher: string; hooks: Array<{ command: string }> }> };
+      };
+      const allCommands = written.hooks.SessionStart.flatMap((g) => g.hooks.map((h) => h.command));
+      expect(allCommands.filter((c) => c === claudePeekHookCommand(env.home))).toHaveLength(1);
+      // The unrelated hook in the "custom" group survives untouched.
+      expect(allCommands).toContain("echo unrelated");
+    });
+  });
+
+  describe("removeHooks", () => {
+    it("removes the Grounder entry and nothing else", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      await claude.installHooks?.({ homeDir: env.home });
+
+      const result = await claude.removeHooks?.({ homeDir: env.home });
+      expect(result?.artifacts[dest]).toBe("overwritten");
+      expect(JSON.parse(await readFile(dest, "utf8"))).toEqual({
+        hooks: { SessionStart: [{ matcher: CLAUDE_SESSION_START_MATCHER, hooks: [] }] },
+      });
+    });
+
+    it("is a no-op when the file does not exist, or when there is nothing to remove", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const missing = await claude.removeHooks?.({ homeDir: env.home });
+      expect(missing?.artifacts).toEqual({});
+      expect(await fileExists(claudeSettingsJsonPath(env.home))).toBe(false);
+    });
+
+    it("preserves unrelated hooks while removing every Grounder match", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(
+        dest,
+        `${JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                {
+                  matcher: CLAUDE_SESSION_START_MATCHER,
+                  hooks: [
+                    { type: "command", command: claudePeekHookCommand(env.home) },
+                    { type: "command", command: "echo keep-me" },
+                  ],
+                },
+              ],
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      await claude.removeHooks?.({ homeDir: env.home });
+
+      expect(JSON.parse(await readFile(dest, "utf8"))).toEqual({
+        hooks: {
+          SessionStart: [
+            {
+              matcher: CLAUDE_SESSION_START_MATCHER,
+              hooks: [{ type: "command", command: "echo keep-me" }],
+            },
+          ],
+        },
+      });
     });
   });
 });
