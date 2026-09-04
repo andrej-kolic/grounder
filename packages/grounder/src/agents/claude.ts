@@ -1,55 +1,18 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { resolveHomeDir } from "../connector/home.js";
 import { fileExists } from "../util/fs.js";
-import { mergeJsonFile } from "../util/merge-json.js";
-import { readHooksObject, removeMatchingEntries } from "./hook-fragment.js";
-import {
-  installHookRuntime,
-  isGrounderPeekHookCommand,
-  isHookRuntimeStale,
-  peekHookCommand,
-  runtimeInvocation,
-} from "./hook-runtime.js";
-import type {
-  AgentAdapter,
-  AgentInstallOptions,
-  AgentInstallResult,
-  ArtifactStatus,
-} from "./types.js";
+import { homeSkillsLayout } from "./home-skills.js";
+import { readEventEntries, readHooksObject, removeMatchingEntries } from "./hook-fragment.js";
+import { installHookFragment, removeHookFragment } from "./hook-install.js";
+import { isGrounderPeekHookCommand, isHookRuntimeStale, peekHookCommand } from "./hook-runtime.js";
+import type { AgentAdapter, AgentInstallOptions, AgentInstallResult } from "./types.js";
 
-const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const templateDir = path.join(pkgRoot, "templates", "agents", "claude", "skills");
+/** Whole-file artifacts: `~/.claude/skills/` plus the retired `~/.claude/commands/`. */
+const layout = homeSkillsLayout({ id: "claude", agentDir: ".claude" });
 
-const SKILLS = [
-  "grounder-note",
-  "grounder-search",
-  "grounder-plan",
-  "grounder-task-handoff",
-  "grounder-task",
-] as const;
-
-const COMMANDS = SKILLS.map((name) => path.join(name, "SKILL.md"));
-
-/**
- * Frozen historical fact about the schema-3 (pre-skill) install layout —
- * deliberately hardcoded, not derived from {@link expectedArtifacts} (which
- * describes today's Agent Skills layout). Safe to delete once schema-3
- * installs are assumed extinct in the wild — a maintainer call, not
- * something to automate via a version check.
- */
-const LEGACY_COMMAND_FILENAMES = [
-  "grounder-note.md",
-  "grounder-search.md",
-  "grounder-plan.md",
-  "grounder-task-handoff.md",
-  "grounder-task.md",
-] as const;
-
-function legacyCommandsDir(homeDir?: string): string {
-  return path.join(resolveHomeDir(homeDir), ".claude", "commands");
-}
+/** Hook event Grounder owns in `settings.json`. */
+const SESSION_START_EVENT = "SessionStart";
 
 /**
  * Canonical SessionStart command for Claude Code (home-local runtime, not `npx`).
@@ -66,7 +29,7 @@ export function claudePeekHookCommand(homeDir?: string): string {
 export const CLAUDE_SESSION_START_MATCHER = "startup|clear|compact";
 
 export function claudeSkillsDir(homeDir?: string): string {
-  return path.join(resolveHomeDir(homeDir), ".claude", "skills");
+  return layout.skillsDir(homeDir);
 }
 
 /** Absolute path to Claude Code's shared settings file (`~/.claude/settings.json`). */
@@ -75,23 +38,23 @@ export function claudeSettingsJsonPath(homeDir?: string): string {
 }
 
 export function grounderNoteCommandPath(homeDir?: string): string {
-  return path.join(claudeSkillsDir(homeDir), "grounder-note", "SKILL.md");
+  return layout.skillPath("grounder-note", homeDir);
 }
 
 export function grounderPlanCommandPath(homeDir?: string): string {
-  return path.join(claudeSkillsDir(homeDir), "grounder-plan", "SKILL.md");
+  return layout.skillPath("grounder-plan", homeDir);
 }
 
 export function grounderTaskHandoffCommandPath(homeDir?: string): string {
-  return path.join(claudeSkillsDir(homeDir), "grounder-task-handoff", "SKILL.md");
+  return layout.skillPath("grounder-task-handoff", homeDir);
 }
 
 export function grounderTaskCommandPath(homeDir?: string): string {
-  return path.join(claudeSkillsDir(homeDir), "grounder-task", "SKILL.md");
+  return layout.skillPath("grounder-task", homeDir);
 }
 
 export function expectedArtifacts(homeDir?: string): string[] {
-  return COMMANDS.map((filename) => path.join(claudeSkillsDir(homeDir), filename));
+  return layout.expectedArtifacts(homeDir);
 }
 
 /** Paths of hook config this adapter touches — currently just `settings.json`. */
@@ -209,26 +172,18 @@ function dropGroupsEmptiedByRemoval(
   return next.filter((group, i) => hasHooks(group) || !hasHooks(before[i]));
 }
 
-function readSessionStart(parsed: unknown): unknown[] | null {
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+/** `hooks.SessionStart` from a settings.json on disk; `null` if absent or unreadable. */
+async function readSessionStart(filePath: string): Promise<unknown[] | null> {
+  try {
+    return readEventEntries(JSON.parse(await readFile(filePath, "utf8")), SESSION_START_EVENT);
+  } catch {
     return null;
   }
-  const hooks = (parsed as Record<string, unknown>).hooks;
-  if (!hooks || typeof hooks !== "object" || Array.isArray(hooks)) {
-    return null;
-  }
-  const sessionStart = (hooks as Record<string, unknown>).SessionStart;
-  return Array.isArray(sessionStart) ? sessionStart : null;
 }
 
 /** Whether `settings.json` already lists any Grounder peek command (for status labeling). */
 async function peekHookHadGrounderEntry(filePath: string): Promise<boolean> {
-  try {
-    const sessionStart = readSessionStart(JSON.parse(await readFile(filePath, "utf8")));
-    return (sessionStart ? findAllPeekHooks(sessionStart) : []).length > 0;
-  } catch {
-    return false;
-  }
+  return findAllPeekHooks((await readSessionStart(filePath)) ?? []).length > 0;
 }
 
 /**
@@ -246,19 +201,15 @@ async function peekHookUpToDate(filePath: string, homeDir?: string): Promise<boo
   if (await isHookRuntimeStale(homeDir)) {
     return false;
   }
-  try {
-    const sessionStart = readSessionStart(JSON.parse(await readFile(filePath, "utf8")));
-    if (!sessionStart) {
-      return false;
-    }
-    const placed = findAllPeekHooksPlaced(sessionStart);
-    if (placed.length !== 1 || placed[0].matcher !== CLAUDE_SESSION_START_MATCHER) {
-      return false;
-    }
-    return JSON.stringify(placed[0].hook) === JSON.stringify(peekHookEntry(homeDir));
-  } catch {
+  const sessionStart = await readSessionStart(filePath);
+  if (!sessionStart) {
     return false;
   }
+  const placed = findAllPeekHooksPlaced(sessionStart);
+  if (placed.length !== 1 || placed[0].matcher !== CLAUDE_SESSION_START_MATCHER) {
+    return false;
+  }
+  return JSON.stringify(placed[0].hook) === JSON.stringify(peekHookEntry(homeDir));
 }
 
 /**
@@ -285,7 +236,8 @@ function mergeClaudeHooks(
   homeDir?: string,
 ): Record<string, unknown> {
   const hooks = readHooksObject(current, claudeSettingsJsonPath(homeDir));
-  const sessionStart = Array.isArray(hooks.SessionStart) ? hooks.SessionStart : [];
+  const raw = hooks[SESSION_START_EVENT];
+  const sessionStart = Array.isArray(raw) ? raw : [];
   const cleaned = removeAllPeekHooks(sessionStart);
   const entry = peekHookEntry(homeDir);
 
@@ -305,7 +257,7 @@ function mergeClaudeHooks(
   }
   nextSessionStart = dropGroupsEmptiedByRemoval(sessionStart, nextSessionStart);
 
-  return { ...current, hooks: { ...hooks, SessionStart: nextSessionStart } };
+  return { ...current, hooks: { ...hooks, [SESSION_START_EVENT]: nextSessionStart } };
 }
 
 /**
@@ -322,52 +274,29 @@ function removeClaudeHooks(current: Record<string, unknown>): Record<string, unk
     current.hooks && typeof current.hooks === "object" && !Array.isArray(current.hooks)
       ? (current.hooks as Record<string, unknown>)
       : undefined;
-  const sessionStart = hooks && Array.isArray(hooks.SessionStart) ? hooks.SessionStart : [];
+  const raw = hooks?.[SESSION_START_EVENT];
+  const sessionStart = Array.isArray(raw) ? raw : [];
   if (findAllPeekHooks(sessionStart).length === 0) {
     return current;
   }
   const cleaned = dropGroupsEmptiedByRemoval(sessionStart, removeAllPeekHooks(sessionStart));
-  return { ...current, hooks: { ...hooks, SessionStart: cleaned } };
+  return { ...current, hooks: { ...hooks, [SESSION_START_EVENT]: cleaned } };
 }
 
 /**
  * Install (or converge) Grounder's SessionStart teaser hook into `~/.claude/settings.json`.
- *
- * Also materializes `~/.grounder/runtime` (see {@link installHookRuntime}).
- * Always converges — no `--force` gate; `force` only affects whole-file
- * skill artifacts, never this shared-JSON fragment.
- *
- * Never clobbers: an unparseable settings.json backs off in
- * {@link mergeJsonFile}, and a present-but-non-object `hooks` key backs off in
- * {@link readHooksObject}. Either way this throws before anything is written.
+ * @see {@link installHookFragment} for the shared install/report scaffolding.
  */
 async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResult> {
-  const dest = claudeSettingsJsonPath(opts.homeDir);
-  const upToDate = await peekHookUpToDate(dest, opts.homeDir);
-
-  if (upToDate) {
-    return { artifacts: { [dest]: "skipped" } };
-  }
-
-  if (!opts.dryRun) {
-    await installHookRuntime({ homeDir: opts.homeDir });
-  }
-  const fileExisted = await fileExists(dest);
-  const hadGrounderEntry = fileExisted && (await peekHookHadGrounderEntry(dest));
-  const result = await mergeJsonFile(dest, (current) => mergeClaudeHooks(current, opts.homeDir), {
-    dryRun: opts.dryRun,
-  });
-
-  if (!result.ok) {
-    throw new Error(result.message);
-  }
-
-  const status: ArtifactStatus = !result.changed
-    ? "skipped"
-    : hadGrounderEntry
-      ? "overwritten"
-      : "created";
-  return { artifacts: { [dest]: status } };
+  return installHookFragment(
+    {
+      dest: claudeSettingsJsonPath(opts.homeDir),
+      isUpToDate: (filePath) => peekHookUpToDate(filePath, opts.homeDir),
+      hasGrounderEntry: peekHookHadGrounderEntry,
+      merge: (current) => mergeClaudeHooks(current, opts.homeDir),
+    },
+    opts,
+  );
 }
 
 /**
@@ -377,47 +306,19 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
  * the next plain `migrate` would have nothing to rest on.
  */
 async function removeHooks(opts: AgentInstallOptions): Promise<AgentInstallResult> {
-  const dest = claudeSettingsJsonPath(opts.homeDir);
-  if (!(await fileExists(dest))) {
-    return { artifacts: {} };
-  }
-  const result = await mergeJsonFile(dest, removeClaudeHooks, { dryRun: opts.dryRun });
-  if (!result.ok) {
-    throw new Error(result.message);
-  }
-  return result.changed ? { artifacts: { [dest]: "overwritten" } } : { artifacts: {} };
+  return removeHookFragment(claudeSettingsJsonPath(opts.homeDir), removeClaudeHooks, opts);
 }
 
 export const claude: AgentAdapter = {
   id: "claude",
   name: "Claude Code",
 
-  async isInstalled(): Promise<boolean> {
-    return fileExists(path.join(resolveHomeDir(), ".claude"));
-  },
-
+  isInstalled: layout.isInstalled,
   expectedArtifacts,
   expectedHookArtifacts,
-
-  async desiredArtifacts(homeDir?: string): Promise<Record<string, string>> {
-    const cli = runtimeInvocation(homeDir);
-    const skillsDir = claudeSkillsDir(homeDir);
-    const desired: Record<string, string> = {};
-    for (const filename of COMMANDS) {
-      const template = await readFile(path.join(templateDir, filename), "utf8");
-      desired[path.join(skillsDir, filename)] = template.replaceAll("{{GROUNDER_CLI}}", cli);
-    }
-    return desired;
-  },
-
-  tombstones(homeDir?: string): string[] {
-    const dir = legacyCommandsDir(homeDir);
-    return LEGACY_COMMAND_FILENAMES.map((filename) => path.join(dir, filename));
-  },
-
-  ownedPrefixes(homeDir?: string): string[] {
-    return [claudeSkillsDir(homeDir), legacyCommandsDir(homeDir)];
-  },
+  desiredArtifacts: layout.desiredArtifacts,
+  tombstones: layout.tombstones,
+  ownedPrefixes: layout.ownedPrefixes,
 
   installHooks,
   removeHooks,

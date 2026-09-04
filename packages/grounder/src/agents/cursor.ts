@@ -1,55 +1,23 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { resolveHomeDir } from "../connector/home.js";
 import { fileExists } from "../util/fs.js";
-import { mergeJsonFile } from "../util/merge-json.js";
-import { isAlreadyConverged, readHooksObject, removeMatchingEntries } from "./hook-fragment.js";
+import { homeSkillsLayout } from "./home-skills.js";
 import {
-  installHookRuntime,
-  isGrounderPeekHookCommand,
-  isHookRuntimeStale,
-  peekHookCommand,
-  runtimeInvocation,
-} from "./hook-runtime.js";
-import type {
-  AgentAdapter,
-  AgentInstallOptions,
-  AgentInstallResult,
-  ArtifactStatus,
-} from "./types.js";
+  isAlreadyConverged,
+  readEventEntries,
+  readHooksObject,
+  removeMatchingEntries,
+} from "./hook-fragment.js";
+import { installHookFragment, removeHookFragment } from "./hook-install.js";
+import { isGrounderPeekHookCommand, isHookRuntimeStale, peekHookCommand } from "./hook-runtime.js";
+import type { AgentAdapter, AgentInstallOptions, AgentInstallResult } from "./types.js";
 
-const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const templateDir = path.join(pkgRoot, "templates", "agents", "cursor", "skills");
+/** Whole-file artifacts: `~/.cursor/skills/` plus the retired `~/.cursor/commands/`. */
+const layout = homeSkillsLayout({ id: "cursor", agentDir: ".cursor" });
 
-const SKILLS = [
-  "grounder-note",
-  "grounder-search",
-  "grounder-plan",
-  "grounder-task-handoff",
-  "grounder-task",
-] as const;
-
-const COMMANDS = SKILLS.map((name) => path.join(name, "SKILL.md"));
-
-/**
- * Frozen historical fact about the schema-3 (pre-skill) install layout —
- * deliberately hardcoded, not derived from {@link expectedArtifacts} (which
- * describes today's Agent Skills layout). Safe to delete once schema-3
- * installs are assumed extinct in the wild — a maintainer call, not
- * something to automate via a version check.
- */
-const LEGACY_COMMAND_FILENAMES = [
-  "grounder-note.md",
-  "grounder-search.md",
-  "grounder-plan.md",
-  "grounder-task-handoff.md",
-  "grounder-task.md",
-] as const;
-
-function legacyCommandsDir(homeDir?: string): string {
-  return path.join(resolveHomeDir(homeDir), ".cursor", "commands");
-}
+/** Hook event Grounder owns in `hooks.json`. */
+const SESSION_START_EVENT = "sessionStart";
 
 /**
  * Canonical sessionStart command for Cursor (home-local runtime, not `npx`).
@@ -64,7 +32,7 @@ export function cursorPeekHookCommand(
 }
 
 export function cursorSkillsDir(homeDir?: string): string {
-  return path.join(resolveHomeDir(homeDir), ".cursor", "skills");
+  return layout.skillsDir(homeDir);
 }
 
 /** Absolute path to Cursor's shared hooks config (`~/.cursor/hooks.json`). */
@@ -73,23 +41,23 @@ export function cursorHooksJsonPath(homeDir?: string): string {
 }
 
 export function grounderNoteCommandPath(homeDir?: string): string {
-  return path.join(cursorSkillsDir(homeDir), "grounder-note", "SKILL.md");
+  return layout.skillPath("grounder-note", homeDir);
 }
 
 export function grounderPlanCommandPath(homeDir?: string): string {
-  return path.join(cursorSkillsDir(homeDir), "grounder-plan", "SKILL.md");
+  return layout.skillPath("grounder-plan", homeDir);
 }
 
 export function grounderTaskHandoffCommandPath(homeDir?: string): string {
-  return path.join(cursorSkillsDir(homeDir), "grounder-task-handoff", "SKILL.md");
+  return layout.skillPath("grounder-task-handoff", homeDir);
 }
 
 export function grounderTaskCommandPath(homeDir?: string): string {
-  return path.join(cursorSkillsDir(homeDir), "grounder-task", "SKILL.md");
+  return layout.skillPath("grounder-task", homeDir);
 }
 
 export function expectedArtifacts(homeDir?: string): string[] {
-  return COMMANDS.map((filename) => path.join(cursorSkillsDir(homeDir), filename));
+  return layout.expectedArtifacts(homeDir);
 }
 
 /** Paths of hook config this adapter touches — currently just `hooks.json`. */
@@ -135,26 +103,18 @@ function isCursorPeekEntry(item: unknown): item is { command: string } {
   );
 }
 
-function readSessionStart(parsed: unknown): unknown[] | null {
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+/** `hooks.sessionStart` from a hooks.json on disk; `null` if absent or unreadable. */
+async function readSessionStart(filePath: string): Promise<unknown[] | null> {
+  try {
+    return readEventEntries(JSON.parse(await readFile(filePath, "utf8")), SESSION_START_EVENT);
+  } catch {
     return null;
   }
-  const hooks = (parsed as Record<string, unknown>).hooks;
-  if (!hooks || typeof hooks !== "object" || Array.isArray(hooks)) {
-    return null;
-  }
-  const sessionStart = (hooks as Record<string, unknown>).sessionStart;
-  return Array.isArray(sessionStart) ? sessionStart : null;
 }
 
 /** Whether `hooks.json` already lists any Grounder peek command (for status labeling). */
 async function peekHookHadGrounderEntry(filePath: string): Promise<boolean> {
-  try {
-    const sessionStart = readSessionStart(JSON.parse(await readFile(filePath, "utf8")));
-    return (sessionStart ?? []).some(isCursorPeekEntry);
-  } catch {
-    return false;
-  }
+  return ((await readSessionStart(filePath)) ?? []).some(isCursorPeekEntry);
 }
 
 /**
@@ -170,17 +130,13 @@ async function peekHookUpToDate(filePath: string, homeDir?: string): Promise<boo
   if (await isHookRuntimeStale(homeDir)) {
     return false;
   }
-  try {
-    const sessionStart = readSessionStart(JSON.parse(await readFile(filePath, "utf8")));
-    if (!sessionStart) {
-      return false;
-    }
-    return isAlreadyConverged(sessionStart, isCursorPeekEntry, {
-      command: cursorPeekHookCommand(homeDir),
-    });
-  } catch {
+  const sessionStart = await readSessionStart(filePath);
+  if (!sessionStart) {
     return false;
   }
+  return isAlreadyConverged(sessionStart, isCursorPeekEntry, {
+    command: cursorPeekHookCommand(homeDir),
+  });
 }
 
 /**
@@ -208,11 +164,12 @@ function mergeCursorHooks(
   }
 
   const hooks = readHooksObject(next, cursorHooksJsonPath(homeDir));
-  const existing = Array.isArray(hooks.sessionStart) ? hooks.sessionStart : [];
+  const raw = hooks[SESSION_START_EVENT];
+  const existing = Array.isArray(raw) ? raw : [];
   const cleaned = removeMatchingEntries(existing, isCursorPeekEntry);
   cleaned.push({ command: cursorPeekHookCommand(homeDir) });
 
-  next.hooks = { ...hooks, sessionStart: cleaned };
+  next.hooks = { ...hooks, [SESSION_START_EVENT]: cleaned };
   return next;
 }
 
@@ -227,57 +184,32 @@ function removeCursorHooks(current: Record<string, unknown>): Record<string, unk
     current.hooks && typeof current.hooks === "object" && !Array.isArray(current.hooks)
       ? (current.hooks as Record<string, unknown>)
       : undefined;
-  const existing = hooks && Array.isArray(hooks.sessionStart) ? hooks.sessionStart : [];
+  const raw = hooks?.[SESSION_START_EVENT];
+  const existing = Array.isArray(raw) ? raw : [];
   const cleaned = removeMatchingEntries(existing, isCursorPeekEntry);
   if (cleaned.length === existing.length) {
     return current;
   }
   return {
     ...current,
-    hooks: { ...hooks, sessionStart: cleaned },
+    hooks: { ...hooks, [SESSION_START_EVENT]: cleaned },
   };
 }
 
 /**
  * Install (or converge) Grounder's sessionStart teaser hook into `~/.cursor/hooks.json`.
- *
- * Also materializes `~/.grounder/runtime` (see {@link installHookRuntime}).
- * Always converges — no `--force` gate; `force` only affects whole-file
- * skill artifacts, never this shared-JSON fragment.
- *
- * Never clobbers: an unparseable hooks.json backs off in
- * {@link mergeJsonFile}, and a present-but-non-object `hooks` key backs off in
- * {@link readHooksObject}. Either way this throws before anything is written.
+ * @see {@link installHookFragment} for the shared install/report scaffolding.
  */
 async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResult> {
-  const dest = cursorHooksJsonPath(opts.homeDir);
-  const upToDate = await peekHookUpToDate(dest, opts.homeDir);
-
-  if (upToDate) {
-    return { artifacts: { [dest]: "skipped" } };
-  }
-
-  if (!opts.dryRun) {
-    await installHookRuntime({ homeDir: opts.homeDir });
-  }
-  const fileExisted = await fileExists(dest);
-  const hadGrounderEntry = fileExisted && (await peekHookHadGrounderEntry(dest));
-  const result = await mergeJsonFile(
-    dest,
-    (current) => mergeCursorHooks(current, !fileExisted, opts.homeDir),
-    { dryRun: opts.dryRun },
+  return installHookFragment(
+    {
+      dest: cursorHooksJsonPath(opts.homeDir),
+      isUpToDate: (filePath) => peekHookUpToDate(filePath, opts.homeDir),
+      hasGrounderEntry: peekHookHadGrounderEntry,
+      merge: (current, fileExisted) => mergeCursorHooks(current, !fileExisted, opts.homeDir),
+    },
+    opts,
   );
-
-  if (!result.ok) {
-    throw new Error(result.message);
-  }
-
-  const status: ArtifactStatus = !result.changed
-    ? "skipped"
-    : hadGrounderEntry
-      ? "overwritten"
-      : "created";
-  return { artifacts: { [dest]: status } };
 }
 
 /**
@@ -289,47 +221,19 @@ async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResu
  * place).
  */
 async function removeHooks(opts: AgentInstallOptions): Promise<AgentInstallResult> {
-  const dest = cursorHooksJsonPath(opts.homeDir);
-  if (!(await fileExists(dest))) {
-    return { artifacts: {} };
-  }
-  const result = await mergeJsonFile(dest, removeCursorHooks, { dryRun: opts.dryRun });
-  if (!result.ok) {
-    throw new Error(result.message);
-  }
-  return result.changed ? { artifacts: { [dest]: "overwritten" } } : { artifacts: {} };
+  return removeHookFragment(cursorHooksJsonPath(opts.homeDir), removeCursorHooks, opts);
 }
 
 export const cursor: AgentAdapter = {
   id: "cursor",
   name: "Cursor",
 
-  async isInstalled(): Promise<boolean> {
-    return fileExists(path.join(resolveHomeDir(), ".cursor"));
-  },
-
+  isInstalled: layout.isInstalled,
   expectedArtifacts,
   expectedHookArtifacts,
-
-  async desiredArtifacts(homeDir?: string): Promise<Record<string, string>> {
-    const cli = runtimeInvocation(homeDir);
-    const skillsDir = cursorSkillsDir(homeDir);
-    const desired: Record<string, string> = {};
-    for (const filename of COMMANDS) {
-      const template = await readFile(path.join(templateDir, filename), "utf8");
-      desired[path.join(skillsDir, filename)] = template.replaceAll("{{GROUNDER_CLI}}", cli);
-    }
-    return desired;
-  },
-
-  tombstones(homeDir?: string): string[] {
-    const dir = legacyCommandsDir(homeDir);
-    return LEGACY_COMMAND_FILENAMES.map((filename) => path.join(dir, filename));
-  },
-
-  ownedPrefixes(homeDir?: string): string[] {
-    return [cursorSkillsDir(homeDir), legacyCommandsDir(homeDir)];
-  },
+  desiredArtifacts: layout.desiredArtifacts,
+  tombstones: layout.tombstones,
+  ownedPrefixes: layout.ownedPrefixes,
 
   installHooks,
   removeHooks,

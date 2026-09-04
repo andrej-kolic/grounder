@@ -13,6 +13,28 @@
  */
 
 /**
+ * The entries registered for one hook event (`hooks.<event>`) in an
+ * already-parsed config root, or `null` when the file has no such array —
+ * a non-object root, no `hooks` key, a `hooks` that isn't an object, or an
+ * event key that is absent or not an array.
+ *
+ * `null` rather than `[]` because the two callers want opposite things from
+ * "nothing there": counting existing entries treats it as empty, while
+ * "already converged?" must answer `false` and go on to converge.
+ */
+export function readEventEntries(parsed: unknown, event: string): unknown[] | null {
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const hooks = (parsed as Record<string, unknown>).hooks;
+  if (!hooks || typeof hooks !== "object" || Array.isArray(hooks)) {
+    return null;
+  }
+  const entries = (hooks as Record<string, unknown>)[event];
+  return Array.isArray(entries) ? entries : null;
+}
+
+/**
  * Grounder's fragment lives at `hooks.<event>`, so a merge has to read `hooks`
  * as a JSON object. A present-but-non-object `hooks` (an array, a string, a
  * number) is refused rather than replaced: these are shared config files whose
