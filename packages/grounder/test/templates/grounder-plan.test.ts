@@ -22,6 +22,7 @@ describe("templates/grounder-plan", () => {
       const body = await readFile(filePath, "utf8");
       expect(body).toContain("name: grounder-plan");
       expect(body).toContain("disable-model-invocation: true");
+      expect(body).toMatch(/^description: .+$/m);
     }
   });
 

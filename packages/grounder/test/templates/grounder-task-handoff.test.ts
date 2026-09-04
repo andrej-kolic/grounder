@@ -28,6 +28,7 @@ describe("templates/grounder-task-handoff", () => {
       const body = await readFile(filePath, "utf8");
       expect(body).toContain("name: grounder-task-handoff");
       expect(body).toContain("disable-model-invocation: true");
+      expect(body).toMatch(/^description: .+$/m);
     }
   });
 

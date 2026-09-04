@@ -1,3 +1,5 @@
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   cursor,
@@ -7,6 +9,8 @@ import {
   grounderTaskHandoffCommandPath,
 } from "../../src/agents/cursor.js";
 import { runtimeInvocation } from "../../src/agents/hook-runtime.js";
+import { withHomeDir } from "../../src/connector/home.js";
+import { createTempEnv } from "../helpers.js";
 
 describe("agents/cursor", () => {
   describe("command paths", () => {
@@ -72,18 +76,25 @@ describe("agents/cursor", () => {
 
   describe("cursor.isInstalled", () => {
     it("returns false when .cursor dir does not exist", async () => {
-      const { mkdtemp, rm } = await import("node:fs/promises");
-      const os = await import("node:os");
-      const path = await import("node:path");
-      const base = await mkdtemp(path.join(os.tmpdir(), "grounder-cursor-test-"));
-      const prev = process.env.GROUNDER_HOME;
-      process.env.GROUNDER_HOME = base;
+      const env = await createTempEnv({ initGit: false });
       try {
-        expect(await cursor.isInstalled()).toBe(false);
+        await withHomeDir(env.home, async () => {
+          expect(await cursor.isInstalled()).toBe(false);
+        });
       } finally {
-        if (prev === undefined) delete process.env.GROUNDER_HOME;
-        else process.env.GROUNDER_HOME = prev;
-        await rm(base, { recursive: true, force: true });
+        await env.cleanup();
+      }
+    });
+
+    it("returns true when .cursor dir exists", async () => {
+      const env = await createTempEnv({ initGit: false });
+      try {
+        await mkdir(path.join(env.home, ".cursor"), { recursive: true });
+        await withHomeDir(env.home, async () => {
+          expect(await cursor.isInstalled()).toBe(true);
+        });
+      } finally {
+        await env.cleanup();
       }
     });
   });

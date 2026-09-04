@@ -18,6 +18,7 @@ describe("templates/grounder-task", () => {
       const body = await readFile(filePath, "utf8");
       expect(body).toContain("name: grounder-task");
       expect(body).toContain("disable-model-invocation: true");
+      expect(body).toMatch(/^description: .+$/m);
     }
   });
 

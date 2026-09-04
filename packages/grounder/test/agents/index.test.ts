@@ -1,3 +1,5 @@
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { ALL_AGENTS, cursor, ownedLedgerFiles, resolveAgents } from "../../src/agents/index.js";
 import { createTempEnv } from "../helpers.js";
@@ -39,6 +41,19 @@ describe("agents/index - resolveAgents", () => {
 
     const agents = await resolveAgents();
     expect(agents).toHaveLength(0);
+  });
+
+  it("auto-detects: returns the one agent whose dir exists", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await mkdir(path.join(env.home, ".cursor"), { recursive: true });
+
+    prevHome = process.env.GROUNDER_HOME;
+    process.env.GROUNDER_HOME = env.home;
+
+    const agents = await resolveAgents();
+    expect(agents.map((a) => a.id)).toEqual(["cursor"]);
   });
 });
 
