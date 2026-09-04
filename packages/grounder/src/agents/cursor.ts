@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { resolveHomeDir } from "../connector/home.js";
 import { fileExists } from "../util/fs.js";
 import { mergeJsonFile } from "../util/merge-json.js";
-import { isAlreadyConverged, removeMatchingEntries } from "./hook-fragment.js";
+import { isAlreadyConverged, readHooksObject, removeMatchingEntries } from "./hook-fragment.js";
 import {
   installHookRuntime,
   isGrounderPeekHookCommand,
@@ -207,10 +207,7 @@ function mergeCursorHooks(
     next.version = 1;
   }
 
-  const hooks =
-    next.hooks && typeof next.hooks === "object" && !Array.isArray(next.hooks)
-      ? { ...(next.hooks as Record<string, unknown>) }
-      : {};
+  const hooks = readHooksObject(next, cursorHooksJsonPath(homeDir));
   const existing = Array.isArray(hooks.sessionStart) ? hooks.sessionStart : [];
   const cleaned = removeMatchingEntries(existing, isCursorPeekEntry);
   cleaned.push({ command: cursorPeekHookCommand(homeDir) });
@@ -248,7 +245,9 @@ function removeCursorHooks(current: Record<string, unknown>): Record<string, unk
  * Always converges — no `--force` gate; `force` only affects whole-file
  * skill artifacts, never this shared-JSON fragment.
  *
- * Unparseable hooks.json: {@link mergeJsonFile} backs off and this throws (never clobbers).
+ * Never clobbers: an unparseable hooks.json backs off in
+ * {@link mergeJsonFile}, and a present-but-non-object `hooks` key backs off in
+ * {@link readHooksObject}. Either way this throws before anything is written.
  */
 async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResult> {
   const dest = cursorHooksJsonPath(opts.homeDir);

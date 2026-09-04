@@ -341,6 +341,28 @@ describe("agents/claude hooks", () => {
       expect(await readFile(dest, "utf8")).toBe(original);
     });
 
+    it("backs off without clobbering a settings.json whose hooks key is not an object", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      // Valid JSON, but `hooks` is unmergeable. Grounder must refuse rather
+      // than replace it with its own object — the whole point of merging into
+      // a shared settings file is that unrelated content survives.
+      const original = `${JSON.stringify(
+        { hooks: ["not-a-matcher-group"], permissions: { allow: ["Bash"] } },
+        null,
+        2,
+      )}\n`;
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(dest, original);
+
+      await expect(claude.installHooks?.({ homeDir: env.home })).rejects.toThrow(
+        /"hooks" must be a JSON object/,
+      );
+      expect(await readFile(dest, "utf8")).toBe(original);
+    });
+
     it("converges a byte-identical canonical entry sitting under the wrong matcher group instead of reporting it as already up to date", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
@@ -451,6 +473,23 @@ describe("agents/claude hooks", () => {
       const missing = await claude.removeHooks?.({ homeDir: env.home });
       expect(missing?.artifacts).toEqual({});
       expect(await fileExists(claudeSettingsJsonPath(env.home))).toBe(false);
+    });
+
+    it("leaves a settings.json whose hooks key is not an object untouched", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      const original = `${JSON.stringify({ hooks: ["not-a-matcher-group"] }, null, 2)}\n`;
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(dest, original);
+
+      // The mirror of installHooks' refusal: an unmergeable `hooks` can't hold
+      // a Grounder entry, so removal has nothing to do and reports nothing —
+      // it must not restructure the key on its way to that conclusion.
+      const result = await claude.removeHooks?.({ homeDir: env.home });
+      expect(result?.artifacts).toEqual({});
+      expect(await readFile(dest, "utf8")).toBe(original);
     });
 
     it("leaves an existing settings.json byte-for-byte untouched when there's no Grounder entry to remove", async () => {

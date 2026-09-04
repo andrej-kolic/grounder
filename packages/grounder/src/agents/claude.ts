@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { resolveHomeDir } from "../connector/home.js";
 import { fileExists } from "../util/fs.js";
 import { mergeJsonFile } from "../util/merge-json.js";
-import { removeMatchingEntries } from "./hook-fragment.js";
+import { readHooksObject, removeMatchingEntries } from "./hook-fragment.js";
 import {
   installHookRuntime,
   isGrounderPeekHookCommand,
@@ -284,10 +284,7 @@ function mergeClaudeHooks(
   current: Record<string, unknown>,
   homeDir?: string,
 ): Record<string, unknown> {
-  const hooks =
-    current.hooks && typeof current.hooks === "object" && !Array.isArray(current.hooks)
-      ? { ...(current.hooks as Record<string, unknown>) }
-      : {};
+  const hooks = readHooksObject(current, claudeSettingsJsonPath(homeDir));
   const sessionStart = Array.isArray(hooks.SessionStart) ? hooks.SessionStart : [];
   const cleaned = removeAllPeekHooks(sessionStart);
   const entry = peekHookEntry(homeDir);
@@ -340,7 +337,9 @@ function removeClaudeHooks(current: Record<string, unknown>): Record<string, unk
  * Always converges — no `--force` gate; `force` only affects whole-file
  * skill artifacts, never this shared-JSON fragment.
  *
- * Unparseable settings.json: {@link mergeJsonFile} backs off and this throws (never clobbers).
+ * Never clobbers: an unparseable settings.json backs off in
+ * {@link mergeJsonFile}, and a present-but-non-object `hooks` key backs off in
+ * {@link readHooksObject}. Either way this throws before anything is written.
  */
 async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResult> {
   const dest = claudeSettingsJsonPath(opts.homeDir);

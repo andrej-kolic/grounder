@@ -242,6 +242,24 @@ describe("agents/cursor hooks", () => {
       expect(await readFile(dest, "utf8")).toBe(original);
     });
 
+    it("backs off without clobbering a hooks.json whose hooks key is not an object", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = cursorHooksJsonPath(env.home);
+      // Valid JSON, but `hooks` is unmergeable. Grounder must refuse rather
+      // than replace it with its own object — the whole point of merging into
+      // a shared hooks file is that unrelated content survives.
+      const original = `${JSON.stringify({ version: 1, hooks: ["not-an-event-map"] }, null, 2)}\n`;
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(dest, original);
+
+      await expect(cursor.installHooks?.({ homeDir: env.home })).rejects.toThrow(
+        /"hooks" must be a JSON object/,
+      );
+      expect(await readFile(dest, "utf8")).toBe(original);
+    });
+
     it("dedupes a legacy npx entry and a drifted runtime entry into exactly one canonical entry", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
@@ -302,6 +320,23 @@ describe("agents/cursor hooks", () => {
       const result = await cursor.removeHooks?.({ homeDir: env.home });
       expect(result?.artifacts).toEqual({});
       expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(false);
+    });
+
+    it("leaves a hooks.json whose hooks key is not an object untouched", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = cursorHooksJsonPath(env.home);
+      const original = `${JSON.stringify({ version: 1, hooks: ["not-an-event-map"] }, null, 2)}\n`;
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(dest, original);
+
+      // The mirror of installHooks' refusal: an unmergeable `hooks` can't hold
+      // a Grounder entry, so removal has nothing to do and reports nothing —
+      // it must not restructure the key on its way to that conclusion.
+      const result = await cursor.removeHooks?.({ homeDir: env.home });
+      expect(result?.artifacts).toEqual({});
+      expect(await readFile(dest, "utf8")).toBe(original);
     });
 
     it("leaves an existing hooks.json byte-for-byte untouched when there's no Grounder entry to remove", async () => {

@@ -1,7 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { isAlreadyConverged, removeMatchingEntries } from "../../src/agents/hook-fragment.js";
+import {
+  isAlreadyConverged,
+  readHooksObject,
+  removeMatchingEntries,
+} from "../../src/agents/hook-fragment.js";
 
 describe("agents/hook-fragment", () => {
+  describe("readHooksObject", () => {
+    it("returns a fresh object when hooks is absent or null", () => {
+      expect(readHooksObject({}, "/cfg.json")).toEqual({});
+      expect(readHooksObject({ hooks: null }, "/cfg.json")).toEqual({});
+    });
+
+    it("returns a shallow copy, never the parsed original", () => {
+      const hooks = { SessionStart: [] };
+      const result = readHooksObject({ hooks }, "/cfg.json");
+      expect(result).toEqual(hooks);
+      expect(result).not.toBe(hooks);
+    });
+
+    it("refuses a present-but-non-object hooks rather than replacing it", () => {
+      for (const hooks of [["a"], "a", 1, true]) {
+        expect(() => readHooksObject({ hooks }, "/cfg.json")).toThrow(
+          /Refusing to modify \/cfg\.json: "hooks" must be a JSON object/,
+        );
+      }
+    });
+  });
+
   describe("removeMatchingEntries", () => {
     it("filters out every match, preserving order of the rest", () => {
       const entries = [{ id: "a" }, { id: "b" }, { id: "a" }, { id: "c" }];

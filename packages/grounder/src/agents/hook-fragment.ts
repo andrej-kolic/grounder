@@ -12,6 +12,36 @@
  * the way a whole skill file can be.
  */
 
+/**
+ * Grounder's fragment lives at `hooks.<event>`, so a merge has to read `hooks`
+ * as a JSON object. A present-but-non-object `hooks` (an array, a string, a
+ * number) is refused rather than replaced: these are shared config files whose
+ * unrelated keys Grounder promises to preserve, and silently dropping a value
+ * it can't interpret is the one way a merge could destroy user data. Refusing
+ * matches how {@link mergeJsonFile} already backs off an unparseable root or a
+ * non-object top level — same contract, one level deeper.
+ *
+ * `null` and absent both mean "nothing there yet" and yield a fresh `{}` —
+ * neither carries content a user could lose.
+ *
+ * Returns a shallow copy, so callers can mutate the result without touching
+ * the parsed original (`mergeJsonFile` compares by reference to decide whether
+ * anything changed).
+ */
+export function readHooksObject(
+  current: Record<string, unknown>,
+  filePath: string,
+): Record<string, unknown> {
+  const hooks = current.hooks;
+  if (hooks === undefined || hooks === null) {
+    return {};
+  }
+  if (typeof hooks !== "object" || Array.isArray(hooks)) {
+    throw new Error(`Refusing to modify ${filePath}: "hooks" must be a JSON object`);
+  }
+  return { ...(hooks as Record<string, unknown>) };
+}
+
 /** Remove every entry `isMatch` accepts, preserving order of the rest. */
 export function removeMatchingEntries<T>(
   entries: readonly T[],
