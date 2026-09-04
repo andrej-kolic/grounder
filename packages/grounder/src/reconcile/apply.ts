@@ -4,31 +4,6 @@ import { writeFileAtomic } from "../util/fs.js";
 import { hashContent } from "../util/hash.js";
 import { isUnderOwnedPrefix, type PlanEntry } from "./core.js";
 
-/**
- * - `created` / `overwritten` — wrote new content
- * - `deleted` — retired (tombstone or dropped-from-manifest path)
- * - `skipped` — already current (or dry-run would no-op)
- * - `modified` — on-disk content differs from last Grounder write / delete
- *   blocked; left alone unless `--force`
- */
-export type ArtifactStatus = "created" | "skipped" | "overwritten" | "deleted" | "modified";
-
-export function statusForPlanAction(entry: PlanEntry): ArtifactStatus {
-  switch (entry.action) {
-    case "noop":
-    case "forget":
-      return "skipped";
-    case "create":
-      return "created";
-    case "update":
-      return "overwritten";
-    case "delete":
-      return "deleted";
-    case "conflict":
-      return "modified";
-  }
-}
-
 export interface ApplyPlanOptions {
   agentId: string;
   plan: readonly PlanEntry[];
@@ -50,11 +25,15 @@ export interface ApplyPlanOptions {
  * Execute a whole-file plan: write/delete each path, and persist that path's
  * ledger hash right after its own file write succeeds (per-artifact, not
  * batched) — a mid-run crash leaves the ledger consistent with whatever
- * actually completed. Returns per-path outcome for table rendering.
+ * actually completed.
+ *
+ * Returns nothing: callers render their tables from the `PlanEntry[]` they
+ * passed in (see `commands/render-artifact-table.ts`'s
+ * `rowStatusFromPlanAction`), so a second per-path outcome vocabulary here
+ * would only be a chance for the two to disagree. Failure is a throw, not a
+ * status — every entry that doesn't throw did exactly what its action says.
  */
-export async function applyPlan(opts: ApplyPlanOptions): Promise<Record<string, ArtifactStatus>> {
-  const statuses: Record<string, ArtifactStatus> = {};
-
+export async function applyPlan(opts: ApplyPlanOptions): Promise<void> {
   for (const entry of opts.plan) {
     if (
       (entry.action === "create" || entry.action === "update" || entry.action === "delete") &&
@@ -80,7 +59,6 @@ export async function applyPlan(opts: ApplyPlanOptions): Promise<Record<string, 
           grounderVersion: opts.grounderVersion,
           homeDir: opts.homeDir,
         });
-        statuses[entry.path] = statusForPlanAction(entry);
         break;
       }
       case "noop": {
@@ -97,7 +75,6 @@ export async function applyPlan(opts: ApplyPlanOptions): Promise<Record<string, 
             homeDir: opts.homeDir,
           });
         }
-        statuses[entry.path] = statusForPlanAction(entry);
         break;
       }
       case "delete": {
@@ -118,7 +95,6 @@ export async function applyPlan(opts: ApplyPlanOptions): Promise<Record<string, 
           grounderVersion: opts.grounderVersion,
           homeDir: opts.homeDir,
         });
-        statuses[entry.path] = statusForPlanAction(entry);
         break;
       }
       case "forget": {
@@ -130,14 +106,13 @@ export async function applyPlan(opts: ApplyPlanOptions): Promise<Record<string, 
           grounderVersion: opts.grounderVersion,
           homeDir: opts.homeDir,
         });
-        statuses[entry.path] = statusForPlanAction(entry);
         break;
       }
       case "conflict":
-        statuses[entry.path] = statusForPlanAction(entry);
+        // Left alone on purpose — on-disk content Grounder can't confirm it
+        // wrote. `--force` is what turns this into an `update`/`delete`
+        // upstream in `reconcile()`, so there is nothing to do here.
         break;
     }
   }
-
-  return statuses;
 }

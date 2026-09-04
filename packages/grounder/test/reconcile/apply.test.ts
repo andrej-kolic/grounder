@@ -22,7 +22,7 @@ describe("reconcile/apply", () => {
     cleanup = env.cleanup;
     const filePath = path.join(env.home, ".cursor", "skills", "grounder-note", "SKILL.md");
 
-    const statuses = await applyPlan({
+    await applyPlan({
       agentId: "cursor",
       plan: [{ path: filePath, action: "create" }],
       content: { [filePath]: "hello\n" },
@@ -31,7 +31,6 @@ describe("reconcile/apply", () => {
       ownedPrefixes: [env.home],
     });
 
-    expect(statuses[filePath]).toBe("created");
     expect(await readFile(filePath, "utf8")).toBe("hello\n");
     const state = await readGrounderState(env.home);
     expect(state?.agents.cursor?.files[filePath]?.hash).toBe(hashContent("hello\n"));
@@ -135,7 +134,7 @@ describe("reconcile/apply", () => {
     const filePath = path.join(env.home, "note.md");
     await writeFile(filePath, "user edits\n", "utf8");
 
-    const statuses = await applyPlan({
+    await applyPlan({
       agentId: "cursor",
       plan: [{ path: filePath, action: "conflict", blockedAction: "overwrite" }],
       content: { [filePath]: "template content\n" },
@@ -144,7 +143,6 @@ describe("reconcile/apply", () => {
       ownedPrefixes: [env.home],
     });
 
-    expect(statuses[filePath]).toBe("modified");
     expect(await readFile(filePath, "utf8")).toBe("user edits\n");
     expect(await fileExists(statePath(env.home))).toBe(false);
   });

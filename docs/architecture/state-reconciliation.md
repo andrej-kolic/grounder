@@ -105,6 +105,12 @@ artifact, not batched after the whole plan runs, so a mid-run crash leaves the l
 consistent with whatever actually completed. `writeGrounderState` itself is atomic (tmp file
 + rename), so even a single artifact's ledger write can't leave a torn `state.json`.
 
+It returns nothing. Reporting is driven by the `PlanEntry[]` the caller already holds
+(`commands/render-artifact-table.ts`'s `rowStatusFromPlanAction`), so there is only one
+per-path outcome vocabulary in the codebase rather than a second one the write path could
+drift from. Failure is a throw, not a status: every entry that doesn't throw did exactly
+what its action says.
+
 A `noop` entry still calls `setLedgerFileHash` (a no-op write if the hash already matches) —
 this is what lets a file that happens to already match the template (fresh clone, manual
 copy, a wiped ledger) get silently re-adopted into the ledger on the next real run, with
