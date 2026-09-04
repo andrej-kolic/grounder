@@ -10,7 +10,7 @@ contributors.
 ## Problem
 
 Upgrading the `grounder` npm package does not automatically refresh files already written
-on the machine (slash commands, hook fragments, `~/.grounder/runtime`). Those artifacts can
+on the machine (skill files, hook fragments, `~/.grounder/runtime`). Those artifacts can
 drift from what the new binary expects, and a previous install shape can leave files behind
 that the current shape no longer wants at all.
 

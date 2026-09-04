@@ -77,8 +77,8 @@ With no `--agent` flag, `setup` auto-detects installed agents. To install explic
 grounder setup <path-to-your-vault> --agent=cursor --agent=claude
 ```
 
-Slash commands invoke `~/.grounder/runtime/dist/cli.js` directly (not `npx`) — see
-[Upgrading](upgrading.md#the-shared-runtime) for how that runtime stays current. Command
+Skills invoke `~/.grounder/runtime/dist/cli.js` directly (not `npx`) — see
+[Upgrading](upgrading.md#the-shared-runtime) for how that runtime stays current. Skill
 files that still match what Grounder last wrote are refreshed by `grounder migrate`
 without `--force`; locally edited files are left alone unless you pass `--force`.
 

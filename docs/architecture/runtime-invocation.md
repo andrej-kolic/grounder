@@ -1,18 +1,18 @@
 # Runtime invocation (baked Node + home runtime)
 
-How Grounder invokes itself from session hooks and slash commands — and why the absolute Node path is intentional.
+How Grounder invokes itself from session hooks and skills — and why the absolute Node path is intentional.
 
 User-facing steps (`grounder migrate`, doctor hints) live in [packages/grounder/README.md](../../packages/grounder/README.md). Ledger / reconciliation details are covered in [state-reconciliation.md](./state-reconciliation.md). This doc is for contributors.
 
 ## Problem
 
-Hooks and slash commands used to shell out via `npx grounder …`. That resolves against the *current project's* dependencies (or fetches `grounder@latest`), so linked repos that do not declare Grounder get the wrong binary. Global install / `pnpm link` does not fix that fallback.
+Hooks and skills used to shell out via `npx grounder …`. That resolves against the *current project's* dependencies (or fetches `grounder@latest`), so linked repos that do not declare Grounder get the wrong binary. Global install / `pnpm link` does not fix that fallback.
 
 A second constraint: editor-spawned subprocesses (Cursor hooks, Claude Code `sh -c`) do not reliably get a login-shell `PATH`. Bare `node` or `#!/usr/bin/env node` can pick up a bundled/editor Node, skip nvm, or fail entirely. Ambient resolution is not a safe contract here.
 
 ## Design
 
-On `setup` / `migrate`, Grounder materializes this package's `dist/` at `~/.grounder/runtime/dist/` and points both host hook configs and installed command markdown at:
+On `setup` / `migrate`, Grounder materializes this package's `dist/` at `~/.grounder/runtime/dist/` and points both host hook configs and installed skill markdown at:
 
 ```text
 '<absolute process.execPath>' '<~/.grounder/runtime/dist/cli.js>' <subcommand> …
@@ -50,7 +50,7 @@ The remaining gap was detection: after `nvm uninstall` (or similar) of the Node 
 
 ## Doctor: dangling interpreter
 
-When an already-installed Grounder hook entry or slash-command file matches the runtime invocation shape, doctor extracts the leading absolute Node path (`extractRuntimeNodePath` / `findRuntimeNodePathsInText`) and checks executability (`isExecutable` — `X_OK` on POSIX; Windows degrades toward existence).
+When an already-installed Grounder hook entry or skill file matches the runtime invocation shape, doctor extracts the leading absolute Node path (`extractRuntimeNodePath` / `findRuntimeNodePathsInText`) and checks executability (`isExecutable` — `X_OK` on POSIX; Windows degrades toward existence).
 
 | Case | Severity |
 | --- | --- |

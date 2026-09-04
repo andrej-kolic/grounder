@@ -103,7 +103,7 @@ packages/grounder/templates/
       grounder-plan/SKILL.md
       grounder-search/SKILL.md
   vault/
-    session-handoff.md            # lean section reference for slash commands
+    session-handoff.md            # lean section reference for skills
     plan.md                       # section reference for /grounder-plan
   bridge/                         # deferred (Phase 2+)
 ```

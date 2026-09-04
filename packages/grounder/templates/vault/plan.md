@@ -1,4 +1,4 @@
-<!-- Reference shape for /grounder-plan. Not installed or filled by the CLI — slash commands embed this structure. -->
+<!-- Reference shape for /grounder-plan. Not installed or filled by the CLI — skills embed this structure. -->
 
 # Plan: <title>
 

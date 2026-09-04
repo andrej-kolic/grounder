@@ -5,7 +5,7 @@ description: >-
   project to a local markdown vault for agent memory (Obsidian-compatible).
   Use when the user asks to install Grounder, set up, upgrade, or repair
   Grounder, run grounder setup, link this project to their vault or Obsidian
-  vault, or when Grounder slash commands, handoffs, or session memory are
+  vault, or when Grounder skills, handoffs, or session memory are
   missing.
 ---
 
@@ -13,7 +13,7 @@ description: >-
 
 Drive the native Grounder CLI to preview, install, verify, and repair Grounder.
 
-Adding this skill only loads these instructions. Running it is what installs the CLI (if missing), slash commands, and hooks.
+Adding this skill only loads these instructions. Running it is what installs the CLI (if missing), skills, and hooks.
 
 ## Boundary
 
@@ -173,6 +173,6 @@ After `link` / repair, run `$GROUNDER doctor` (full, not `--global`). Report the
 
 - If the repo is shared, mention that `.grounder.json` should be committed.
 - Do not write a test note or handoff unless asked.
-- Slash commands / teasers may need a **new session** to appear.
+- Skills / teasers may need a **new session** to appear.
 - Adapters without `installHooks` no-op; missing hooks is a `doctor` `warn`, not a failure.
-- If this host has no Grounder adapter (Codex and Copilot have none): vault + CLI work; slash commands and teasers will not.
+- If this host has no Grounder adapter (Codex and Copilot have none): vault + CLI work; skills and teasers will not.

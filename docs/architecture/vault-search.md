@@ -1,6 +1,6 @@
 # Vault search and `/grounder-search`
 
-How Grounder retrieves prior project-vault context — and why ranking lives in the CLI while the slash command only drives it.
+How Grounder retrieves prior project-vault context — and why ranking lives in the CLI while the skill only drives it.
 
 User-facing flags live in `grounder search --help`. This doc is for contributors who will change either layer.
 
@@ -24,7 +24,7 @@ That is slow, model-dependent, and mixes two different trees (source vs vault). 
 
 **`--terms` is the only model-dependent input that changes ranking.** Protocol (two rounds, `--json`, numbered `file://` links) is compatible across models. File order is not, unless terms match.
 
-If a future change “fixes ranking” by adding more prose to the slash command, you are treating a CLI problem as a prompt problem. If it “fixes synthesis” by making the CLI print an essay, you are treating a prompt problem as a CLI problem.
+If a future change “fixes ranking” by adding more prose to the skill, you are treating a CLI problem as a prompt problem. If it “fixes synthesis” by making the CLI print an essay, you are treating a prompt problem as a CLI problem.
 
 ## Scope
 
@@ -101,8 +101,8 @@ Then, as tiebreakers only: **non-archive before archive**, newer `mtime`, folder
 | Flag | Who | Shape |
 | --- | --- | --- |
 | (plain) | Humans | Summary line + optional truncation header; numbered stem + absolute path + one-line snippets |
-| `--markdown` | Lookup-mode slash command | `file://` links (spaces percent-encoded via `pathToFileURL`) + fenced snippets |
-| `--json` | Default slash command | See below — **parse privately, never paste** |
+| `--markdown` | Lookup-mode skill | `file://` links (spaces percent-encoded via `pathToFileURL`) + fenced snippets |
+| `--json` | Default skill | See below — **parse privately, never paste** |
 
 `--markdown` and `--json` are mutually exclusive.
 
@@ -127,7 +127,7 @@ Each `hits[]` entry:
 | `mtimeMs`, `topicsMatch` | Metadata |
 | `matches[]` | `{ line, term, snippet }` per hit line |
 
-## Slash-command protocol
+## Skill protocol
 
 Installed from `templates/agents/{cursor,claude}/skills/grounder-search/SKILL.md` via `grounder setup` / `grounder migrate`. `{{GROUNDER_CLI}}` becomes the baked runtime invocation. Cursor requires Shell `required_permissions: ["all"]` (vault is outside the workspace).
 
@@ -140,7 +140,7 @@ After **any** template edit, run `grounder migrate` (hash-safe if the on-disk fi
 
 ### Query and terms (the ranking contract)
 
-The CLI does not guess intent. The slash command **classifies** after stripping retrieval wrappers (`find`, `search for`, `documents discussing`, `notes about`, `look up`), then builds argv.
+The CLI does not guess intent. The skill **classifies** after stripping retrieval wrappers (`find`, `search for`, `documents discussing`, `notes about`, `look up`), then builds argv.
 
 | Class | Signal | `query` |
 | --- | --- | --- |
@@ -211,7 +211,7 @@ You may list a design/archive authority first **among the four full-reads**. Do 
 | Verbatim-only phrase match | NL queries rarely appear verbatim in vault | **Keep** partial n-gram match (+100; trigrams for 4+ words) |
 | Semantic / BM25 / embeddings | Needs an index, deps, and a rebuild story | **Rejected for v1** — vaults are small; scan is sub-second |
 
-### Slash command (prompt)
+### Skill (prompt)
 
 Cross-model runs on the same probe (`find documents discussing handling migrations of slash commands`) taught these leaks. Each “fix” that only added a softer sentence failed on at least one family; **counterexamples** worked better than adjectives.
 

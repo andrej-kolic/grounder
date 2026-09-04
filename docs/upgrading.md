@@ -1,6 +1,6 @@
 # Upgrading
 
-Upgrading the npm package does not by itself refresh the slash commands and shared
+Upgrading the npm package does not by itself refresh the skills and shared
 runtime that `grounder setup` installed under your home directory. One command does:
 
 ```bash
@@ -32,7 +32,7 @@ Untouched skill files update automatically; locally edited ones (and pre-0.3 ins
 with no ledger) are skipped unless you pass `--force`. `setup --force` still works for
 scripts that already use it — it shares the same install path as `migrate`.
 
-**Upgrading from before 0.6** (`grounder-*.md` slash commands, not yet `SKILL.md`):
+**Upgrading from before 0.6** (`grounder-*.md` command files, not yet `SKILL.md`):
 `migrate` installs the new skill files and then deletes the old `~/.cursor/commands/` /
 `~/.claude/commands/grounder-*.md` files, but only ones it can prove are untouched (hash
 matches what Grounder last wrote). `--force` also deletes ones you edited locally —
@@ -47,7 +47,7 @@ Contributor detail on the install ledger and hash drift:
 
 ## The shared runtime
 
-Hooks *and* slash commands both run `~/.grounder/runtime/dist/cli.js` directly (never
+Hooks *and* skills both run `~/.grounder/runtime/dist/cli.js` directly (never
 `npx`), so they don't depend on whatever `grounder` happens to be on your `PATH`.
 `setup` materializes that runtime whether or not `--hooks` is passed, in one of two ways:
 
