@@ -33,15 +33,17 @@ describe("connector/ledger-migrations", () => {
       });
     });
 
-    it("maps hooksSchema: 0 to hooksEnabled: false, not 'leave unset'", () => {
+    it("maps hooksSchema: 0 to hooksEnabled: undefined, not false", () => {
+      // `false` means an explicit `--no-hooks` opt-out — a flag that didn't
+      // exist in v0.5.0, so no v0.5.0 ledger value should ever produce it.
+      // Folding `hooksSchema: 0` into `false` would turn a machine that
+      // simply never installed hooks into a permanent sticky opt-out.
       const result = upgradeFrom0({
         grounderVersion: "0.6.0",
         agents: { cursor: { hooksSchema: 0, files: {} } },
       });
 
-      expect(
-        (result.agents as Record<string, { hooksEnabled?: boolean }>).cursor.hooksEnabled,
-      ).toBe(false);
+      expect("hooksEnabled" in (result.agents as Record<string, object>).cursor).toBe(false);
     });
 
     it("leaves hooksEnabled unset when neither key is present", () => {

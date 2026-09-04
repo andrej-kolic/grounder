@@ -249,6 +249,54 @@ describe("connector/state", () => {
     );
   });
 
+  it("throws a clear invalid-state error (not a bare TypeError) when state.json is literal JSON null", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(path.dirname(statePath(env.home)), { recursive: true });
+    await writeFile(statePath(env.home), "null\n", "utf8");
+
+    const error = await readGrounderState(env.home).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/missing grounderVersion/);
+    expect((error as Error).message).not.toMatch(/Cannot read propert/);
+  });
+
+  it("drops a file entry whose hash isn't a string instead of casting it through", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(path.dirname(statePath(env.home)), { recursive: true });
+    await writeFile(
+      statePath(env.home),
+      `${JSON.stringify(
+        {
+          ledgerSchema: LEDGER_SCHEMA,
+          grounderVersion: "0.6.0",
+          agents: {
+            cursor: {
+              files: {
+                "/a/SKILL.md": { hash: "sha256:aaa" },
+                "/b/SKILL.md": { hash: 123 },
+                "/c/SKILL.md": {},
+              },
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const state = await readGrounderState(env.home);
+    expect(state?.agents.cursor?.files).toEqual({
+      "/a/SKILL.md": { hash: "sha256:aaa" },
+    });
+  });
+
   describe("assertVersionSupportsWrite", () => {
     it("hard-stops only when the running binary is behind the ledger's recorded version", () => {
       expect(() =>

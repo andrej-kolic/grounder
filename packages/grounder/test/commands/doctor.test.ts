@@ -358,6 +358,62 @@ describe("commands/doctor", () => {
     expect(out).not.toContain("legacy-commands");
   });
 
+  it("warns about a ledger-tracked skill file dropped from the current release without a tombstone", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    // Simulates a skill retired from a future release with nobody adding it
+    // to `tombstones()` — still on disk, ledger hash matches, so `migrate`
+    // would delete it with no conflict. Before this fix, doctor's plan split
+    // silently dropped entries like this (neither in `desired` nor in
+    // `tombstones`), so nothing here ever warned ahead of that delete.
+    const orphanedPath = path.join(env.home, ".cursor", "skills", "grounder-old-skill", "SKILL.md");
+    const orphanedContent = "an old skill file no longer rendered by this version\n";
+    await mkdir(path.dirname(orphanedPath), { recursive: true });
+    await writeFile(orphanedPath, orphanedContent, "utf8");
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
+    await writeGrounderState(
+      {
+        ...state,
+        agents: {
+          ...state.agents,
+          cursor: {
+            ...state.agents.cursor,
+            files: {
+              ...state.agents.cursor?.files,
+              [orphanedPath]: { hash: hashContent(orphanedContent) },
+            },
+          },
+        },
+      },
+      env.home,
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("warn  agent-cursor-orphaned");
+    expect(out).toContain(orphanedPath);
+    expect(out).toContain("no longer part of the current install");
+    expect(out).toContain("safe to clean up");
+    expect(out).toContain("→ grounder migrate\n");
+    expect(out).not.toContain("grounder migrate --force");
+    expect(out).toMatch(/^\d+ passed, 0 failed, \d+ warned$/m);
+  });
+
   it("warns when install state is missing (legacy pre-ledger install)", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;

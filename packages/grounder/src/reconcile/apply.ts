@@ -1,8 +1,8 @@
-import { mkdir, unlink, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { unlink } from "node:fs/promises";
 import { forgetLedgerFile, setLedgerFileHash } from "../connector/state.js";
+import { writeFileAtomic } from "../util/fs.js";
 import { hashContent } from "../util/hash.js";
-import type { PlanEntry } from "./core.js";
+import { isUnderOwnedPrefix, type PlanEntry } from "./core.js";
 
 /**
  * - `created` / `overwritten` — wrote new content
@@ -36,6 +36,14 @@ export interface ApplyPlanOptions {
   content: Record<string, string>;
   grounderVersion: string;
   homeDir?: string;
+  /**
+   * Directories this agent is allowed to write into / delete from (its own
+   * `AgentAdapter#ownedPrefixes`) — re-checked here via
+   * {@link isUnderOwnedPrefix}, not trusted solely from the caller, so a plan
+   * built from a stray/corrupted ledger entry can never be applied as a
+   * filesystem write outside the agent's own tree.
+   */
+  ownedPrefixes: readonly string[];
 }
 
 /**
@@ -48,6 +56,15 @@ export async function applyPlan(opts: ApplyPlanOptions): Promise<Record<string, 
   const statuses: Record<string, ArtifactStatus> = {};
 
   for (const entry of opts.plan) {
+    if (
+      (entry.action === "create" || entry.action === "update" || entry.action === "delete") &&
+      !isUnderOwnedPrefix(entry.path, opts.ownedPrefixes)
+    ) {
+      throw new Error(
+        `Refusing to ${entry.action} ${entry.path}: outside ${opts.agentId}'s owned prefixes`,
+      );
+    }
+
     switch (entry.action) {
       case "create":
       case "update": {
@@ -55,8 +72,7 @@ export async function applyPlan(opts: ApplyPlanOptions): Promise<Record<string, 
         if (content === undefined) {
           throw new Error(`No desired content for ${entry.path} (action: ${entry.action})`);
         }
-        await mkdir(path.dirname(entry.path), { recursive: true });
-        await writeFile(entry.path, content, "utf8");
+        await writeFileAtomic(entry.path, content);
         await setLedgerFileHash({
           agentId: opts.agentId,
           filePath: entry.path,

@@ -281,6 +281,53 @@ describe("agents/claude hooks", () => {
       ]);
     });
 
+    it("does not treat a non-command hook entry with a matching command string as Grounder's own", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(
+        dest,
+        `${JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                {
+                  matcher: CLAUDE_SESSION_START_MATCHER,
+                  hooks: [{ type: "other", command: claudePeekHookCommand(env.home) }],
+                },
+              ],
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const result = await claude.installHooks?.({ homeDir: env.home });
+
+      // A non-`command` hook is not Grounder's, even if its `command` string
+      // happens to match — it must survive untouched, alongside Grounder's
+      // own newly appended entry. Not recognized as a prior Grounder entry,
+      // so this reports "created" (matches the "preserves unrelated hooks"
+      // case above), not "overwritten".
+      expect(result?.artifacts[dest]).toBe("created");
+      expect(JSON.parse(await readFile(dest, "utf8"))).toEqual({
+        hooks: {
+          SessionStart: [
+            {
+              matcher: CLAUDE_SESSION_START_MATCHER,
+              hooks: [
+                { type: "other", command: claudePeekHookCommand(env.home) },
+                { type: "command", command: claudePeekHookCommand(env.home) },
+              ],
+            },
+          ],
+        },
+      });
+    });
+
     it("backs off without clobbering malformed settings.json", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
@@ -466,6 +513,43 @@ describe("agents/claude hooks", () => {
           SessionStart: [
             { matcher: "otherEvent", hooks: [{ type: "command", command: "echo keep-me" }] },
           ],
+        },
+      });
+    });
+
+    it("leaves a matcher group already empty for unrelated reasons in place", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(
+        dest,
+        `${JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                {
+                  matcher: CLAUDE_SESSION_START_MATCHER,
+                  hooks: [{ type: "command", command: claudePeekHookCommand(env.home) }],
+                },
+                { matcher: "otherEvent", hooks: [] },
+              ],
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      await claude.removeHooks?.({ homeDir: env.home });
+
+      // Grounder's own group is emptied by this removal and dropped; the
+      // "otherEvent" group was already empty before Grounder touched
+      // anything — not Grounder's clutter to clean up, so it survives.
+      expect(JSON.parse(await readFile(dest, "utf8"))).toEqual({
+        hooks: {
+          SessionStart: [{ matcher: "otherEvent", hooks: [] }],
         },
       });
     });

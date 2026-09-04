@@ -186,6 +186,7 @@ export async function applyAgentInstalls(
         content: desired,
         grounderVersion: opts.grounderVersion,
         homeDir,
+        ownedPrefixes: agent.ownedPrefixes(homeDir),
       });
     }
 

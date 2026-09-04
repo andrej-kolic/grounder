@@ -28,6 +28,7 @@ describe("reconcile/apply", () => {
       content: { [filePath]: "hello\n" },
       grounderVersion: "0.6.0",
       homeDir: env.home,
+      ownedPrefixes: [env.home],
     });
 
     expect(statuses[filePath]).toBe("created");
@@ -48,6 +49,7 @@ describe("reconcile/apply", () => {
       content: { [filePath]: "old\n" },
       grounderVersion: "0.6.0",
       homeDir: env.home,
+      ownedPrefixes: [env.home],
     });
 
     await applyPlan({
@@ -56,6 +58,7 @@ describe("reconcile/apply", () => {
       content: {},
       grounderVersion: "0.6.0",
       homeDir: env.home,
+      ownedPrefixes: [env.home],
     });
 
     expect(await fileExists(filePath)).toBe(false);
@@ -86,6 +89,7 @@ describe("reconcile/apply", () => {
         content: {},
         grounderVersion: "0.6.0",
         homeDir: env.home,
+        ownedPrefixes: [env.home],
       }),
     ).rejects.toThrow();
 
@@ -118,6 +122,7 @@ describe("reconcile/apply", () => {
       content: {},
       grounderVersion: "0.6.0",
       homeDir: env.home,
+      ownedPrefixes: [env.home],
     });
 
     expect(await fileExists(filePath)).toBe(false);
@@ -136,6 +141,7 @@ describe("reconcile/apply", () => {
       content: { [filePath]: "template content\n" },
       grounderVersion: "0.6.0",
       homeDir: env.home,
+      ownedPrefixes: [env.home],
     });
 
     expect(statuses[filePath]).toBe("modified");
@@ -155,6 +161,7 @@ describe("reconcile/apply", () => {
       content: { [filePath]: "already correct\n" },
       grounderVersion: "0.6.0",
       homeDir: env.home,
+      ownedPrefixes: [env.home],
     });
 
     expect((await readGrounderState(env.home))?.agents.cursor?.files[filePath]?.hash).toBe(
@@ -173,11 +180,64 @@ describe("reconcile/apply", () => {
       content: { [filePath]: "hello\n" },
       grounderVersion: "0.6.0",
       homeDir: env.home,
+      ownedPrefixes: [env.home],
     });
 
     const { readdir } = await import("node:fs/promises");
     const entries = await readdir(path.dirname(statePath(env.home)));
     expect(entries.filter((name) => name.includes(".tmp-"))).toEqual([]);
     expect(entries).toContain("state.json");
+  });
+
+  it("skill file writes are atomic (tmp file + rename) — no partial SKILL.md ever lands at the real path", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const skillDir = path.join(env.home, ".cursor", "skills", "grounder-note");
+    const filePath = path.join(skillDir, "SKILL.md");
+
+    await applyPlan({
+      agentId: "cursor",
+      plan: [{ path: filePath, action: "create" }],
+      content: { [filePath]: "hello\n" },
+      grounderVersion: "0.6.0",
+      homeDir: env.home,
+      ownedPrefixes: [env.home],
+    });
+
+    const { readdir } = await import("node:fs/promises");
+    const entries = await readdir(skillDir);
+    expect(entries.filter((name) => name.includes(".tmp-"))).toEqual([]);
+    expect(entries).toEqual(["SKILL.md"]);
+    expect(await readFile(filePath, "utf8")).toBe("hello\n");
+  });
+
+  it("refuses to create/update/delete a path outside the agent's owned prefixes", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const outsidePath = path.join(env.home, ".claude", "skills", "grounder-note", "SKILL.md");
+
+    await expect(
+      applyPlan({
+        agentId: "cursor",
+        plan: [{ path: outsidePath, action: "create" }],
+        content: { [outsidePath]: "hello\n" },
+        grounderVersion: "0.6.0",
+        homeDir: env.home,
+        ownedPrefixes: [path.join(env.home, ".cursor", "skills")],
+      }),
+    ).rejects.toThrow(/outside cursor's owned prefixes/);
+
+    expect(await fileExists(outsidePath)).toBe(false);
+
+    await expect(
+      applyPlan({
+        agentId: "cursor",
+        plan: [{ path: outsidePath, action: "delete" }],
+        content: {},
+        grounderVersion: "0.6.0",
+        homeDir: env.home,
+        ownedPrefixes: [path.join(env.home, ".cursor", "skills")],
+      }),
+    ).rejects.toThrow(/outside cursor's owned prefixes/);
   });
 });

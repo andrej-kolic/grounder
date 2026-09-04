@@ -19,6 +19,14 @@ import { hashContent } from "../util/hash.js";
  * `agent-*-legacy-commands` check is the one place that actually reads disk
  * to tell delete/conflict/already-gone apart; this only answers "is migrate
  * a no-op," which none of those three are.
+ *
+ * A ledger key that is neither desired nor tombstoned (a skill dropped from
+ * the current release with nobody remembering to tombstone the old path) is
+ * the same kind of drift: `reconcile()` never plans a non-desired ledger path
+ * as `noop`, so `migrate` always has something to do with it (forget it if
+ * already gone from disk, else delete/conflict). Same plain key-lookup cost
+ * as the tombstone check above — no disk read needed to know *that* there's
+ * drift, only to know which of forget/delete/conflict it'll be.
  */
 export async function installDriftDetected(
   state: GrounderState | null,
@@ -40,7 +48,12 @@ export async function installDriftDetected(
     if (desiredDrift(desiredHashes, ledgerFiles).length > 0) {
       return true;
     }
-    if (agent.tombstones(homeDir).some((p) => p in ledgerFiles)) {
+    const tombstonePaths = new Set(agent.tombstones(homeDir));
+    if ([...tombstonePaths].some((p) => p in ledgerFiles)) {
+      return true;
+    }
+    const desiredPaths = new Set(Object.keys(desiredHashes));
+    if (Object.keys(ledgerFiles).some((p) => !desiredPaths.has(p) && !tombstonePaths.has(p))) {
       return true;
     }
   }

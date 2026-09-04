@@ -1,6 +1,6 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { fileExists } from "../util/fs.js";
+import { fileExists, writeFileAtomic } from "../util/fs.js";
 import { packageVersionRelation } from "../util/semver.js";
 import { resolveHomeDir } from "./home.js";
 import {
@@ -72,6 +72,17 @@ export async function readGrounderState(homeDir?: string): Promise<GrounderState
     );
   }
 
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    // Same "missing grounderVersion" message a non-object payload already
+    // gets further down (`raw.grounderVersion` on a boxed number/string
+    // reads as `undefined`, not a throw) — `null` is the one JSON value
+    // whose property access throws before reaching that check, so it's
+    // guarded here explicitly rather than falling through.
+    throw new Error(
+      `Invalid grounder state at ${filePath}: missing grounderVersion. Fix or remove it, then run: grounder migrate --force`,
+    );
+  }
+
   let ledgerSchema: number;
   if (raw.ledgerSchema === undefined) {
     ledgerSchema = 0;
@@ -121,10 +132,19 @@ export async function readGrounderState(homeDir?: string): Promise<GrounderState
     }
     const e = entry as { files?: unknown; hooksEnabled?: unknown };
     const filesRaw = e.files;
-    const files: Record<string, AgentFileState> =
-      filesRaw && typeof filesRaw === "object" && !Array.isArray(filesRaw)
-        ? (filesRaw as Record<string, AgentFileState>)
-        : {};
+    // Drop, rather than cast through, any file entry whose `hash` isn't a
+    // string — a corrupted or hand-edited `{ hash: 123 }` / `{}` entry would
+    // otherwise persist forever via `withUpdatedAgent`'s `...prev.files`
+    // spread and compare unequal to every real hash anyway.
+    const files: Record<string, AgentFileState> = {};
+    if (filesRaw && typeof filesRaw === "object" && !Array.isArray(filesRaw)) {
+      for (const [entryPath, fileEntry] of Object.entries(filesRaw as Record<string, unknown>)) {
+        const hash = (fileEntry as { hash?: unknown } | null)?.hash;
+        if (typeof hash === "string") {
+          files[entryPath] = { hash };
+        }
+      }
+    }
     const hooksEnabled = typeof e.hooksEnabled === "boolean" ? e.hooksEnabled : undefined;
     agents[id] = { files, ...(hooksEnabled !== undefined ? { hooksEnabled } : {}) };
   }
@@ -134,11 +154,7 @@ export async function readGrounderState(homeDir?: string): Promise<GrounderState
 
 /** Atomic write — tmp file + rename, so a crash mid-write never leaves a truncated ledger. */
 export async function writeGrounderState(state: GrounderState, homeDir?: string): Promise<void> {
-  const filePath = statePath(homeDir);
-  await mkdir(path.dirname(filePath), { recursive: true });
-  const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
-  await writeFile(tmpPath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
-  await rename(tmpPath, filePath);
+  await writeFileAtomic(statePath(homeDir), `${JSON.stringify(state, null, 2)}\n`);
 }
 
 /** Last-recorded content hash for a managed file, or `undefined` if unknown. */

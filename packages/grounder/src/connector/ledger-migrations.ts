@@ -32,10 +32,18 @@ interface RawAgentEntryV0 {
 
 /**
  * Schema 0 → 1: drop `commandsSchema` (no replacement) and fold `hooksSchema` into
- * `hooksEnabled` via `hooksSchema > 0` for any numeric value including `0` (`0` maps to
- * `false`, not "leave unset"); absent `hooksSchema` leaves `hooksEnabled` unset. No
- * `hooksEnabled`-already-present case: `hooksEnabled` didn't exist before schema 1, so a
- * schema-0 file (v0.5.0, the only released shape without `ledgerSchema`) can never carry it.
+ * `hooksEnabled` — a positive `hooksSchema` (hooks were actually installed) maps to
+ * `true`; `hooksSchema: 0`, an absent `hooksSchema`, or a non-numeric value all leave
+ * `hooksEnabled` unset. `0` deliberately does NOT map to `false`: `false` means an
+ * explicit `--no-hooks` opt-out, a flag that didn't exist in v0.5.0, so there's no v0.5.0
+ * ledger state that should ever produce it — mapping `0` to `false` would turn a machine
+ * that simply never installed hooks into a sticky opt-out, silencing `shouldInstallHooks`'s
+ * on-disk-recognizer fallback for it forever. (In practice v0.5.0's writer only ever
+ * persisted `hooksSchema` as the installed schema constant or omitted it entirely, so `0`
+ * likely never hit a real ledger — this is a correctness fix for the mapping, not a
+ * reaction to an observed bad value.) No `hooksEnabled`-already-present case: `hooksEnabled`
+ * didn't exist before schema 1, so a schema-0 file (v0.5.0, the only released shape without
+ * `ledgerSchema`) can never carry it.
  */
 export function upgradeFrom0(raw: Record<string, unknown>): Record<string, unknown> {
   const rawAgents = raw.agents;
@@ -50,7 +58,7 @@ export function upgradeFrom0(raw: Record<string, unknown>): Record<string, unkno
       continue;
     }
     const e = entry as RawAgentEntryV0;
-    const hooksEnabled = typeof e.hooksSchema === "number" ? e.hooksSchema > 0 : undefined;
+    const hooksEnabled = typeof e.hooksSchema === "number" && e.hooksSchema > 0 ? true : undefined;
     agents[id] = {
       files: e.files,
       ...(hooksEnabled !== undefined ? { hooksEnabled } : {}),

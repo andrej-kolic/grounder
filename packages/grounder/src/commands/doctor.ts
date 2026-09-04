@@ -293,13 +293,25 @@ function checkFromInstallPreview(
 interface AgentPlan {
   skillEntries: PlanEntry[];
   legacyEntries: PlanEntry[];
+  /**
+   * Ledger-tracked paths that fell out of the desired set without being
+   * added to {@link AgentAdapter.tombstones} — a skill dropped from the
+   * current release with nobody remembering to tombstone the old path.
+   * `reconcile()` already plans these (they're in `allPaths` via
+   * `ledgerFiles`) and `migrate` already acts on them; before this bucket
+   * existed, `computeAgentPlan`'s two-way split silently dropped their plan
+   * entries on the floor, so doctor could never warn about them ahead of a
+   * `migrate` that deletes or forgets them.
+   */
+  orphanedEntries: PlanEntry[];
 }
 
 /**
- * One reconcile() call per agent covering both desired skill files and
- * tombstoned legacy paths, then split by which side of the diff each path
- * fell on — the same plan `migrate`/`setup` would apply, so doctor can never
- * disagree with what a real run would do.
+ * One reconcile() call per agent covering desired skill files, tombstoned
+ * legacy paths, and any other ledger-recorded path, then split three ways by
+ * which side of the diff each path fell on — the same plan `migrate`/`setup`
+ * would apply, so doctor can never disagree with what a real run would do
+ * (see {@link AgentPlan.orphanedEntries} for why the split isn't just two-way).
  */
 async function computeAgentPlan(
   agent: AgentAdapter,
@@ -326,6 +338,7 @@ async function computeAgentPlan(
   return {
     skillEntries: plan.filter((e) => desiredPaths.has(e.path)),
     legacyEntries: plan.filter((e) => tombstonePaths.has(e.path) && !desiredPaths.has(e.path)),
+    orphanedEntries: plan.filter((e) => !desiredPaths.has(e.path) && !tombstonePaths.has(e.path)),
   };
 }
 
@@ -486,6 +499,52 @@ async function checkLegacyCommands(
 }
 
 /**
+ * Detect ledger-tracked paths dropped from the current desired set without a
+ * matching {@link AgentAdapter.tombstones} entry — the other half of
+ * {@link AgentPlan.orphanedEntries}, reported separately from
+ * {@link checkLegacyCommands}'s tombstone-derived leftovers since the wording
+ * ("superseded by skill") doesn't apply to a plain removed skill file.
+ *
+ * Same reporting rule as `checkLegacyCommands`: both `conflict` (needs
+ * `--force`) and `delete` (a plain `migrate` cleans it up) are reported;
+ * `noop`/`forget` stay silent — nothing left to act on.
+ */
+async function checkOrphanedLedgerFiles(
+  agents: AgentAdapter[],
+  agentPlans: Map<string, AgentPlanResult>,
+): Promise<CheckResult[]> {
+  const checks: CheckResult[] = [];
+  for (const agent of agents) {
+    const result = agentPlans.get(agent.id);
+    if (!result?.ok) {
+      // Already reported by `checkAgentArtifacts`'s "could not verify skill
+      // drift" warning — nothing new to add here.
+      continue;
+    }
+    for (const entry of result.plan.orphanedEntries) {
+      if (entry.action === "conflict") {
+        checks.push(
+          warnCheck(
+            `agent-${agent.id}-orphaned`,
+            `${agent.name}: Grounder-managed file no longer part of the current install, locally modified (needs --force to retire): ${entry.path}`,
+            MIGRATE_FORCE,
+          ),
+        );
+      } else if (entry.action === "delete") {
+        checks.push(
+          warnCheck(
+            `agent-${agent.id}-orphaned`,
+            `${agent.name}: Grounder-managed file no longer part of the current install, safe to clean up: ${entry.path}`,
+            MIGRATE,
+          ),
+        );
+      }
+    }
+  }
+  return checks;
+}
+
+/**
  * Warn-only: session hooks are opt-in. Missing entry never fails doctor.
  * One check per detected agent that declares `expectedHookArtifacts`.
  *
@@ -635,8 +694,9 @@ async function runAgentChecks(
   const agentPlans = await computeAgentPlansSafe(agents, state, homeDir);
   const agentChecks = await checkAgentArtifacts(agentPlans, stateReadable, homeDir);
   const legacyChecks = await checkLegacyCommands(agents, agentPlans);
+  const orphanedChecks = await checkOrphanedLedgerFiles(agents, agentPlans);
   const hookChecks = await checkAgentHooks(state, stateReadable, homeDir);
-  return [...agentChecks, ...legacyChecks, ...hookChecks];
+  return [...agentChecks, ...legacyChecks, ...orphanedChecks, ...hookChecks];
 }
 
 async function runProjectChecks(

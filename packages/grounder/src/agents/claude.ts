@@ -145,6 +145,7 @@ function isClaudeHookEntry(hook: unknown): hook is { type: "command"; command: s
     hook !== null &&
     typeof hook === "object" &&
     !Array.isArray(hook) &&
+    (hook as { type?: unknown }).type === "command" &&
     isGrounderPeekHookCommand((hook as { command?: unknown }).command)
   );
 }
@@ -186,6 +187,26 @@ function removeAllPeekHooks(sessionStart: readonly unknown[]): unknown[] {
     }
     return { ...group, hooks: removeMatchingEntries(group.hooks, isClaudeHookEntry) };
   });
+}
+
+function hasHooks(group: unknown): boolean {
+  return isMatcherGroup(group) && Array.isArray(group.hooks) && group.hooks.length > 0;
+}
+
+/**
+ * Drop matcher groups that removal itself emptied — i.e. `next[i]` has no
+ * hooks left but `before[i]` (same index, pre-removal) did. A group that was
+ * already empty for reasons of its own (not something Grounder touched) is
+ * left alone: it isn't clutter Grounder created room for, so it isn't
+ * Grounder's call to delete it. `next` may be longer than `before` (a newly
+ * appended canonical group) — those extra entries always have hooks, so the
+ * length mismatch never reaches the `before[i]` lookup.
+ */
+function dropGroupsEmptiedByRemoval(
+  before: readonly unknown[],
+  next: readonly unknown[],
+): unknown[] {
+  return next.filter((group, i) => hasHooks(group) || !hasHooks(before[i]));
 }
 
 function readSessionStart(parsed: unknown): unknown[] | null {
@@ -285,20 +306,19 @@ function mergeClaudeHooks(
   } else {
     nextSessionStart = [...cleaned, { matcher: CLAUDE_SESSION_START_MATCHER, hooks: [entry] }];
   }
-  nextSessionStart = nextSessionStart.filter(
-    (group) => !isMatcherGroup(group) || !Array.isArray(group.hooks) || group.hooks.length > 0,
-  );
+  nextSessionStart = dropGroupsEmptiedByRemoval(sessionStart, nextSessionStart);
 
   return { ...current, hooks: { ...hooks, SessionStart: nextSessionStart } };
 }
 
 /**
  * Remove every Grounder hook entry from every matcher group, touching
- * nothing else, and drop any matcher group left with an empty `hooks` array
- * by that removal (an empty group is clutter Grounder itself created room
- * for, not something to leave behind). Returns `current` verbatim when
- * there's no Grounder entry to remove, so `mergeJsonFile` sees no change and
- * leaves an unrelated `settings.json` untouched instead of reformatting it.
+ * nothing else, and drop a matcher group only when this removal is what left
+ * its `hooks` array empty (see {@link dropGroupsEmptiedByRemoval}) — clutter
+ * Grounder itself created room for, not a group that started empty for
+ * reasons of its own. Returns `current` verbatim when there's no Grounder
+ * entry to remove, so `mergeJsonFile` sees no change and leaves an unrelated
+ * `settings.json` untouched instead of reformatting it.
  */
 function removeClaudeHooks(current: Record<string, unknown>): Record<string, unknown> {
   const hooks =
@@ -309,9 +329,7 @@ function removeClaudeHooks(current: Record<string, unknown>): Record<string, unk
   if (findAllPeekHooks(sessionStart).length === 0) {
     return current;
   }
-  const cleaned = removeAllPeekHooks(sessionStart).filter(
-    (group) => !isMatcherGroup(group) || !Array.isArray(group.hooks) || group.hooks.length > 0,
-  );
+  const cleaned = dropGroupsEmptiedByRemoval(sessionStart, removeAllPeekHooks(sessionStart));
   return { ...current, hooks: { ...hooks, SessionStart: cleaned } };
 }
 
