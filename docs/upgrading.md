@@ -1,5 +1,10 @@
 # Upgrading
 
+**Minimum Node.js bumped to 22** (from 18) as of 0.6 — Node 18 and 20 are both past their
+own end-of-life dates, and CI only exercises 22 and 24. `npm`/`pnpm` warn rather than
+hard-fail on an `engines` mismatch by default, so an older Node can still run Grounder in
+practice, but it's unsupported and untested.
+
 Upgrading the npm package does not by itself refresh the skills and shared
 runtime that `grounder setup` installed under your home directory. One command does:
 

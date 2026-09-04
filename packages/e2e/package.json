@@ -8,7 +8,7 @@
     "e2e": "node scripts/run-e2e.mjs"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "license": "MIT"
 }

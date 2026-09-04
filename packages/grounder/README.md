@@ -38,7 +38,7 @@ The daily loop is five skills, typed as `/name` — [examples](#examples) show w
 - **Follows you across machines** — the vault is just a folder, so git (or Syncthing, or Dropbox) is all the sync you need.
 - **Cursor and Claude Code today** — skills for both; more agents on the [roadmap](#roadmap).
 
-**Requirements:** Node.js 18+ and a folder to keep the files in — an existing Obsidian
+**Requirements:** Node.js 22+ and a folder to keep the files in — an existing Obsidian
 vault, or an empty directory Grounder fills over time. Git is optional.
 
 ## Install
