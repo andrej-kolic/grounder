@@ -7,7 +7,7 @@ Session summaries, plans, and notes in files you own.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/what-dark.svg">
-  <img alt="Grounder connects Cursor, Claude Code, and more agents to one markdown vault through slash commands and the CLI. The vault is a folder tree: 10-Projects/your-project/ containing plans (updated across sessions), notes (always a new file), and logs (saved session summaries). Caption: Any agent. One vault. Only when you ask." src="docs/assets/what.svg">
+  <img alt="Grounder connects Cursor, Claude Code, and more agents to one markdown vault through skills and the CLI. The vault is a folder tree: 10-Projects/your-project/ containing plans (updated across sessions), notes (always a new file), and logs (saved session summaries). Caption: Any agent. One vault. Only when you ask." src="docs/assets/what.svg">
 </picture>
 
 <div>&nbsp;</div>

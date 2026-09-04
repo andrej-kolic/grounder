@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="426.6" viewBox="0 0 1024 426.6" role="img" aria-labelledby="what-title what-desc" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" text-rendering="geometricPrecision">
   <title id="what-title">Grounder — Obsidian vault memory for Cursor and Claude Code</title>
-  <desc id="what-desc">Cursor, Claude Code, and more agents on the left are connected by a two-way arrow to the vault on the right, labelled slash commands above and CLI below. The vault is a folder tree: 10-Projects, your-project, and inside it plans (updated across sessions), notes (always a new file), and logs (saved session summaries). Caption: any agent, one vault, only when you ask.</desc>
+  <desc id="what-desc">Cursor, Claude Code, and more agents on the left are connected by a two-way arrow to the vault on the right, labelled skills above and CLI below. The vault is a folder tree: 10-Projects, your-project, and inside it plans (updated across sessions), notes (always a new file), and logs (saved session summaries). Caption: any agent, one vault, only when you ask.</desc>
 
   <defs>
     <radialGradient id="glow" cx="512" cy="213.3" r="558" gradientUnits="userSpaceOnUse">
@@ -51,8 +51,7 @@
   <text class="more" x="199.8" y="279.9" text-anchor="middle">+ more agents</text>
 
   <!-- two-way arrow -->
-  <text class="kicker" x="510.5" y="140.4" text-anchor="middle">SLASH</text>
-  <text class="kicker" x="510.5" y="167.4" text-anchor="middle">COMMANDS</text>
+  <text class="kicker" x="510.5" y="167.4" text-anchor="middle">SKILLS</text>
   <path class="arrow" d="M380 190.8H644"/>
   <path class="arrow" d="M390.6 184.5L378 190.8L390.6 196.8"/>
   <path class="arrow" d="M633.4 184.5L646 190.8L633.4 196.8"/>
