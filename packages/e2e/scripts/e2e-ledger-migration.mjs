@@ -4,7 +4,7 @@
 // the real built CLI binary, so it also catches wiring bugs the in-process tests can't
 // see (flag parsing, GROUNDER_HOME resolution, actual process exit codes).
 //
-// Usage: pnpm build && node scripts/e2e-ledger-migration.mjs
+// Usage: pnpm build && node packages/e2e/scripts/e2e-ledger-migration.mjs
 
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -12,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const cliPath = path.join(repoRoot, "packages/grounder/dist/cli.js");
 
 if (!existsSync(cliPath)) {

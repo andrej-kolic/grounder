@@ -20,6 +20,8 @@ importers:
 
   packages/demo-casts: {}
 
+  packages/e2e: {}
+
   packages/grounder:
     devDependencies:
       '@types/node':
