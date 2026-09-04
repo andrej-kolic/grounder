@@ -367,11 +367,11 @@ async function computeAgentPlansSafe(
 }
 
 async function checkAgentArtifacts(
+  agents: readonly AgentAdapter[],
   agentPlans: Map<string, AgentPlanResult>,
   stateReadable: boolean,
   homeDir?: string,
 ): Promise<CheckResult[]> {
-  const agents = await resolveAgents();
   const checks: CheckResult[] = [];
 
   for (const agent of agents) {
@@ -464,7 +464,7 @@ async function checkAgentArtifacts(
  * nothing left to act on.
  */
 async function checkLegacyCommands(
-  agents: AgentAdapter[],
+  agents: readonly AgentAdapter[],
   agentPlans: Map<string, AgentPlanResult>,
 ): Promise<CheckResult[]> {
   const checks: CheckResult[] = [];
@@ -510,7 +510,7 @@ async function checkLegacyCommands(
  * `noop`/`forget` stay silent — nothing left to act on.
  */
 async function checkOrphanedLedgerFiles(
-  agents: AgentAdapter[],
+  agents: readonly AgentAdapter[],
   agentPlans: Map<string, AgentPlanResult>,
 ): Promise<CheckResult[]> {
   const checks: CheckResult[] = [];
@@ -554,11 +554,11 @@ async function checkOrphanedLedgerFiles(
  * (symlink installs stay current without re-init).
  */
 async function checkAgentHooks(
+  agents: readonly AgentAdapter[],
   state: GrounderState | null,
   stateReadable: boolean,
   homeDir?: string,
 ): Promise<CheckResult[]> {
-  const agents = await resolveAgents();
   const checks: CheckResult[] = [];
   let anyHooksInstalled = false;
 
@@ -685,6 +685,13 @@ async function runMachineChecks(homeDir?: string): Promise<{
   };
 }
 
+/**
+ * Detect installed agents once per doctor run and hand the same list to every
+ * check below. Each `resolveAgents()` call probes the filesystem for every
+ * adapter, and — more to the point — re-detecting per check would let two
+ * sections of one report disagree about which agents exist if the filesystem
+ * changed mid-run.
+ */
 async function runAgentChecks(
   state: GrounderState | null,
   stateReadable: boolean,
@@ -692,10 +699,10 @@ async function runAgentChecks(
 ): Promise<CheckResult[]> {
   const agents = await resolveAgents();
   const agentPlans = await computeAgentPlansSafe(agents, state, homeDir);
-  const agentChecks = await checkAgentArtifacts(agentPlans, stateReadable, homeDir);
+  const agentChecks = await checkAgentArtifacts(agents, agentPlans, stateReadable, homeDir);
   const legacyChecks = await checkLegacyCommands(agents, agentPlans);
   const orphanedChecks = await checkOrphanedLedgerFiles(agents, agentPlans);
-  const hookChecks = await checkAgentHooks(state, stateReadable, homeDir);
+  const hookChecks = await checkAgentHooks(agents, state, stateReadable, homeDir);
   return [...agentChecks, ...legacyChecks, ...orphanedChecks, ...hookChecks];
 }
 
