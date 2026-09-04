@@ -22,6 +22,7 @@ absolute URLs for images and links, since relative paths break outside the tarba
 connector/          # repo ↔ vault wiring (config stores + resolution)
   home.ts             # ~/.grounder/config.json
   state.ts            # ~/.grounder/state.json install ledger (schemas + file hashes)
+  ledger-migrations.ts # ledgerSchema upgrade table + walker (state.json shape only)
   unsupported-schema.ts # forward-compat hard stop (newer on-disk schema)
   repo.ts             # .grounder.json marker, findLinkedRepoRoot
   linked.ts           # resolveLinkedProject (home + marker Result)

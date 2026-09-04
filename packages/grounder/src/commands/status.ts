@@ -111,8 +111,12 @@ async function writeInstallStateLine(homeDir?: string): Promise<void> {
     } else {
       process.stdout.write(statusLine("Install:", "current"));
     }
-  } catch {
-    process.stdout.write(statusLine("State:", `invalid → ${MIGRATE_FORCE}`));
+  } catch (error: unknown) {
+    process.stdout.write(
+      isUnsupportedSchemaError(error)
+        ? statusLine("State:", `unsupported → ${UPGRADE_GROUNDER}`)
+        : statusLine("State:", `invalid → ${MIGRATE_FORCE}`),
+    );
   }
 }
 

@@ -6,6 +6,8 @@ import {
   forgetLedgerFile,
   LEDGER_SCHEMA,
   ledgerFilesFor,
+  ledgerVersionChanged,
+  MIN_SUPPORTED_LEDGER_SCHEMA,
   readGrounderState,
   recordedFileHash,
   recordedHooksEnabled,
@@ -74,7 +76,7 @@ describe("connector/state", () => {
       statePath(env.home),
       `${JSON.stringify(
         {
-          grounderVersion: "0.6.0-dev.1",
+          grounderVersion: "0.5.0",
           agents: {
             cursor: {
               commandsSchema: 4,
@@ -95,35 +97,13 @@ describe("connector/state", () => {
 
     const state = await readGrounderState(env.home);
     expect(state).toEqual({
-      ledgerSchema: 0,
-      grounderVersion: "0.6.0-dev.1",
+      ledgerSchema: LEDGER_SCHEMA,
+      grounderVersion: "0.5.0",
       agents: {
         cursor: { files: { "/a/SKILL.md": { hash: "sha256:aaa" } }, hooksEnabled: true },
         claude: { files: {} },
       },
     });
-  });
-
-  it("prefers hooksEnabled over legacy hooksSchema when both are present", async () => {
-    const env = await createTempEnv({ initGit: false });
-    cleanup = env.cleanup;
-
-    const { mkdir } = await import("node:fs/promises");
-    await mkdir(path.dirname(statePath(env.home)), { recursive: true });
-    await writeFile(
-      statePath(env.home),
-      `${JSON.stringify(
-        {
-          grounderVersion: "0.6.0-dev.1",
-          agents: { cursor: { hooksSchema: 1, hooksEnabled: false, files: {} } },
-        },
-        null,
-        2,
-      )}\n`,
-      "utf8",
-    );
-
-    expect(recordedHooksEnabled(await readGrounderState(env.home), "cursor")).toBe(false);
   });
 
   it("setLedgerFileHash merges without clobbering siblings, and is a no-op when unchanged", async () => {
@@ -298,6 +278,77 @@ describe("connector/state", () => {
 
       // No state at all → nothing to protect against.
       expect(() => assertVersionSupportsWrite("0.5.0", null)).not.toThrow();
+    });
+  });
+
+  describe("ledgerSchema gate", () => {
+    it("throws UnsupportedSchemaError when ledgerSchema is newer than this binary", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const { mkdir } = await import("node:fs/promises");
+      await mkdir(path.dirname(statePath(env.home)), { recursive: true });
+      await writeFile(
+        statePath(env.home),
+        `${JSON.stringify(
+          { ledgerSchema: LEDGER_SCHEMA + 1, grounderVersion: "9.9.9", agents: {} },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
+
+      await expect(readGrounderState(env.home)).rejects.toThrow(UnsupportedSchemaError);
+    });
+
+    it("throws a plain invalid-state error when ledgerSchema is older than supported", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const { mkdir } = await import("node:fs/promises");
+      await mkdir(path.dirname(statePath(env.home)), { recursive: true });
+      await writeFile(
+        statePath(env.home),
+        `${JSON.stringify(
+          { ledgerSchema: MIN_SUPPORTED_LEDGER_SCHEMA - 1, grounderVersion: "0.6.0", agents: {} },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
+
+      const error = await readGrounderState(env.home).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(Error);
+      expect(error).not.toBeInstanceOf(UnsupportedSchemaError);
+      expect((error as Error).message).toMatch(/older than this grounder supports/);
+    });
+
+    it("rejects a non-integer ledgerSchema instead of silently defaulting to 0", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const { mkdir } = await import("node:fs/promises");
+      await mkdir(path.dirname(statePath(env.home)), { recursive: true });
+      await writeFile(
+        statePath(env.home),
+        `${JSON.stringify(
+          { ledgerSchema: "not-a-number", grounderVersion: "0.6.0", agents: {} },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
+
+      await expect(readGrounderState(env.home)).rejects.toThrow(/ledgerSchema must be an integer/);
+    });
+  });
+
+  describe("ledgerVersionChanged", () => {
+    it("compares only grounderVersion", () => {
+      const current = { ledgerSchema: LEDGER_SCHEMA, grounderVersion: "0.6.0", agents: {} };
+      expect(ledgerVersionChanged(current, "0.6.0")).toBe(false);
+      expect(ledgerVersionChanged(current, "0.6.1")).toBe(true);
+      expect(ledgerVersionChanged(null, "0.6.0")).toBe(true);
     });
   });
 });

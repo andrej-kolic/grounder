@@ -308,6 +308,133 @@ describe("commands/setup", () => {
     }
   });
 
+  it("dry-run reports upgrade grounder when the ledger's own schema is newer than this binary", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await mkdir(path.dirname(statePath(env.home)), { recursive: true });
+    await writeFile(
+      statePath(env.home),
+      `${JSON.stringify(
+        { ledgerSchema: LEDGER_SCHEMA + 1, grounderVersion: "9.9.9", agents: {} },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const stderrChunks: string[] = [];
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderrChunks.push(String(chunk));
+      return true;
+    });
+
+    try {
+      const { code } = await captureStdout(() =>
+        runSetupWithOptions({
+          vaultPath: env.vault,
+          dryRun: true,
+          homeDir: env.home,
+          agents: ["cursor"],
+        }),
+      );
+
+      expect(code).toBe(1);
+      expect(stderrChunks.join("")).toContain("Upgrade grounder");
+    } finally {
+      stderrSpy.mockRestore();
+    }
+  });
+
+  it("reports upgrade grounder (not the generic partial-success message) on a real run", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await mkdir(path.dirname(statePath(env.home)), { recursive: true });
+    await writeFile(
+      statePath(env.home),
+      `${JSON.stringify(
+        { ledgerSchema: LEDGER_SCHEMA + 1, grounderVersion: "9.9.9", agents: {} },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const stderrChunks: string[] = [];
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderrChunks.push(String(chunk));
+      return true;
+    });
+
+    try {
+      const { code } = await captureStdout(() =>
+        runSetupWithOptions({
+          vaultPath: env.vault,
+          yes: true,
+          homeDir: env.home,
+          agents: ["cursor"],
+        }),
+      );
+
+      expect(code).toBe(1);
+      const stderrOut = stderrChunks.join("");
+      expect(stderrOut).toContain("Upgrade grounder");
+      expect(stderrOut).not.toContain("agent skill files/hooks were not installed");
+    } finally {
+      stderrSpy.mockRestore();
+    }
+  });
+
+  it("rewrites a real v0.5.0 ledger to the current schema, dropping legacy keys", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
+    // A real v0.5.0 ledger: commandsSchema/hooksSchema, no ledgerSchema field at all.
+    await writeFile(
+      statePath(env.home),
+      `${JSON.stringify(
+        {
+          grounderVersion: "0.5.0",
+          agents: {
+            cursor: {
+              commandsSchema: 4,
+              hooksSchema: 1,
+              files: state.agents.cursor?.files ?? {},
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+
+    const onDisk = JSON.parse(await readFile(statePath(env.home), "utf8"));
+    expect(onDisk.ledgerSchema).toBe(LEDGER_SCHEMA);
+    expect(onDisk.grounderVersion).not.toBe("0.5.0");
+    expect(onDisk.agents.cursor.commandsSchema).toBeUndefined();
+    expect(onDisk.agents.cursor.hooksSchema).toBeUndefined();
+    expect(onDisk.agents.cursor.hooksEnabled).toBe(true);
+  });
+
   it("returns error before prompting when vault already configured to a different path", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;

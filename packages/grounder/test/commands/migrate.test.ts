@@ -7,6 +7,7 @@ import { runtimeCliPath } from "../../src/agents/hook-runtime.js";
 import { runMigrate, runMigrateWithOptions } from "../../src/commands/migrate.js";
 import { runSetupWithOptions } from "../../src/commands/setup.js";
 import {
+  LEDGER_SCHEMA,
   readGrounderState,
   setLedgerFileHash,
   statePath,
@@ -124,6 +125,52 @@ describe("commands/migrate", () => {
     const after = await readGrounderState(env.home);
     expect(after?.grounderVersion).not.toBe("0.0.1");
     expect(after?.agents.cursor?.files).toEqual(state.agents.cursor?.files);
+  });
+
+  it("rewrites a real v0.5.0 ledger to the current schema, dropping legacy keys", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
+    // A real v0.5.0 ledger: commandsSchema/hooksSchema, no ledgerSchema field at all.
+    // Same file hashes as what's actually on disk, so the only pending change is
+    // the ledger's own shape catching up, not a per-file reconcile.
+    await writeFile(
+      statePath(env.home),
+      `${JSON.stringify(
+        {
+          grounderVersion: "0.5.0",
+          agents: {
+            cursor: {
+              commandsSchema: 4,
+              hooksSchema: 1,
+              files: state.agents.cursor?.files ?? {},
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    await runMigrateWithOptions({ homeDir: env.home });
+
+    const onDisk = JSON.parse(await readFile(statePath(env.home), "utf8"));
+    expect(onDisk.ledgerSchema).toBe(LEDGER_SCHEMA);
+    expect(onDisk.grounderVersion).not.toBe("0.5.0");
+    expect(onDisk.agents.cursor.commandsSchema).toBeUndefined();
+    expect(onDisk.agents.cursor.hooksSchema).toBeUndefined();
+    expect(onDisk.agents.cursor.hooksEnabled).toBe(true);
   });
 
   it("dry-run reports state.json as unchanged when the only pending row is a conflict", async () => {
@@ -514,6 +561,39 @@ describe("commands/migrate", () => {
 
     // Refused before any write — the ledger's recorded version is untouched.
     expect((await readGrounderState(env.home))?.grounderVersion).toBe("999.0.0");
+  });
+
+  it("hard-stops (read path) when the ledger's own schema is newer than this binary understands", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    const before = await readGrounderState(env.home);
+    if (!before) {
+      throw new Error("expected install state after setup");
+    }
+    await writeGrounderState({ ...before, ledgerSchema: LEDGER_SCHEMA + 1 }, env.home);
+
+    const chunks: string[] = [];
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      chunks.push(String(chunk));
+      return true;
+    });
+    try {
+      // Exercises the real entry point, not just the inner read — a
+      // too-new ledger used to throw unhandled through
+      // `resolveMigrateAgents`, bypassing this exact catch.
+      const { code } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+      expect(code).toBe(1);
+      expect(chunks.join("")).toContain("Upgrade grounder");
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("refuses to migrate when install state JSON is corrupt", async () => {

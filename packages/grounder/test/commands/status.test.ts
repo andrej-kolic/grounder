@@ -197,6 +197,31 @@ describe("commands/status", () => {
     expect(out).toContain("  Install:    outdated → grounder migrate");
   });
 
+  it("reports unsupported ledger schema without suggesting migrate --force", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
+    await writeGrounderState({ ...state, ledgerSchema: LEDGER_SCHEMA + 1 }, env.home);
+
+    const { code, out } = await captureStdout(() =>
+      runStatusWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("  State:      unsupported → upgrade grounder");
+    expect(out).not.toContain("grounder migrate --force");
+  });
+
   it("reports missing vault when neither vault nor project is configured", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;

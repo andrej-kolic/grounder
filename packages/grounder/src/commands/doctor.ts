@@ -192,6 +192,16 @@ async function loadInstallState(homeDir?: string): Promise<{
     };
   } catch (error: unknown) {
     const detail = error instanceof Error ? error.message : String(error);
+    // Stays `failCheck` either way: `runMachineChecks` derives `stateReadable`
+    // from `level !== "fail"`, and that flag is what stops
+    // `checkAgentArtifacts`/`checkAgentHooks` from inventing drift against a
+    // `null` state.
+    if (isUnsupportedSchemaError(error)) {
+      return {
+        state: null,
+        check: failCheck("install-state", `install state unsupported: ${detail}`, UPGRADE_GROUNDER),
+      };
+    }
     return {
       state: null,
       check: failCheck(

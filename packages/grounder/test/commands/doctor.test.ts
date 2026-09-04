@@ -12,7 +12,12 @@ import { runDoctorWithOptions } from "../../src/commands/doctor.js";
 import { runLinkWithOptions } from "../../src/commands/link.js";
 import { runSetupWithOptions } from "../../src/commands/setup.js";
 import { writeRepoConfig } from "../../src/connector/repo.js";
-import { readGrounderState, statePath, writeGrounderState } from "../../src/connector/state.js";
+import {
+  LEDGER_SCHEMA,
+  readGrounderState,
+  statePath,
+  writeGrounderState,
+} from "../../src/connector/state.js";
 import { VERSION } from "../../src/index.js";
 import { hashContent } from "../../src/util/hash.js";
 import { captureStdout, createTempEnv } from "../helpers.js";
@@ -676,6 +681,35 @@ describe("commands/doctor", () => {
     // Presence still ok — do not invent a migrate/drift warn on corrupt ledger.
     expect(out).toContain("ok    agent-cursor");
     expect(out).toContain("skill files present");
+    expect(out).not.toContain("locally modified");
+    expect(out).not.toContain("would update on next migrate");
+  });
+
+  it("fails (as a failCheck, not a warn) when the ledger's own schema is newer than this binary", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
+    await writeGrounderState({ ...state, ledgerSchema: LEDGER_SCHEMA + 1 }, env.home);
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(1);
+    expect(out).toContain("fail  install-state");
+    expect(out).toContain("→ upgrade grounder");
+    // stateReadable must flip to false — no invented drift against a null state.
     expect(out).not.toContain("locally modified");
     expect(out).not.toContain("would update on next migrate");
   });

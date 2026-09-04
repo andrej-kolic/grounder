@@ -1,6 +1,11 @@
 import { type AgentAdapter, ALL_AGENTS, resolveAgents } from "../agents/index.js";
 import { readHomeConfig, withHomeDir } from "../connector/home.js";
-import { readGrounderState, statePath } from "../connector/state.js";
+import {
+  type GrounderState,
+  ledgerVersionChanged,
+  readGrounderState,
+  statePath,
+} from "../connector/state.js";
 import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
 import { helpExitCode } from "../help.js";
 import { VERSION } from "../index.js";
@@ -34,16 +39,20 @@ export interface MigrateOptions {
  * Ledger keys from a newer Grounder (agents this binary does not know) are
  * skipped with a stderr warning — same forward-compat idea as the version
  * hard stop, but migrate can still refresh the agents it understands.
+ *
+ * Takes the already-read `state` rather than reading it itself — the caller
+ * has already read it once (and needs it again for the too-new guard and the
+ * trailing state row), so this stays pure lookup logic instead of a second
+ * read of the same file.
  */
 export async function resolveMigrateAgents(
   explicitIds: string[] | undefined,
-  homeDir?: string,
+  state: GrounderState | null,
 ): Promise<AgentAdapter[]> {
   if (explicitIds && explicitIds.length > 0) {
     return resolveAgents(explicitIds);
   }
 
-  const state = await readGrounderState(homeDir);
   const recordedIds = state ? Object.keys(state.agents) : [];
   if (recordedIds.length === 0) {
     return resolveAgents();
@@ -96,11 +105,14 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
       return 1;
     }
 
-    const agents = await resolveMigrateAgents(options.agents, homeDir);
-
-    let state: Awaited<ReturnType<typeof readGrounderState>>;
+    // Read once, up front, inside this guard — `resolveMigrateAgents` used to
+    // trigger a second, unguarded read (migrate.ts:46 pre-refactor) that a
+    // too-new ledger threw through before this catch was ever reached.
+    let state: GrounderState | null;
+    let agents: AgentAdapter[];
     try {
       state = await readGrounderState(homeDir);
+      agents = await resolveMigrateAgents(options.agents, state);
     } catch (error: unknown) {
       if (isUnsupportedSchemaError(error)) {
         process.stderr.write(`${error.message}\n`);
@@ -149,13 +161,13 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
 
     const rows = rowsFromApplyResult(applyResult);
 
-    // `ledgerChanged` is computed once, by the same code, whether or not this
-    // is `--dry-run` — `applyAgentInstalls` decides "would this write change
-    // the ledger" from the reconciled plan itself, and only actually writes
-    // when it's real. So there's no separate prediction to keep in sync here:
-    // real and dry-run report the exact same thing for the exact same reason.
+    // Computed once, by the same code, whether or not this is `--dry-run` —
+    // `applyAgentInstalls` decides "would this write change the ledger" from
+    // the reconciled plan itself, and only actually writes when it's real. So
+    // there's no separate prediction to keep in sync here: real and dry-run
+    // report the exact same thing for the exact same reason.
     const ledgerChanged =
-      applyResult.agents.some((a) => a.ledgerChanged) || VERSION !== state?.grounderVersion;
+      applyResult.agents.some((a) => a.ledgerChanged) || ledgerVersionChanged(state, VERSION);
     rows.push(stateRow(ledgerChanged, state, statePath(homeDir)));
 
     renderTable(rows);

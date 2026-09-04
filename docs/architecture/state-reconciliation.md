@@ -156,9 +156,38 @@ where the old per-agent int would have let it through). That's the right trade f
 guard: false positives cost a "upgrade grounder" message, false negatives risked silent
 content regressions.
 
-`ledgerSchema` (a separate int on `state.json` itself) is unrelated to this — it exists
-purely for forward-compat of the ledger's own JSON *shape*, should that ever need to change
-independently of install content.
+`ledgerSchema` (a separate int on `state.json` itself) is unrelated to this — it versions the
+ledger's own JSON *shape*, independently of install content. `connector/ledger-migrations.ts`
+owns a table of `upgradeFromN` steps (currently just `upgradeFrom0`, converting v0.5.0's real
+shape — `commandsSchema`/`hooksSchema`, no `ledgerSchema` field — into today's
+`hooksEnabled`/`ledgerSchema: 1`); `state.ts`'s `readGrounderState` walks that table in memory
+on every read, immediately after `JSON.parse` and ahead of the `grounderVersion`/`agents`
+validation, so a v0.5.0 file is transparently upgraded before the rest of the read path ever
+sees it. A `ledgerSchema` *newer* than this binary understands is a hard stop
+(`UnsupportedSchemaError`, same family as `.grounder.json`'s version guard) — the bytes are
+genuinely unparseable by an older binary, not just unsafe to overwrite.
+
+That distinction is why this hard stop applies on **reads**, unlike the `grounderVersion`
+"behind" guard above, which is write-only: `ledgerSchema` too-new is a *parse-capability*
+stop (an older binary cannot interpret the shape at all, so it has to refuse both reads and
+writes), while `grounderVersion` "behind" is a *content-safety* stop (the bytes are perfectly
+readable — only overwriting them with an older render is unsafe, so it only needs to guard
+writes). They coexist without conflict, but the difference is easy to miss, since it looks at
+first glance like this reverses the "Scope: the write path only" decision above.
+
+The user-visible consequence is graceful degradation, not a lockout: against a future
+schema-2 ledger, an older binary's `doctor` still runs every non-ledger check and only fails
+the `install-state` check; `status` prints one `State: unsupported → upgrade grounder` line;
+`handoff peek` stays silent (it already swallows every `readGrounderState` error); only
+`migrate` and `setup` — the commands whose job is to write the ledger — refuse outright.
+
+Upgrades never touch disk on their own: a read that upgrades an old shape only changes the
+in-memory `GrounderState`, and `status`/`doctor`/`handoff peek` must never write `state.json`
+as a side effect of reading it. A real, non-dry-run `setup`/`migrate` persists the upgraded
+shape as a side effect of `touchGrounderVersion` (which always writes with `ledgerSchema:
+LEDGER_SCHEMA`) firing whenever `grounderVersion` changed — true for every real released
+upgrade (v0.5.0 → v0.6.0's version string always differs), so this needs no schema-specific
+write condition of its own.
 
 ## Session hooks: a fragment reconciler
 
@@ -221,6 +250,7 @@ is — a future shape change to either needs its own mechanism, not an extension
 | Plan execution (file writes + incremental ledger writes) | `src/reconcile/apply.ts` |
 | On-disk hashing helper | `src/reconcile/disk.ts` |
 | Ledger read/write, tri-state `hooksEnabled`, version hard stop | `src/connector/state.ts` |
+| `ledgerSchema` upgrade table + walker | `src/connector/ledger-migrations.ts` |
 | Adapter contract (`desiredArtifacts`, `tombstones`, `expectedArtifacts`) | `src/agents/types.ts` |
 | Adapter implementations | `src/agents/cursor.ts`, `src/agents/claude.ts` |
 | Orchestration (runtime + per-agent plan/apply + hooks) shared by `setup`/`migrate` | `src/commands/apply.ts` |

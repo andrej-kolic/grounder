@@ -3,10 +3,14 @@ import path from "node:path";
 import { fileExists } from "../util/fs.js";
 import { packageVersionRelation } from "../util/semver.js";
 import { resolveHomeDir } from "./home.js";
+import {
+  applyLedgerUpgrades,
+  LEDGER_SCHEMA,
+  MIN_SUPPORTED_LEDGER_SCHEMA,
+} from "./ledger-migrations.js";
 import { UnsupportedSchemaError } from "./unsupported-schema.js";
 
-/** Bumped only when `state.json`'s own on-disk shape changes (not install content). */
-export const LEDGER_SCHEMA = 1;
+export { LEDGER_SCHEMA, MIN_SUPPORTED_LEDGER_SCHEMA } from "./ledger-migrations.js";
 
 /** Per-file install record for chezmoi-style drift detection on managed markdown. */
 export interface AgentFileState {
@@ -38,21 +42,19 @@ export function statePath(homeDir?: string): string {
   return path.join(resolveHomeDir(homeDir), ".grounder", "state.json");
 }
 
-/** Raw on-disk shape before/after the reconciler rewrite — old keys tolerated, never written. */
-interface RawAgentEntry {
-  files?: unknown;
-  hooksEnabled?: unknown;
-  /** Legacy: fallback for `hooksEnabled` only when `hooksEnabled` itself is absent. */
-  hooksSchema?: unknown;
-  /** Legacy: ignored entirely — no replacement content-schema int (see version hard stop). */
-  commandsSchema?: unknown;
-}
-
 /**
  * Read `~/.grounder/state.json`. Missing file → `null` (legacy / pre-ledger
- * install). Tolerates the pre-rewrite on-disk shape (`commandsSchema`,
- * `hooksSchema`, no `ledgerSchema`) so the first run after upgrading does not
- * crash on a machine's real, old-shape ledger.
+ * install). A `ledgerSchema` older than current (only v0.5.0's real shape —
+ * `commandsSchema`/`hooksSchema`, no `ledgerSchema` field — has ever existed
+ * on disk) is upgraded to the current shape in memory only; disk is untouched
+ * until a real ledger write (`setup`/`migrate`/`setLedgerFileHash`/etc).
+ * `status`, `doctor`, and `handoff peek` must never write `state.json` as a
+ * side effect of reading it.
+ *
+ * The gate runs immediately after `JSON.parse`, ahead of the
+ * `grounderVersion`/`agents` validation below: a schema-2 file that
+ * restructures `agents` must report "upgrade grounder", not "missing
+ * agents — fix or remove it".
  */
 export async function readGrounderState(homeDir?: string): Promise<GrounderState | null> {
   const filePath = statePath(homeDir);
@@ -60,53 +62,74 @@ export async function readGrounderState(homeDir?: string): Promise<GrounderState
     return null;
   }
 
-  let raw: Partial<GrounderState> & { agents?: Record<string, RawAgentEntry> };
+  let raw: Record<string, unknown>;
   try {
-    raw = JSON.parse(await readFile(filePath, "utf8")) as typeof raw;
+    raw = JSON.parse(await readFile(filePath, "utf8")) as Record<string, unknown>;
   } catch (error: unknown) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(
       `Invalid grounder state at ${filePath}: ${detail}. Fix or remove it, then run: grounder migrate --force`,
     );
   }
-  if (typeof raw.grounderVersion !== "string" || raw.grounderVersion.length === 0) {
+
+  let ledgerSchema: number;
+  if (raw.ledgerSchema === undefined) {
+    ledgerSchema = 0;
+  } else if (typeof raw.ledgerSchema === "number" && Number.isInteger(raw.ledgerSchema)) {
+    ledgerSchema = raw.ledgerSchema;
+  } else {
+    // Deliberate tightening, not preserved behavior: previously a non-number
+    // silently became `0`.
+    throw new Error(
+      `Invalid grounder state at ${filePath}: ledgerSchema must be an integer. Fix or remove it, then run: grounder migrate --force`,
+    );
+  }
+
+  if (ledgerSchema > LEDGER_SCHEMA) {
+    throw new UnsupportedSchemaError(
+      `${filePath} requires ledger schema ${ledgerSchema}; this grounder supports ${LEDGER_SCHEMA}. Upgrade grounder.`,
+    );
+  }
+  if (ledgerSchema < MIN_SUPPORTED_LEDGER_SCHEMA) {
+    throw new Error(
+      `Invalid grounder state at ${filePath}: ledger schema ${ledgerSchema} is older than this grounder supports (minimum ${MIN_SUPPORTED_LEDGER_SCHEMA}). Fix or remove it, then run: grounder migrate --force`,
+    );
+  }
+
+  const upgraded = applyLedgerUpgrades(raw, ledgerSchema);
+
+  if (typeof upgraded.grounderVersion !== "string" || upgraded.grounderVersion.length === 0) {
     throw new Error(
       `Invalid grounder state at ${filePath}: missing grounderVersion. Fix or remove it, then run: grounder migrate --force`,
     );
   }
-  if (raw.agents === null || typeof raw.agents !== "object" || Array.isArray(raw.agents)) {
+  if (
+    upgraded.agents === null ||
+    typeof upgraded.agents !== "object" ||
+    Array.isArray(upgraded.agents)
+  ) {
     throw new Error(`Invalid grounder state at ${filePath}: missing agents`);
   }
 
+  // Explicit field-by-field construction (not a spread of `upgraded`'s agent
+  // entries) so an upgraded-but-unknown key can never round-trip back to disk
+  // through `withUpdatedAgent`'s `...existing.agents` spread.
   const agents: Record<string, AgentLedgerEntry> = {};
-  for (const [id, entry] of Object.entries(raw.agents)) {
+  for (const [id, entry] of Object.entries(upgraded.agents as Record<string, unknown>)) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
       throw new Error(`Invalid grounder state at ${filePath}: bad agent entry "${id}"`);
     }
-    const filesRaw = entry.files;
+    const e = entry as { files?: unknown; hooksEnabled?: unknown };
+    const filesRaw = e.files;
     const files: Record<string, AgentFileState> =
       filesRaw && typeof filesRaw === "object" && !Array.isArray(filesRaw)
         ? (filesRaw as Record<string, AgentFileState>)
         : {};
-
-    let hooksEnabled: boolean | undefined;
-    if (typeof entry.hooksEnabled === "boolean") {
-      hooksEnabled = entry.hooksEnabled;
-    } else if (typeof entry.hooksSchema === "number") {
-      hooksEnabled = entry.hooksSchema > 0;
-    }
-
-    agents[id] = {
-      files,
-      ...(hooksEnabled !== undefined ? { hooksEnabled } : {}),
-    };
+    const hooksEnabled = typeof e.hooksEnabled === "boolean" ? e.hooksEnabled : undefined;
+    agents[id] = { files, ...(hooksEnabled !== undefined ? { hooksEnabled } : {}) };
   }
 
-  return {
-    ledgerSchema: typeof raw.ledgerSchema === "number" ? raw.ledgerSchema : 0,
-    grounderVersion: raw.grounderVersion,
-    agents,
-  };
+  return { ledgerSchema: LEDGER_SCHEMA, grounderVersion: upgraded.grounderVersion, agents };
 }
 
 /** Atomic write — tmp file + rename, so a crash mid-write never leaves a truncated ledger. */
@@ -234,6 +257,18 @@ export async function setHooksEnabled(opts: {
 }
 
 /**
+ * Shared by `touchGrounderVersion`'s own no-op guard and `migrate`/`setup`'s
+ * reported "did the ledger change" row, so the two can't independently drift
+ * on the same comparison.
+ */
+export function ledgerVersionChanged(
+  existing: GrounderState | null,
+  grounderVersion: string,
+): boolean {
+  return existing?.grounderVersion !== grounderVersion;
+}
+
+/**
  * Stamp `grounderVersion` unconditionally — the hook for an all-noop plan
  * (nothing else in a per-artifact write loop touches it when every entry was
  * `noop`), so the upgrade banner still clears on a fully-current machine.
@@ -243,7 +278,7 @@ export async function touchGrounderVersion(
   homeDir?: string,
 ): Promise<void> {
   const existing = await readGrounderState(homeDir);
-  if (existing?.grounderVersion === grounderVersion) {
+  if (!ledgerVersionChanged(existing, grounderVersion)) {
     return;
   }
   await writeGrounderState(

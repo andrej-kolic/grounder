@@ -9,7 +9,13 @@ import {
   withHomeDir,
   writeHomeConfig,
 } from "../connector/home.js";
-import { readGrounderState, statePath } from "../connector/state.js";
+import {
+  type GrounderState,
+  ledgerVersionChanged,
+  readGrounderState,
+  statePath,
+} from "../connector/state.js";
+import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
 import { helpExitCode } from "../help.js";
 import { VERSION } from "../index.js";
 import { flagBool, flagStrings, parseArgs } from "../util/parse-args.js";
@@ -150,7 +156,7 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
     process.stdout.write("\n");
 
     if (dryRun) {
-      let priorState: Awaited<ReturnType<typeof readGrounderState>>;
+      let priorState: GrounderState | null;
       let applyResult: Awaited<ReturnType<typeof applyAgentInstalls>>;
       try {
         priorState = await readGrounderState(homeDir);
@@ -163,6 +169,10 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
           grounderVersion: VERSION,
         });
       } catch (error: unknown) {
+        if (isUnsupportedSchemaError(error)) {
+          process.stderr.write(`${error.message}\n`);
+          return 1;
+        }
         const detail = error instanceof Error ? error.message : String(error);
         process.stderr.write(`Dry run failed: agent install would not succeed:\n  ${detail}\n`);
         return 1;
@@ -199,7 +209,7 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
     process.stdout.write("✓ Wrote home config\n");
     process.stdout.write(`✓ Vault scaffold: ${projectsDir}\n`);
 
-    let priorState: Awaited<ReturnType<typeof readGrounderState>>;
+    let priorState: GrounderState | null;
     let applyResult: Awaited<ReturnType<typeof applyAgentInstalls>>;
     try {
       priorState = await readGrounderState(homeDir);
@@ -211,6 +221,10 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
         grounderVersion: VERSION,
       });
     } catch (error: unknown) {
+      if (isUnsupportedSchemaError(error)) {
+        process.stderr.write(`${error.message}\n`);
+        return 1;
+      }
       const detail = error instanceof Error ? error.message : String(error);
       process.stderr.write(
         `\nHome config and vault scaffold were written, but agent skill files/hooks were not installed:\n  ${detail}\n`,
@@ -237,14 +251,14 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
  */
 function reportAgentInstalls(
   applyResult: Awaited<ReturnType<typeof applyAgentInstalls>>,
-  priorState: Awaited<ReturnType<typeof readGrounderState>>,
+  priorState: GrounderState | null,
   homeDir: string | undefined,
   dryRun: boolean,
   forceCommand: string,
 ): void {
   const rows = rowsFromApplyResult(applyResult);
   const ledgerChanged =
-    applyResult.agents.some((a) => a.ledgerChanged) || VERSION !== priorState?.grounderVersion;
+    applyResult.agents.some((a) => a.ledgerChanged) || ledgerVersionChanged(priorState, VERSION);
   rows.push(stateRow(ledgerChanged, priorState, statePath(homeDir)));
 
   process.stdout.write("\n");
