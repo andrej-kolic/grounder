@@ -143,8 +143,10 @@ dev loop) both proceed; reconcile already handles content correctness via hashes
 of the version string.
 
 **Scope: the write path only.** `applyAgentInstalls()` (`commands/apply.ts`) calls this
-before any real (non-`--dry-run`) write. `doctor`, `status`, and `handoff peek` never call
-it — they keep today's warning (`package-version-notice.ts`'s `"behind"` branch) and stay
+unconditionally, including on `--dry-run` — a dry-run preview must refuse exactly like a real
+run would, so the two never disagree about whether this binary can write at all. `doctor`,
+`status`, and `handoff peek` never call it — they keep today's warning
+(`package-version-notice.ts`'s `"behind"` branch) and stay
 fully functional against a newer ledger. A read-path hard stop would turn "a global 0.7.0
 migrated this machine, then `npx grounder@0.6.0 doctor` runs" into a refusal to diagnose
 anything, when the only property being protected — an older binary overwriting newer files —
