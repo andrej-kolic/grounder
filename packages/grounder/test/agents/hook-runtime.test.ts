@@ -144,6 +144,17 @@ describe("agents/hook-runtime", () => {
       ].join("\n");
       expect(findRuntimeNodePathsInText(text)).toEqual(["/opt/node"]);
     });
+
+    it("handles a path with an embedded quote without matching its own escape sequence", () => {
+      // shellQuote renders an embedded `'` as the four characters `'\''`, so a
+      // scan that visits every quote character starts three extra parses
+      // *inside* one invocation. Each must fail rather than yield a second,
+      // bogus path.
+      const nodePath = "/opt/no'de";
+      const text = `Run \`${shellQuote(nodePath)} ${shellQuote("/home/me/.grounder/runtime/dist/cli.js")} handoff peek\` first.`;
+      expect(text).toContain(`'\\''`);
+      expect(findRuntimeNodePathsInText(text)).toEqual([nodePath]);
+    });
   });
 
   describe("peekHookCommand", () => {

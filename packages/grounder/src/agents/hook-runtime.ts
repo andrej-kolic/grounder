@@ -140,6 +140,37 @@ function isAbsolutePath(p: string): boolean {
 }
 
 /**
+ * Match a home-runtime invocation (`'<abs node>' '<abs …/runtime/dist/cli.js>'`)
+ * starting at `start`, returning its baked Node interpreter path.
+ *
+ * Takes an offset rather than a pre-sliced string so {@link findRuntimeNodePathsInText}
+ * can sweep a whole document without allocating a fresh substring at every
+ * quote character.
+ */
+function matchRuntimeInvocationAt(input: string, start: number): string | null {
+  const first = parseShellQuoted(input, start);
+  if (!first || !isAbsolutePath(first.value)) {
+    return null;
+  }
+  let i = first.next;
+  if (input[i] !== " ") {
+    return null;
+  }
+  while (input[i] === " ") {
+    i += 1;
+  }
+  const second = parseShellQuoted(input, i);
+  if (!second) {
+    return null;
+  }
+  const cliNormalized = second.value.replace(/\\/g, "/");
+  if (!cliNormalized.includes("/.grounder/runtime/dist/cli.js")) {
+    return null;
+  }
+  return first.value;
+}
+
+/**
  * Extract the baked Node interpreter path from a home-runtime invocation
  * string (`'<abs node>' '<abs …/runtime/dist/cli.js>' …`).
  *
@@ -150,27 +181,7 @@ export function extractRuntimeNodePath(command: unknown): string | null {
   if (typeof command !== "string") {
     return null;
   }
-  const trimmed = command.trim();
-  const first = parseShellQuoted(trimmed, 0);
-  if (!first || !isAbsolutePath(first.value)) {
-    return null;
-  }
-  let i = first.next;
-  if (trimmed[i] !== " ") {
-    return null;
-  }
-  while (trimmed[i] === " ") {
-    i += 1;
-  }
-  const second = parseShellQuoted(trimmed, i);
-  if (!second) {
-    return null;
-  }
-  const cliNormalized = second.value.replace(/\\/g, "/");
-  if (!cliNormalized.includes("/.grounder/runtime/dist/cli.js")) {
-    return null;
-  }
-  return first.value;
+  return matchRuntimeInvocationAt(command.trim(), 0);
 }
 
 /**
@@ -185,7 +196,7 @@ export function findRuntimeNodePathsInText(text: string): string[] {
     if (text[i] !== "'") {
       continue;
     }
-    const nodePath = extractRuntimeNodePath(text.slice(i));
+    const nodePath = matchRuntimeInvocationAt(text, i);
     if (nodePath !== null && !seen.has(nodePath)) {
       seen.add(nodePath);
       found.push(nodePath);
