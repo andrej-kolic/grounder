@@ -24,6 +24,7 @@ import { confirm } from "../util/prompt.js";
 import { projectsParent } from "../vault/layout.js";
 import { applyAgentInstalls } from "./apply.js";
 import {
+  renderAgentErrors,
   renderModifiedNote,
   renderSummary,
   renderTable,
@@ -194,8 +195,14 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
       const forceCommand = existingHome
         ? "grounder migrate"
         : `grounder setup ${options.vaultPath}`;
-      reportAgentInstalls(applyResult, priorState, homeDir, true, forceCommand);
-      return 0;
+      const hadAgentError = reportAgentInstalls(
+        applyResult,
+        priorState,
+        homeDir,
+        true,
+        forceCommand,
+      );
+      return hadAgentError ? 1 : 0;
     }
 
     if (!yes) {
@@ -243,8 +250,14 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
     // Real setup has already written a valid home config by this point
     // (above), so `grounder migrate --force` always works as the remediation
     // command here.
-    reportAgentInstalls(applyResult, priorState, homeDir, false, "grounder migrate");
-    return 0;
+    const hadAgentError = reportAgentInstalls(
+      applyResult,
+      priorState,
+      homeDir,
+      false,
+      "grounder migrate",
+    );
+    return hadAgentError ? 1 : 0;
   });
 }
 
@@ -252,6 +265,9 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
  * Render the table/summary/conflict-note block shared by a dry-run preview
  * and a real apply — same rows, same wording, only `renderSummary`'s tense
  * differs, so a dry run tells the truth about what a real run would show.
+ * Returns whether any agent's hook step failed (see
+ * `AgentApplyResult#error`), so the caller can exit non-zero without
+ * duplicating that check.
  */
 function reportAgentInstalls(
   applyResult: Awaited<ReturnType<typeof applyAgentInstalls>>,
@@ -259,7 +275,7 @@ function reportAgentInstalls(
   homeDir: string | undefined,
   dryRun: boolean,
   forceCommand: string,
-): void {
+): boolean {
   const rows = rowsFromApplyResult(applyResult);
   const ledgerChanged =
     applyResult.agents.some((a) => a.ledgerChanged) || ledgerVersionChanged(priorState, VERSION);
@@ -270,4 +286,6 @@ function reportAgentInstalls(
   process.stdout.write("\n");
   renderSummary(rows, dryRun);
   renderModifiedNote(rows, forceCommand);
+  renderAgentErrors(applyResult);
+  return applyResult.agents.some((a) => a.error !== undefined);
 }

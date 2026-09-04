@@ -386,6 +386,63 @@ describe("commands/setup", () => {
     }
   });
 
+  it("isolates a bad hook config to the one agent, still installing the others", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    // A `hooks` key that isn't a JSON object — `readHooksObject` refuses
+    // rather than clobbering it, and that refusal must not take Claude
+    // Code's install down with it.
+    await mkdir(path.dirname(cursorHooksJsonPath(env.home)), { recursive: true });
+    await writeFile(
+      cursorHooksJsonPath(env.home),
+      `${JSON.stringify({ version: 1, hooks: [] }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const stderrChunks: string[] = [];
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderrChunks.push(String(chunk));
+      return true;
+    });
+
+    try {
+      const { code, out } = await captureStdout(() =>
+        runSetupWithOptions({
+          vaultPath: env.vault,
+          yes: true,
+          hooks: true,
+          homeDir: env.home,
+          agents: ["cursor", "claude"],
+        }),
+      );
+
+      expect(code).toBe(1);
+      const stderrOut = stderrChunks.join("");
+      expect(stderrOut).toContain("cursor:");
+      expect(stderrOut).toContain("Refusing to modify");
+
+      for (const artifact of claude.expectedArtifacts(env.home)) {
+        expect(await fileExists(artifact)).toBe(true);
+      }
+      expect(await fileExists(claudeSettingsJsonPath(env.home))).toBe(true);
+
+      const state = await readGrounderState(env.home);
+      expect(state?.agents.claude?.hooksEnabled).toBe(true);
+      expect(Object.keys(state?.agents.claude?.files ?? {}).length).toBeGreaterThan(0);
+
+      // Cursor's own whole-file skills still installed too — only its hook
+      // step failed.
+      for (const artifact of cursor.expectedArtifacts(env.home)) {
+        expect(await fileExists(artifact)).toBe(true);
+      }
+      expect(state?.agents.cursor).toBeDefined();
+      expect(out).not.toContain("agent skill files/hooks were not installed");
+    } finally {
+      stderrSpy.mockRestore();
+    }
+  });
+
   it("rewrites a real v0.5.0 ledger to the current schema, dropping legacy keys", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;

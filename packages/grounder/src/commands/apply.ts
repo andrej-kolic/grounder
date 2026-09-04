@@ -15,6 +15,7 @@ import {
   setHooksEnabled,
   touchGrounderVersion,
 } from "../connector/state.js";
+import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
 import { applyPlan } from "../reconcile/apply.js";
 import { type PlanEntry, planChangesLedger, reconcile } from "../reconcile/core.js";
 import { readDiskHashes } from "../reconcile/disk.js";
@@ -61,6 +62,15 @@ export interface AgentApplyResult {
   hooks?: AgentInstallResult;
   /** Would/did this agent's install change `~/.grounder/state.json`? */
   ledgerChanged: boolean;
+  /**
+   * Set when this agent's hook install/removal threw (e.g. a shared hook
+   * config file has a `hooks` key that isn't a JSON object — see
+   * `readHooksObject`). This agent's whole-file artifacts (`plan` above)
+   * already applied by this point regardless; only the hook step failed, and
+   * later agents in the same run are unaffected — see the per-agent `try`
+   * in the loop below.
+   */
+  error?: string;
 }
 
 export interface ApplyAgentInstallsResult {
@@ -202,43 +212,64 @@ export async function applyAgentInstalls(
     const hooksEnabled = recordedHooksEnabled(state, agent.id);
     let hooksResult: AgentInstallResult | undefined;
     let hooksLedgerChanged = false;
-    if (opts.noHooks && !opts.hooks) {
-      const removeHooksFn = agent.removeHooks;
-      if (removeHooksFn) {
-        hooksResult = await removeHooksFn({ force, dryRun, homeDir });
-        if (hooksEnabled !== false) {
-          hooksLedgerChanged = true;
-          if (!dryRun) {
-            await setHooksEnabled({
-              agentId: agent.id,
-              enabled: false,
-              grounderVersion: opts.grounderVersion,
-              homeDir,
-            });
+    let hooksError: string | undefined;
+    // Isolated per agent: a hook merge can throw on a shared config file this
+    // agent doesn't own the shape of (e.g. a `hooks` key that isn't a JSON
+    // object — see `readHooksObject`). Left uncaught, that unwinds past this
+    // loop and skips every agent after this one, even though their installs
+    // are entirely independent. `UnsupportedSchemaError` is the one exception
+    // that must still abort the whole run (same contract as
+    // `assertVersionSupportsWrite` above).
+    try {
+      if (opts.noHooks && !opts.hooks) {
+        const removeHooksFn = agent.removeHooks;
+        if (removeHooksFn) {
+          hooksResult = await removeHooksFn({ force, dryRun, homeDir });
+          if (hooksEnabled !== false) {
+            hooksLedgerChanged = true;
+            if (!dryRun) {
+              await setHooksEnabled({
+                agentId: agent.id,
+                enabled: false,
+                grounderVersion: opts.grounderVersion,
+                homeDir,
+              });
+            }
+          }
+        }
+      } else if (await shouldInstallHooks(agent, opts, hooksEnabled)) {
+        const installHooksFn = agent.installHooks;
+        if (installHooksFn) {
+          hooksResult = await installHooksFn({ force, dryRun, homeDir });
+          if (hooksEnabled !== true) {
+            hooksLedgerChanged = true;
+            if (!dryRun) {
+              await setHooksEnabled({
+                agentId: agent.id,
+                enabled: true,
+                grounderVersion: opts.grounderVersion,
+                homeDir,
+              });
+            }
           }
         }
       }
-    } else if (await shouldInstallHooks(agent, opts, hooksEnabled)) {
-      const installHooksFn = agent.installHooks;
-      if (installHooksFn) {
-        hooksResult = await installHooksFn({ force, dryRun, homeDir });
-        if (hooksEnabled !== true) {
-          hooksLedgerChanged = true;
-          if (!dryRun) {
-            await setHooksEnabled({
-              agentId: agent.id,
-              enabled: true,
-              grounderVersion: opts.grounderVersion,
-              homeDir,
-            });
-          }
-        }
+    } catch (error: unknown) {
+      if (isUnsupportedSchemaError(error)) {
+        throw error;
       }
+      hooksError = error instanceof Error ? error.message : String(error);
     }
 
     const ledgerChanged = planChangesLedger(plan, ledgerFiles, desiredHashes) || hooksLedgerChanged;
 
-    results.push({ agent, plan: visiblePlan, hooks: hooksResult, ledgerChanged });
+    results.push({
+      agent,
+      plan: visiblePlan,
+      hooks: hooksResult,
+      ledgerChanged,
+      error: hooksError,
+    });
   }
 
   // Per-artifact writes above have no hook for an all-noop plan — stamp

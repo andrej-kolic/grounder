@@ -12,6 +12,7 @@ import { VERSION } from "../index.js";
 import { flagBool, flagStrings, parseArgs } from "../util/parse-args.js";
 import { applyAgentInstalls } from "./apply.js";
 import {
+  renderAgentErrors,
   renderModifiedNote,
   renderSummary,
   renderTable,
@@ -174,7 +175,8 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
     process.stdout.write("\n");
     renderSummary(rows, dryRun);
     renderModifiedNote(rows, "grounder migrate");
+    renderAgentErrors(applyResult);
 
-    return 0;
+    return applyResult.agents.some((a) => a.error !== undefined) ? 1 : 0;
   });
 }

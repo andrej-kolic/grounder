@@ -233,6 +233,27 @@ export function renderSummary(rows: Row[], dryRun: boolean): void {
 }
 
 /**
+ * Per-agent hook failures `applyAgentInstalls` isolated (see
+ * `AgentApplyResult#error`) — printed after the table/summary so a failing
+ * agent's hook error doesn't obscure whether other agents (or this agent's
+ * own whole-file artifacts, already applied by this point) succeeded.
+ */
+export function renderAgentErrors(applyResult: ApplyAgentInstallsResult): void {
+  const failed = applyResult.agents.filter(
+    (a): a is typeof a & { error: string } => a.error !== undefined,
+  );
+  if (failed.length === 0) {
+    return;
+  }
+  process.stderr.write(
+    `\n${plural(failed.length, "agent")} hook install failed (its other artifacts above still applied):\n`,
+  );
+  for (const { agent, error } of failed) {
+    process.stderr.write(`  ${agent.id}: ${error}\n`);
+  }
+}
+
+/**
  * @param forceCommand The command line (without `--force`) the reader should
  * re-run to resolve conflicts. Both `setup` and `migrate` pass `"grounder
  * migrate"` today — `setup --force` applies just as well, but pointing every
