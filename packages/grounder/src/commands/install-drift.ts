@@ -1,4 +1,4 @@
-import { ALL_AGENTS } from "../agents/index.js";
+import { ALL_AGENTS, ownedLedgerFiles } from "../agents/index.js";
 import { type GrounderState, ledgerFilesFor } from "../connector/state.js";
 import { desiredDrift } from "../reconcile/core.js";
 import { hashContent } from "../util/hash.js";
@@ -12,6 +12,12 @@ import { hashContent } from "../util/hash.js";
  * agent produces no drift here (see `desiredDrift`'s own scoping rule), so
  * this never teases `migrate` forever with no command able to silence it.
  *
+ * `ledgerFiles` is run through `ownedLedgerFiles()` first, same as
+ * `migrate`/`doctor`/`applyPlan()` — a stray key outside the adapter's
+ * `ownedPrefixes` (a hand-edited or corrupted `state.json` entry) is invisible
+ * to `reconcile()` and refused on apply, so counting it as drift here would
+ * nag `migrate` forever for a path `migrate` will never actually touch.
+ *
  * A tombstoned path still present in the ledger's `files` map means `migrate`
  * has something to retire (delete, forget, or a conflict needing `--force`) —
  * checking that is a plain key lookup against data already in memory, not a
@@ -20,13 +26,13 @@ import { hashContent } from "../util/hash.js";
  * to tell delete/conflict/already-gone apart; this only answers "is migrate
  * a no-op," which none of those three are.
  *
- * A ledger key that is neither desired nor tombstoned (a skill dropped from
- * the current release with nobody remembering to tombstone the old path) is
- * the same kind of drift: `reconcile()` never plans a non-desired ledger path
- * as `noop`, so `migrate` always has something to do with it (forget it if
- * already gone from disk, else delete/conflict). Same plain key-lookup cost
- * as the tombstone check above — no disk read needed to know *that* there's
- * drift, only to know which of forget/delete/conflict it'll be.
+ * An owned ledger key that is neither desired nor tombstoned (a skill dropped
+ * from the current release with nobody remembering to tombstone the old path)
+ * is the same kind of drift: `reconcile()` never plans a non-desired ledger
+ * path as `noop`, so `migrate` always has something to do with it (forget it
+ * if already gone from disk, else delete/conflict). Same plain key-lookup
+ * cost as the tombstone check above — no disk read needed to know *that*
+ * there's drift, only to know which of forget/delete/conflict it'll be.
  */
 export async function installDriftDetected(
   state: GrounderState | null,
@@ -36,7 +42,7 @@ export async function installDriftDetected(
     return false;
   }
   for (const agent of ALL_AGENTS) {
-    const ledgerFiles = ledgerFilesFor(state, agent.id);
+    const ledgerFiles = ownedLedgerFiles(agent, ledgerFilesFor(state, agent.id), homeDir);
     if (!ledgerFiles) {
       continue;
     }
