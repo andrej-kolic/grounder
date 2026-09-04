@@ -148,6 +148,6 @@ Both are read-only. `status` exits `0` even when unlinked; `doctor` fails when c
 fail. Use `doctor --global` to check the machine without a project link.
 
 `status` only reads the install ledger (`Schemas: current` / `Schemas: ledger stale` —
-it does not open agent command/hook files). `doctor` checks on-disk drift via migrate
+it does not open agent skill/hook files). `doctor` checks on-disk drift via migrate
 dry-run, and also warns when files already match but the ledger schema is still behind,
 so both point at `grounder migrate` in that case.

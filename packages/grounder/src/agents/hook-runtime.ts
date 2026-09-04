@@ -1,14 +1,14 @@
 /**
- * Home-local runtime shared by session hooks *and* slash commands (originally
+ * Home-local runtime shared by session hooks *and* skills (originally
  * "Issue 2 — replace `npx grounder` in session hooks"; later extended to cover
- * slash-command templates too, since they had the identical problem).
+ * skill templates too, since they had the identical problem).
  *
  * ## Why
  * Both surfaces used to shell out via `npx grounder …`. `npx <pkg>` (no
  * version specifier) matches against whatever `grounder` version exists in
  * the *current project's own dependencies*; only when the project doesn't
  * declare `grounder` as a dependency does it fall back to fetching
- * `grounder@latest` from the registry. Session hooks and slash commands both
+ * `grounder@latest` from the registry. Session hooks and skills both
  * run from arbitrary linked projects, which normally have no reason to depend
  * on `grounder` themselves, so contributors (and anyone ahead of the last
  * publish, or deliberately pinned to an older version) get the wrong binary.
@@ -174,7 +174,7 @@ export function extractRuntimeNodePath(command: unknown): string | null {
 }
 
 /**
- * Find every baked Node interpreter path embedded in free-form text (slash-command
+ * Find every baked Node interpreter path embedded in free-form text (skill
  * markdown, etc.). Scans for the same `'<abs node>' '<abs …/cli.js>'` shape as
  * {@link extractRuntimeNodePath}, including mid-line / backtick-wrapped uses.
  */
@@ -196,7 +196,7 @@ export function findRuntimeNodePathsInText(text: string): string[] {
 
 /**
  * Quoted `<node> <runtime cli.js>` prefix, shared by every home-runtime
- * invocation (session hooks and slash-command templates alike). Append
+ * invocation (session hooks and skill templates alike). Append
  * subcommand args to build a full command string.
  */
 export function runtimeInvocation(homeDir?: string): string {

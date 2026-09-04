@@ -424,14 +424,12 @@ describe("commands/migrate", () => {
 
     expect(code).toBe(0);
     expect(out).toContain(
-      "Refresh Grounder after an upgrade (slash commands/hooks; vault path unchanged).",
+      "Refresh Grounder after an upgrade (skills/hooks; vault path unchanged).",
     );
     expect(out).toContain("Dry run — no files will be written.");
     expect(hasRow(out, "updated", noteDest)).toBe(true);
     expect(
-      out.indexOf(
-        "Refresh Grounder after an upgrade (slash commands/hooks; vault path unchanged).",
-      ),
+      out.indexOf("Refresh Grounder after an upgrade (skills/hooks; vault path unchanged)."),
     ).toBeLessThan(out.indexOf("Dry run — no files will be written."));
     // The ledger already recorded the template's hash for this path from the
     // original `setup` (the test only rewrote the file on disk, not via

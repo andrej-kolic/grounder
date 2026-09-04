@@ -50,7 +50,7 @@ async function rewriteCursorHookCommandStale(homeDir: string): Promise<void> {
   await writeFile(hooksPath, `${JSON.stringify(parsed, null, 2)}\n`);
 }
 
-/** Replace every baked Node path in a slash-command markdown file. */
+/** Replace every baked Node path in a skill markdown file. */
 async function rewriteCommandFileNodePaths(filePath: string, nodePath: string): Promise<void> {
   const text = await readFile(filePath, "utf8");
   const from = shellQuote(process.execPath);
@@ -851,7 +851,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("ok    agent-cursor");
     expect(out).toContain("warn  agent-cursor-hooks");
     expect(out).toContain("no Grounder session hook → grounder migrate --hooks");
-    // Slash commands were installed (hooks were not), so the shared runtime is
+    // Skills were installed (hooks were not), so the shared runtime is
     // still checked — it just doesn't depend on hooks being installed.
     expect(out).toContain("ok    hook-runtime");
     expect(out).toMatch(/^\d+ passed, 0 failed, 1 warned$/m);
@@ -1030,7 +1030,7 @@ describe("commands/doctor", () => {
     expect(out).toContain("agent-cursor-hooks");
   });
 
-  it("fails when a slash-skill Node interpreter is missing", async () => {
+  it("fails when a skill Node interpreter is missing", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -1057,7 +1057,7 @@ describe("commands/doctor", () => {
   });
 
   it.skipIf(process.platform === "win32")(
-    "fails when a slash-skill Node interpreter exists but is not executable",
+    "fails when a skill Node interpreter exists but is not executable",
     async () => {
       const env = await createTempEnv({ packageName: "my-app" });
       cleanup = env.cleanup;
@@ -1085,7 +1085,7 @@ describe("commands/doctor", () => {
     },
   );
 
-  it("does not flag a different-but-still-executable Node path in slash commands", async () => {
+  it("does not flag a different-but-still-executable Node path in skills", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 

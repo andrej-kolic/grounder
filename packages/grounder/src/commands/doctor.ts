@@ -368,7 +368,7 @@ async function checkAgentArtifacts(
     const id = `agent-${agent.id}`;
 
     if (presentCount === expected.length) {
-      // Missing/non-executable baked Node in slash-command markdown → fail.
+      // Missing/non-executable baked Node in skill markdown → fail.
       // Do not compare to process.execPath. Legacy npx / non-runtime shapes skip.
       const texts = await Promise.all(
         expected.map(async (p) => {
@@ -489,7 +489,7 @@ async function checkLegacyCommands(
  * Warn-only: session hooks are opt-in. Missing entry never fails doctor.
  * One check per detected agent that declares `expectedHookArtifacts`.
  *
- * Slash commands and session hooks both depend on the shared
+ * Skills and session hooks both depend on the shared
  * `~/.grounder/runtime` materialization, so it's checked whenever *either* is
  * installed — stale mainly for bare-npx copy installs after an upgrade
  * (symlink installs stay current without re-init).

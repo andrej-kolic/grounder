@@ -124,7 +124,7 @@ describe("agents/hook-runtime", () => {
   });
 
   describe("findRuntimeNodePathsInText", () => {
-    it("finds invocations embedded mid-line (slash-command markdown)", () => {
+    it("finds invocations embedded mid-line (skill markdown)", () => {
       const text = [
         "Save a note.",
         "",

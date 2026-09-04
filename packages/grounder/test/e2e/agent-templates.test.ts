@@ -8,7 +8,7 @@ import { DISPATCHED_COMMAND_IDS } from "../../src/help.js";
 
 /**
  * Static lint: every `{{GROUNDER_CLI}} <subcommand>` invocation documented in
- * the slash-command templates must map to a real, currently-registered
+ * the skill templates must map to a real, currently-registered
  * grounder subcommand, and every `--flag` mentioned near it must be a flag
  * that subcommand's own `--help` documents. Catches a renamed/removed CLI
  * command or flag silently breaking a template — no live agent or LLM

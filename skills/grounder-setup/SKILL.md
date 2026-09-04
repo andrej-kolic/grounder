@@ -17,7 +17,7 @@ Adding this skill only loads these instructions. Running it is what installs the
 
 ## Boundary
 
-- Delegate writes to the CLI. Do not copy command files, edit `~/.grounder/config.json` by hand, or invent repair steps.
+- Delegate writes to the CLI. Do not copy skill files, edit `~/.grounder/config.json` by hand, or invent repair steps.
 - Do not pass `--agent` unless the user asks to **limit** the install. Auto-detect should install every detected host (Cursor and Claude Code).
 - Never `--force` on first setup. Never `--force` a vault-root change (home config pointing at a different vault is a conflict to surface, not overwrite).
 - Always preview writes in chat and get approval. For `setup` / `link` / `migrate`, say the `Step N of 4` line (section 4), run `--dry-run`, and show that stdout as-is — do not reconstruct the write list. Then apply (`--yes` on setup/link; `migrate` has no confirm). Never rely on the interactive `confirm()` prompt — it treats empty stdin as yes, so a non-TTY agent shell would apply unaudited. No extra confirmation gates.
