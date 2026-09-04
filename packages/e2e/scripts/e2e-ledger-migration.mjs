@@ -88,6 +88,15 @@ try {
   check("hooksSchema dropped", migrated.agents.cursor.hooksSchema, undefined);
   check("hooksSchema:1 folded into hooksEnabled:true", migrated.agents.cursor.hooksEnabled, true);
   check("grounderVersion bumped off 0.5.0", migrated.grounderVersion !== "0.5.0", true);
+
+  // `hooksEnabled:true` (just asserted above) makes this plain `migrate` a
+  // real side effect, not a no-op: step 1's setup never passed `--hooks`, so
+  // this is the migrate run that actually installs the session hook.
+  const hooksJsonPath = path.join(home, ".cursor", "hooks.json");
+  const hooksInstalled =
+    existsSync(hooksJsonPath) &&
+    JSON.stringify(JSON.parse(readFileSync(hooksJsonPath, "utf8"))).includes("handoff peek");
+  check("hooksEnabled:true side effect: hooks.json now has a Grounder entry", hooksInstalled, true);
 } finally {
   section(failed ? "Result: FAIL" : "Result: PASS");
   if (failed) {

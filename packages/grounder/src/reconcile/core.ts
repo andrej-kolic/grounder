@@ -1,3 +1,5 @@
+import path from "node:path";
+
 /**
  * Pure reconciliation core — no I/O anywhere in this file.
  *
@@ -8,6 +10,21 @@
  * preview. Modeled on chezmoi's source/destination/target state and dpkg's
  * old-pristine/new-pristine/on-disk compare.
  */
+
+/**
+ * True when `filePath` sits under one of `prefixes` (a directory, matched
+ * exactly or via a `prefix + separator` boundary — never a bare substring
+ * match). Callers use this to keep a ledger's extra/stray entries — a
+ * hand-edited or corrupted `state.json`, say — from ever being treated as
+ * delete candidates for paths outside the directories an adapter actually
+ * manages. `reconcile()` itself stays agnostic to this (see its own docs);
+ * callers filter `ledger` before passing it in.
+ */
+export function isUnderOwnedPrefix(filePath: string, prefixes: readonly string[]): boolean {
+  return prefixes.some(
+    (prefix) => filePath === prefix || filePath.startsWith(`${prefix}${path.sep}`),
+  );
+}
 
 export type DriftKind = "create" | "update";
 

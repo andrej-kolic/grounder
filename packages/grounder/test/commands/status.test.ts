@@ -9,10 +9,12 @@ import { writeRepoConfig } from "../../src/connector/repo.js";
 import {
   LEDGER_SCHEMA,
   readGrounderState,
+  setLedgerFileHash,
   statePath,
   writeGrounderState,
 } from "../../src/connector/state.js";
 import { VERSION } from "../../src/index.js";
+import { hashContent } from "../../src/util/hash.js";
 import { captureStdout, createTempEnv } from "../helpers.js";
 
 describe("commands/status", () => {
@@ -194,6 +196,39 @@ describe("commands/status", () => {
     expect(code).toBe(0);
     expect(out).toContain(`  State:      ${statePath(env.home)}`);
     expect(out).not.toContain("Package:");
+    expect(out).toContain("  Install:    outdated → grounder migrate");
+  });
+
+  it("reports install drift when a tombstoned legacy path is still recorded in the ledger", async () => {
+    // Simulates the leftover doctor's agent-cursor-legacy-commands check
+    // catches (a schema-3→4 upgrade that hasn't retired the old command file
+    // yet) — status must not claim "current" while a plain `migrate` still
+    // has that path to retire (delete, forget, or a conflict).
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+
+    const legacyPath = path.join(env.home, ".cursor", "commands", "grounder-note.md");
+    const legacyContent = "old pre-skill note command\n";
+    await setLedgerFileHash({
+      agentId: "cursor",
+      filePath: legacyPath,
+      hash: hashContent(legacyContent),
+      grounderVersion: "0.5.0",
+      homeDir: env.home,
+    });
+
+    const { code, out } = await captureStdout(() =>
+      runStatusWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
     expect(out).toContain("  Install:    outdated → grounder migrate");
   });
 

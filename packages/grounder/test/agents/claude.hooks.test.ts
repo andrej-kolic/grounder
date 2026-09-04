@@ -348,18 +348,84 @@ describe("agents/claude hooks", () => {
 
       const result = await claude.removeHooks?.({ homeDir: env.home });
       expect(result?.artifacts[dest]).toBe("overwritten");
+      // The matcher group Grounder itself created is dropped once its own
+      // removal leaves its `hooks` array empty — not left behind as clutter.
       expect(JSON.parse(await readFile(dest, "utf8"))).toEqual({
-        hooks: { SessionStart: [{ matcher: CLAUDE_SESSION_START_MATCHER, hooks: [] }] },
+        hooks: { SessionStart: [] },
       });
     });
 
-    it("is a no-op when the file does not exist, or when there is nothing to remove", async () => {
+    it("is a no-op when the file does not exist", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;
 
       const missing = await claude.removeHooks?.({ homeDir: env.home });
       expect(missing?.artifacts).toEqual({});
       expect(await fileExists(claudeSettingsJsonPath(env.home))).toBe(false);
+    });
+
+    it("leaves an existing settings.json byte-for-byte untouched when there's no Grounder entry to remove", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      await mkdir(path.dirname(dest), { recursive: true });
+      const original = `${JSON.stringify(
+        {
+          hooks: {
+            SessionStart: [
+              { matcher: "otherEvent", hooks: [{ type: "command", command: "echo other" }] },
+            ],
+          },
+        },
+        null,
+        2,
+      )}\n`;
+      await writeFile(dest, original);
+
+      const result = await claude.removeHooks?.({ homeDir: env.home });
+
+      expect(result?.artifacts).toEqual({});
+      expect(await readFile(dest, "utf8")).toBe(original);
+    });
+
+    it("drops a matcher group left empty by removal without touching groups that still have other hooks", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(
+        dest,
+        `${JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                {
+                  matcher: CLAUDE_SESSION_START_MATCHER,
+                  hooks: [{ type: "command", command: claudePeekHookCommand(env.home) }],
+                },
+                {
+                  matcher: "otherEvent",
+                  hooks: [{ type: "command", command: "echo keep-me" }],
+                },
+              ],
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      await claude.removeHooks?.({ homeDir: env.home });
+
+      expect(JSON.parse(await readFile(dest, "utf8"))).toEqual({
+        hooks: {
+          SessionStart: [
+            { matcher: "otherEvent", hooks: [{ type: "command", command: "echo keep-me" }] },
+          ],
+        },
+      });
     });
 
     it("preserves unrelated hooks while removing every Grounder match", async () => {

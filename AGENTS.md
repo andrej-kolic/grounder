@@ -47,25 +47,35 @@ commands/             # mirrors CLI structure
   setup.ts            # grounder setup (agent-blind; uses agents registry)
   link.ts             # grounder link (creates notes/ + logs/ + plans/)
   note.ts             # grounder note
+  note/list.ts        # grounder note list
   handoff.ts          # grounder handoff
   handoff/list.ts     # grounder handoff list
+  handoff/peek.ts      # grounder handoff peek (session-start hook teaser)
   plan.ts             # grounder plan
   plan/list.ts        # grounder plan list
   path/notes.ts       # grounder path notes
   path/logs.ts        # grounder path logs
   path/plans.ts       # grounder path plans
+  check.ts            # shared ok/warn/fail CheckResult type (doctor)
   doctor.ts           # grounder doctor
   status.ts           # grounder status
+  install-drift.ts    # cheap ledger-only "would migrate change something" (status/peek)
   output.ts           # shared formatting (doctor/status + vault item lists)
   migrate.ts          # grounder migrate (refresh install after upgrade)
-  apply-agent-installs.ts # shared agent install loop (setup + migrate)
+  apply.ts            # shared agent install loop (setup + migrate)
   render-artifact-table.ts # shared STATUS/TARGET/PATH table + summary (setup + migrate)
+  package-version-notice.ts # package-vs-ledger version comparison (doctor/status)
   upgrade-banner.ts   # stderr notice when package version ahead of ledger
+reconcile/            # pure desired/ledger/disk plan core + its I/O edges
+  core.ts             # reconcile(), desiredDrift(), planChangesLedger() — no I/O
+  disk.ts             # readDiskHashes() — the only disk-read edge
+  apply.ts            # applyPlan() — the only disk-write edge
 agents/               # AgentAdapter registry (pluggable install targets)
   types.ts            # AgentAdapter interface
-  index.ts            # resolveAgents(), detect
-  install-command.ts  # shared slash-command install + hash drift detection
+  index.ts            # resolveAgents(), ownedLedgerFiles(), detect
+  hook-fragment.ts    # shared always-converge JSON fragment helpers (cursor/claude hooks)
   hook-runtime.ts     # ~/.grounder/runtime for session hooks (symlink durable source / copy npx cache)
+  cursor-hook-input.ts # Cursor sessionStart hook stdin parsing
   cursor.ts           # Cursor adapter
   claude.ts           # Claude Code adapter
 util/                 # shared helpers (fs, parse-args, prompt, slugs, path)

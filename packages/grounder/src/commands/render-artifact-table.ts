@@ -5,7 +5,7 @@ import type { ApplyAgentInstallsResult } from "./apply.js";
 
 /** A row's plan status, independent of tense — "current" never changes wording; the
  * others are rendered as an infinitive in a dry run and past tense in a real one. */
-export type RowStatus = "current" | "create" | "update" | "delete" | "modified";
+export type RowStatus = "current" | "create" | "update" | "delete" | "forget" | "modified";
 
 export interface Row {
   status: RowStatus;
@@ -24,17 +24,23 @@ export function toRowStatus(status: ArtifactStatus): RowStatus {
       return "create";
     case "overwritten":
       return "update";
-    case "modified":
-      return "modified";
   }
 }
 
-/** Whole-file artifact rows come straight from the reconciler's own plan vocabulary. */
+/**
+ * Whole-file artifact rows come straight from the reconciler's own plan
+ * vocabulary. `forget` gets its own status, distinct from `noop`'s
+ * "current" — a forget entry always changes `state.json` (see
+ * `planChangesLedger`), even though it never touches the file itself, so
+ * folding it into "current"/"unchanged" would hide the one row that explains
+ * why the trailing state row says "updated".
+ */
 export function rowStatusFromPlanAction(action: PlanAction): RowStatus {
   switch (action) {
     case "noop":
-    case "forget":
       return "current";
+    case "forget":
+      return "forget";
     case "create":
       return "create";
     case "update":
@@ -60,6 +66,7 @@ export const VERB: Record<RowStatus, { dry: string; real: string }> = {
   create: { dry: "create", real: "created" },
   update: { dry: "update", real: "updated" },
   delete: { dry: "delete", real: "deleted" },
+  forget: { dry: "forget", real: "forgotten" },
   modified: { dry: "modified", real: "modified" },
 };
 
@@ -76,12 +83,18 @@ export const VERB: Record<RowStatus, { dry: string; real: string }> = {
  * local edit was found and Grounder left it untouched. "conflict" names that
  * outcome without implying an action was taken (see the STATUS header below,
  * not ACTION, for the same reason).
+ *
+ * `forget` is deliberately not "unchanged" here, even though the file itself
+ * is untouched: the ledger entry for it is dropped, which is exactly the
+ * "updated" the trailing state row reports — collapsing it into "unchanged"
+ * would leave that state-row change unexplained by any visible row.
  */
 export const TABLE_LABEL: Record<RowStatus, string> = {
   current: "unchanged",
   create: "created",
   update: "updated",
   delete: "deleted",
+  forget: "forgotten",
   modified: "conflict",
 };
 
@@ -114,7 +127,9 @@ export function rowsFromApplyResult(applyResult: ApplyAgentInstallsResult): Row[
           // <path>" wording setup's pre-confirm preview list already uses.
           target: `${agentResult.agent.id} hook`,
           path,
-          forceAction: status === "modified" ? "overwrite" : undefined,
+          // No `forceAction` — hooks always-converge with no conflict/`--force`
+          // gate (see `AgentAdapter#installHooks`'s own docs), so a hook row
+          // never lands in RowStatus "modified".
         });
       }
     }
@@ -161,6 +176,7 @@ export function renderSummary(rows: Row[], dryRun: boolean): void {
     create: 0,
     update: 0,
     delete: 0,
+    forget: 0,
     modified: 0,
   };
   for (const row of rows) {
@@ -168,7 +184,7 @@ export function renderSummary(rows: Row[], dryRun: boolean): void {
   }
 
   const acted: string[] = [];
-  for (const status of ["create", "update", "delete"] as const) {
+  for (const status of ["create", "update", "delete", "forget"] as const) {
     if (counts[status] > 0) {
       acted.push(`${VERB[status][dryRun ? "dry" : "real"]} ${counts[status]}`);
     }

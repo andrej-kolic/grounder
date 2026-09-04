@@ -7,7 +7,7 @@ import {
   isHookRuntimeStale,
 } from "../agents/hook-runtime.js";
 import type { AgentAdapter, AgentInstallResult } from "../agents/index.js";
-import { resolveAgents } from "../agents/index.js";
+import { ownedLedgerFiles, resolveAgents } from "../agents/index.js";
 import { findGitRoot } from "../connector/git.js";
 import { homeConfigPath, readHomeConfig, withHomeDir } from "../connector/home.js";
 import { findLinkedRepoRoot, readRepoConfig } from "../connector/repo.js";
@@ -266,7 +266,12 @@ function checkFromPlan(
   );
 }
 
-/** Map the (still-imperative, commit-1) hook install preview onto a doctor check. */
+/**
+ * Map the hook install preview onto a doctor check. Hooks always-converge —
+ * no conflict/`--force` gate (see `AgentAdapter#installHooks`'s own docs) —
+ * so unlike {@link checkFromPlan}'s whole-file artifacts, there's no
+ * "locally modified" case to report here.
+ */
 function checkFromInstallPreview(
   id: string,
   agentName: string,
@@ -275,27 +280,14 @@ function checkFromInstallPreview(
   upToDateMessage: string,
 ): CheckResult {
   const statuses = Object.values(preview.artifacts);
-  const modified = statuses.filter((s) => s === "modified").length;
   const created = statuses.filter((s) => s === "created").length;
   const overwritten = statuses.filter((s) => s === "overwritten").length;
   const wouldWrite = created + overwritten;
 
-  if (modified === 0 && wouldWrite === 0) {
+  if (wouldWrite === 0) {
     return okCheck(id, upToDateMessage);
   }
-  if (modified === 0) {
-    return warnCheck(
-      id,
-      `${agentName}: ${pendingWriteMessage(kind, created, overwritten)}`,
-      MIGRATE,
-    );
-  }
-  return warnCheck(
-    id,
-    `${agentName}: ${modified} ${kind} locally modified (needs --force to refresh)` +
-      (wouldWrite > 0 ? `, ${wouldWrite} would auto-update` : ""),
-    MIGRATE_FORCE,
-  );
+  return warnCheck(id, `${agentName}: ${pendingWriteMessage(kind, created, overwritten)}`, MIGRATE);
 }
 
 interface AgentPlan {
@@ -316,7 +308,7 @@ async function computeAgentPlan(
 ): Promise<AgentPlan> {
   const desired = await agent.desiredArtifacts(homeDir);
   const tombstones = agent.tombstones(homeDir);
-  const ledgerFiles = ledgerFilesFor(state, agent.id);
+  const ledgerFiles = ownedLedgerFiles(agent, ledgerFilesFor(state, agent.id), homeDir);
   const diskPaths = new Set<string>([
     ...Object.keys(desired),
     ...Object.keys(ledgerFiles ?? {}),

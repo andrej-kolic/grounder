@@ -304,6 +304,25 @@ describe("agents/cursor hooks", () => {
       expect(await fileExists(cursorHooksJsonPath(env.home))).toBe(false);
     });
 
+    it("leaves an existing hooks.json byte-for-byte untouched when there's no Grounder entry to remove", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = cursorHooksJsonPath(env.home);
+      await mkdir(path.dirname(dest), { recursive: true });
+      const original = `${JSON.stringify(
+        { version: 1, hooks: { beforeSubmitPrompt: [{ command: "echo other" }] } },
+        null,
+        2,
+      )}\n`;
+      await writeFile(dest, original);
+
+      const result = await cursor.removeHooks?.({ homeDir: env.home });
+
+      expect(result?.artifacts).toEqual({});
+      expect(await readFile(dest, "utf8")).toBe(original);
+    });
+
     it("preserves unrelated sessionStart hooks", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;

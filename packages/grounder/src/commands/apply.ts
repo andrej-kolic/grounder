@@ -5,6 +5,7 @@ import {
   runtimeCliPath,
   runtimeMode,
 } from "../agents/hook-runtime.js";
+import { ownedLedgerFiles } from "../agents/index.js";
 import type { AgentAdapter, AgentInstallResult, ArtifactStatus } from "../agents/types.js";
 import {
   assertVersionSupportsWrite,
@@ -39,6 +40,15 @@ export interface ApplyAgentInstallsOptions {
    * opted in.
    */
   refreshInstalledHooks?: boolean;
+  /**
+   * Retire tombstoned legacy paths (pre-skill `grounder-*.md` command files).
+   * Defaults to `true` (`migrate`'s behavior). `setup` passes `false` — per
+   * `docs/upgrading.md`, `setup --force` is a documented repair path that
+   * never deletes legacy files, only `migrate` does; `setup` overwriting a
+   * user's hand-edited leftover on `--force` would silently discard edits
+   * that were never ported into the new `SKILL.md`.
+   */
+  retireLegacy?: boolean;
   dryRun?: boolean;
   homeDir?: string;
   /** Running package version — recorded in the ledger and checked on the write path. */
@@ -110,13 +120,15 @@ export async function applyAgentInstalls(
 ): Promise<ApplyAgentInstallsResult> {
   const force = opts.force ?? false;
   const dryRun = opts.dryRun ?? false;
+  const retireLegacy = opts.retireLegacy ?? true;
   const homeDir = opts.homeDir;
   const agents = opts.agents;
   const state = await readGrounderState(homeDir);
 
-  if (!dryRun) {
-    assertVersionSupportsWrite(opts.grounderVersion, state);
-  }
+  // Not gated on `dryRun` — a dry-run preview must refuse exactly like a real
+  // run would, so the two never disagree about whether this binary can write
+  // at all (see docs/architecture/state-reconciliation.md).
+  assertVersionSupportsWrite(opts.grounderVersion, state);
 
   let runtime: ApplyAgentInstallsResult["runtime"];
   if (agents.length > 0) {
@@ -141,8 +153,19 @@ export async function applyAgentInstalls(
 
   for (const agent of agents) {
     const desired = await agent.desiredArtifacts(homeDir);
-    const tombstones = agent.tombstones(homeDir);
-    const ledgerFiles = ledgerFilesFor(state, agent.id);
+    const tombstones = retireLegacy ? agent.tombstones(homeDir) : [];
+    let ledgerFiles = ownedLedgerFiles(agent, ledgerFilesFor(state, agent.id), homeDir);
+    if (!retireLegacy && ledgerFiles) {
+      // `setup` must not retire legacy paths it already retired the ledger
+      // entry for either — an empty `tombstones` list alone isn't enough:
+      // `ownedLedgerFiles` still includes the legacy-commands-dir entry
+      // `migrate` recorded, and reconcile() would still see it and plan a
+      // delete. Restrict the ledger view itself to currently-desired paths.
+      const desiredPaths = new Set(Object.keys(desired));
+      ledgerFiles = Object.fromEntries(
+        Object.entries(ledgerFiles).filter(([p]) => desiredPaths.has(p)),
+      );
+    }
     const diskPaths = new Set<string>([
       ...Object.keys(desired),
       ...Object.keys(ledgerFiles ?? {}),

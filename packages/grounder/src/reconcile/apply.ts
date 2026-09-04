@@ -85,7 +85,17 @@ export async function applyPlan(opts: ApplyPlanOptions): Promise<Record<string, 
         break;
       }
       case "delete": {
-        await unlink(entry.path).catch(() => undefined);
+        try {
+          await unlink(entry.path);
+        } catch (error: unknown) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+            // A real failure (EACCES, EISDIR, …) — propagate rather than
+            // forgetting the ledger hash for a file that's still on disk;
+            // swallowing it here would leave the ledger and disk permanently
+            // disagreeing, with no way for a future run to notice and retry.
+            throw error;
+          }
+        }
         await forgetLedgerFile({
           agentId: opts.agentId,
           filePath: entry.path,

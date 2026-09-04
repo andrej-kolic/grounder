@@ -1,7 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { desiredDrift, planChangesLedger, reconcile } from "../../src/reconcile/core.js";
+import {
+  desiredDrift,
+  isUnderOwnedPrefix,
+  planChangesLedger,
+  reconcile,
+} from "../../src/reconcile/core.js";
 
 describe("reconcile/core", () => {
+  describe("isUnderOwnedPrefix", () => {
+    it("matches a path nested under a prefix", () => {
+      expect(isUnderOwnedPrefix("/a/b/c.md", ["/a/b"])).toBe(true);
+    });
+
+    it("matches the prefix path itself", () => {
+      expect(isUnderOwnedPrefix("/a/b", ["/a/b"])).toBe(true);
+    });
+
+    it("rejects a sibling directory that merely shares the prefix as a substring", () => {
+      // "/a/bee" starts with "/a/b" as a raw string but is not under it.
+      expect(isUnderOwnedPrefix("/a/bee/c.md", ["/a/b"])).toBe(false);
+    });
+
+    it("rejects a path under none of the given prefixes", () => {
+      expect(isUnderOwnedPrefix("/etc/passwd", ["/a/b", "/a/c"])).toBe(false);
+    });
+  });
+
   describe("desiredDrift", () => {
     it("returns no drift for an agent absent from the ledger — even with skill files missing on disk", () => {
       // Fifth-pass gap 1: `ledger === undefined` must short-circuit to no

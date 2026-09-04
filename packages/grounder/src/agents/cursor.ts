@@ -219,16 +219,25 @@ function mergeCursorHooks(
   return next;
 }
 
-/** Remove every Grounder peek entry from `hooks.sessionStart`, touching nothing else. */
+/**
+ * Remove every Grounder peek entry from `hooks.sessionStart`, touching
+ * nothing else. Returns `current` verbatim (no restructuring at all) when
+ * there's no Grounder entry to remove, so `mergeJsonFile` sees no change and
+ * leaves an unrelated `hooks.json` untouched instead of reformatting it.
+ */
 function removeCursorHooks(current: Record<string, unknown>): Record<string, unknown> {
   const hooks =
     current.hooks && typeof current.hooks === "object" && !Array.isArray(current.hooks)
-      ? { ...(current.hooks as Record<string, unknown>) }
-      : {};
-  const existing = Array.isArray(hooks.sessionStart) ? hooks.sessionStart : [];
+      ? (current.hooks as Record<string, unknown>)
+      : undefined;
+  const existing = hooks && Array.isArray(hooks.sessionStart) ? hooks.sessionStart : [];
+  const cleaned = removeMatchingEntries(existing, isCursorPeekEntry);
+  if (cleaned.length === existing.length) {
+    return current;
+  }
   return {
     ...current,
-    hooks: { ...hooks, sessionStart: removeMatchingEntries(existing, isCursorPeekEntry) },
+    hooks: { ...hooks, sessionStart: cleaned },
   };
 }
 
@@ -317,6 +326,10 @@ export const cursor: AgentAdapter = {
   tombstones(homeDir?: string): string[] {
     const dir = legacyCommandsDir(homeDir);
     return LEGACY_COMMAND_FILENAMES.map((filename) => path.join(dir, filename));
+  },
+
+  ownedPrefixes(homeDir?: string): string[] {
+    return [cursorSkillsDir(homeDir), legacyCommandsDir(homeDir)];
   },
 
   installHooks,

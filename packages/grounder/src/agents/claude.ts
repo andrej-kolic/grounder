@@ -53,7 +53,7 @@ function legacyCommandsDir(homeDir?: string): string {
 
 /**
  * Canonical SessionStart command for Claude Code (home-local runtime, not `npx`).
- * @see {@link peekHookCommand} — REVERT: restore `"npx grounder handoff peek"` and drop runtime.
+ * @see {@link peekHookCommand}
  */
 export function claudePeekHookCommand(homeDir?: string): string {
   return peekHookCommand(homeDir);
@@ -266,14 +266,27 @@ function mergeClaudeHooks(
   return { ...current, hooks: { ...hooks, SessionStart: nextSessionStart } };
 }
 
-/** Remove every Grounder hook entry from every matcher group, touching nothing else. */
+/**
+ * Remove every Grounder hook entry from every matcher group, touching
+ * nothing else, and drop any matcher group left with an empty `hooks` array
+ * by that removal (an empty group is clutter Grounder itself created room
+ * for, not something to leave behind). Returns `current` verbatim when
+ * there's no Grounder entry to remove, so `mergeJsonFile` sees no change and
+ * leaves an unrelated `settings.json` untouched instead of reformatting it.
+ */
 function removeClaudeHooks(current: Record<string, unknown>): Record<string, unknown> {
   const hooks =
     current.hooks && typeof current.hooks === "object" && !Array.isArray(current.hooks)
-      ? { ...(current.hooks as Record<string, unknown>) }
-      : {};
-  const sessionStart = Array.isArray(hooks.SessionStart) ? hooks.SessionStart : [];
-  return { ...current, hooks: { ...hooks, SessionStart: removeAllPeekHooks(sessionStart) } };
+      ? (current.hooks as Record<string, unknown>)
+      : undefined;
+  const sessionStart = hooks && Array.isArray(hooks.SessionStart) ? hooks.SessionStart : [];
+  if (findAllPeekHooks(sessionStart).length === 0) {
+    return current;
+  }
+  const cleaned = removeAllPeekHooks(sessionStart).filter(
+    (group) => !isMatcherGroup(group) || !Array.isArray(group.hooks) || group.hooks.length > 0,
+  );
+  return { ...current, hooks: { ...hooks, SessionStart: cleaned } };
 }
 
 /**
@@ -357,6 +370,10 @@ export const claude: AgentAdapter = {
   tombstones(homeDir?: string): string[] {
     const dir = legacyCommandsDir(homeDir);
     return LEGACY_COMMAND_FILENAMES.map((filename) => path.join(dir, filename));
+  },
+
+  ownedPrefixes(homeDir?: string): string[] {
+    return [claudeSkillsDir(homeDir), legacyCommandsDir(homeDir)];
   },
 
   installHooks,

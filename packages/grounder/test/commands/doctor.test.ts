@@ -572,6 +572,38 @@ describe("commands/doctor", () => {
     }
   });
 
+  it("warns instead of crashing when a skill file can't be read at all", async () => {
+    // readDiskHashes() propagates a non-ENOENT read failure rather than
+    // treating an unreadable-but-present file as "missing" — this proves
+    // doctor's own computeAgentPlansSafe catch is where that error lands
+    // (turned into the same "could not verify skill drift" warning as any
+    // other computeAgentPlan failure), not an uncaught crash.
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const notePath = grounderNoteCommandPath(env.home);
+    await rm(notePath, { force: true });
+    // A directory in place of the expected file — readFile() on it fails
+    // with EISDIR, never ENOENT.
+    await mkdir(notePath, { recursive: true });
+
+    const { code, out } = await captureStdout(() =>
+      runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("warn  agent-cursor");
+    expect(out).toContain("Cursor: could not verify skill drift");
+  });
+
   it("warns when a skill file would auto-update on next migrate (ledger hash matches, on-disk stale)", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;

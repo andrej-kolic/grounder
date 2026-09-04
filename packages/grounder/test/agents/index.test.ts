@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { ALL_AGENTS, resolveAgents } from "../../src/agents/index.js";
+import { ALL_AGENTS, cursor, ownedLedgerFiles, resolveAgents } from "../../src/agents/index.js";
 import { createTempEnv } from "../helpers.js";
 
 describe("agents/index - resolveAgents", () => {
@@ -39,5 +39,29 @@ describe("agents/index - resolveAgents", () => {
 
     const agents = await resolveAgents();
     expect(agents).toHaveLength(0);
+  });
+});
+
+describe("agents/index - ownedLedgerFiles", () => {
+  it("passes through undefined for an agent with no ledger entry at all", () => {
+    expect(ownedLedgerFiles(cursor, undefined, "/home/user")).toBeUndefined();
+  });
+
+  it("keeps entries under the adapter's owned prefixes (skills dir, legacy commands dir)", () => {
+    const files = {
+      "/home/user/.cursor/skills/grounder-note/SKILL.md": { hash: "sha256:a" },
+      "/home/user/.cursor/commands/grounder-note.md": { hash: "sha256:b" },
+    };
+    expect(ownedLedgerFiles(cursor, files, "/home/user")).toEqual(files);
+  });
+
+  it("drops a stray entry outside every owned prefix — a hand-edited or corrupted state.json", () => {
+    const files = {
+      "/home/user/.cursor/skills/grounder-note/SKILL.md": { hash: "sha256:a" },
+      "/etc/passwd": { hash: "sha256:evil" },
+    };
+    expect(ownedLedgerFiles(cursor, files, "/home/user")).toEqual({
+      "/home/user/.cursor/skills/grounder-note/SKILL.md": { hash: "sha256:a" },
+    });
   });
 });

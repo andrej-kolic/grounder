@@ -18,7 +18,6 @@ describe("commands/render-artifact-table", () => {
       expect(toRowStatus("skipped")).toBe("current");
       expect(toRowStatus("created")).toBe("create");
       expect(toRowStatus("overwritten")).toBe("update");
-      expect(toRowStatus("modified")).toBe("modified");
     });
   });
 
@@ -31,7 +30,7 @@ describe("commands/render-artifact-table", () => {
         forceAction: undefined,
       });
       expect(rowFromPlanEntry("cursor", { path: "/a", action: "forget" })).toMatchObject({
-        status: "current",
+        status: "forget",
       });
       expect(rowFromPlanEntry("cursor", { path: "/a", action: "create" })).toMatchObject({
         status: "create",
@@ -57,7 +56,7 @@ describe("commands/render-artifact-table", () => {
           {
             agent,
             plan: [{ path: "/note.md", action: "create" }],
-            hooks: { artifacts: { "/hooks.json": "modified" } },
+            hooks: { artifacts: { "/hooks.json": "overwritten" } },
             ledgerChanged: true,
           },
         ],
@@ -67,10 +66,9 @@ describe("commands/render-artifact-table", () => {
         { status: "create", target: "runtime", path: "/runtime" },
         { status: "create", target: "cursor", path: "/note.md", forceAction: undefined },
         {
-          status: "modified",
+          status: "update",
           target: "cursor hook",
           path: "/hooks.json",
-          forceAction: "overwrite",
         },
       ]);
     });
@@ -95,6 +93,13 @@ describe("commands/render-artifact-table", () => {
       expect(lines[0]).toBe("STATUS   TARGET      PATH");
       expect(lines[1]).toBe("created  cursor      /a");
       expect(lines[2]).toBe("conflict cursor hook /b");
+    });
+
+    it("labels a forget row 'forgotten' — distinct from noop's 'unchanged'", () => {
+      const rows: Row[] = [{ status: "forget", target: "cursor", path: "/legacy.md" }];
+      const out = captureStdout(() => renderTable(rows));
+      const lines = out.split("\n").filter(Boolean);
+      expect(lines[1]).toBe("forgotten cursor /legacy.md");
     });
   });
 
@@ -127,6 +132,18 @@ describe("commands/render-artifact-table", () => {
       ];
       const out = captureStdout(() => renderSummary(rows, true));
       expect(out).toBe("Would create 1, delete 1. Run without --dry-run to apply.\n");
+    });
+
+    it("a forget-only result is never reported as nothing to do, and is named distinctly from unchanged", () => {
+      // Regression: a `forget` row always changes state.json (it drops a
+      // stale ledger entry) even though the file itself is untouched —
+      // folding it into "current"/"unchanged" would print "Nothing to do"
+      // right above a state row that says "updated," and would leave that
+      // change unexplained by any visible row.
+      const rows: Row[] = [{ status: "forget", target: "cursor", path: "/legacy.md" }];
+      const out = captureStdout(() => renderSummary(rows, false));
+      expect(out).not.toContain("Nothing to do");
+      expect(out).toBe("Forgotten 1.\n");
     });
 
     it("real run: a conflict-only result is never reported as nothing to do", () => {

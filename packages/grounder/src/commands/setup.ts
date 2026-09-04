@@ -164,6 +164,9 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
           agents,
           force,
           hooks,
+          // `setup` never retires legacy pre-skill command files, even with
+          // `--force` — see docs/upgrading.md and ApplyAgentInstallsOptions#retireLegacy.
+          retireLegacy: false,
           dryRun: true,
           homeDir,
           grounderVersion: VERSION,
@@ -217,6 +220,7 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
         agents,
         force,
         hooks,
+        retireLegacy: false,
         homeDir,
         grounderVersion: VERSION,
       });

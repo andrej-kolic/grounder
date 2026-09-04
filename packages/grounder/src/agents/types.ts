@@ -1,10 +1,12 @@
 /**
  * - `created` / `overwritten` — wrote new content
  * - `skipped` — already current (or dry-run would no-op)
- * - `modified` — on-disk content differs from last Grounder write; left alone
- *   unless `--force`
+ *
+ * No `modified`/conflict status here: hook fragments always-converge (see
+ * `installHooks`'s own docs on `AgentAdapter`) — unlike whole-file artifacts,
+ * there is no `--force` gate to report a blocked state for.
  */
-export type ArtifactStatus = "created" | "skipped" | "overwritten" | "modified";
+export type ArtifactStatus = "created" | "skipped" | "overwritten";
 
 export interface AgentInstallOptions {
   force?: boolean;
@@ -41,6 +43,15 @@ export interface AgentAdapter {
    * even when the ledger never recorded them (pre-hash-tracking installs).
    */
   tombstones(homeDir?: string): string[];
+  /**
+   * Directories this adapter is allowed to create in and delete from for its
+   * whole-file artifacts (skills dir, legacy commands dir) — never hook
+   * config, which is a shared JSON file merged/unmerged in place, not
+   * whole-file reconciled. Callers use this to keep a stray ledger entry
+   * (hand-edited or corrupted `state.json`) from being treated as a delete
+   * candidate just because it happens to share this agent's id.
+   */
+  ownedPrefixes(homeDir?: string): string[];
   /**
    * Optional: converge session hooks (separate from whole-file artifact
    * install) — always-converge, no conflict/`--force` gate: removes every

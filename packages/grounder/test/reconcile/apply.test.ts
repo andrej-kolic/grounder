@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { readGrounderState, statePath } from "../../src/connector/state.js";
@@ -60,6 +60,42 @@ describe("reconcile/apply", () => {
 
     expect(await fileExists(filePath)).toBe(false);
     expect((await readGrounderState(env.home))?.agents.cursor?.files[filePath]).toBeUndefined();
+  });
+
+  it("a delete whose unlink fails (not ENOENT) throws and leaves the ledger entry intact", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    // A directory in place of the expected file — unlink() on it fails with
+    // EISDIR/EPERM, never ENOENT, without needing to mock node:fs/promises.
+    const dirAsFilePath = path.join(env.home, "legacy-dir.md");
+    await mkdir(dirAsFilePath, { recursive: true });
+
+    const { setLedgerFileHash } = await import("../../src/connector/state.js");
+    await setLedgerFileHash({
+      agentId: "cursor",
+      filePath: dirAsFilePath,
+      hash: "sha256:whatever",
+      grounderVersion: "0.5.0",
+      homeDir: env.home,
+    });
+
+    await expect(
+      applyPlan({
+        agentId: "cursor",
+        plan: [{ path: dirAsFilePath, action: "delete" }],
+        content: {},
+        grounderVersion: "0.6.0",
+        homeDir: env.home,
+      }),
+    ).rejects.toThrow();
+
+    // Still on disk (delete failed) and the ledger still remembers it — a
+    // failed delete must never be forgotten, or a future run would see "on
+    // disk, no ledger, not desired" and nothing left to retry it.
+    expect(await fileExists(dirAsFilePath)).toBe(true);
+    expect((await readGrounderState(env.home))?.agents.cursor?.files[dirAsFilePath]?.hash).toBe(
+      "sha256:whatever",
+    );
   });
 
   it("forget entries touch only the ledger, never the filesystem", async () => {

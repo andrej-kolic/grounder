@@ -756,9 +756,11 @@ describe("commands/migrate", () => {
 
       expect(code).toBe(0);
       // Nothing was created/updated/deleted on disk (already gone) — but the
-      // stale hash is dropped from the ledger, so `state` still reports
-      // "updated" even though no per-path row explains why.
+      // stale hash is dropped from the ledger, reported as its own
+      // "forgotten" row so the trailing state row's "updated" isn't left
+      // unexplained.
       expect(hasRow(out, "deleted", legacyPath)).toBe(false);
+      expect(hasRow(out, "forgotten", legacyPath)).toBe(true);
       expect(hasRow(out, "updated", statePath(env.home))).toBe(true);
       const state = await readGrounderState(env.home);
       expect(state?.agents.cursor?.files ?? {}).not.toHaveProperty(legacyPath);
@@ -790,6 +792,7 @@ describe("commands/migrate", () => {
       expect(code).toBe(0);
       // Predicts the same "state updated" outcome a real run would report,
       // without actually writing.
+      expect(hasRow(out, "forgotten", legacyPath)).toBe(true);
       expect(hasRow(out, "updated", statePath(env.home))).toBe(true);
       const state = await readGrounderState(env.home);
       expect(state?.agents.cursor?.files ?? {}).toHaveProperty(legacyPath);
@@ -812,6 +815,49 @@ describe("commands/migrate", () => {
 
       expect(await fileExists(legacyPath)).toBe(true);
       expect(await readFile(legacyPath, "utf8")).toBe("pre-existing legacy file\n");
+    });
+
+    it("grounder setup --force still never retires legacy command files (only migrate does)", async () => {
+      // docs/upgrading.md: "grounder setup never does this cleanup, even with
+      // --force — only migrate retires old install shapes." This exercises
+      // the actual --force path — the prior test above never passes force,
+      // so it can't tell "setup ignores tombstones" apart from "setup ignores
+      // hash-matching leftovers because force is off."
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      await runSetupWithOptions({
+        vaultPath: env.vault,
+        yes: true,
+        homeDir: env.home,
+        agents: ["cursor"],
+      });
+
+      const legacyPath = legacyCursorNotePath(env.home);
+      await mkdir(path.dirname(legacyPath), { recursive: true });
+      const legacyContent = "old pre-skill note command\n";
+      await writeFile(legacyPath, legacyContent, "utf8");
+      await setLedgerFileHash({
+        agentId: "cursor",
+        filePath: legacyPath,
+        hash: hashContent(legacyContent),
+        grounderVersion: "0.5.0",
+        homeDir: env.home,
+      });
+
+      const { code } = await captureStdout(() =>
+        runSetupWithOptions({
+          vaultPath: env.vault,
+          yes: true,
+          force: true,
+          homeDir: env.home,
+          agents: ["cursor"],
+        }),
+      );
+
+      expect(code).toBe(0);
+      expect(await fileExists(legacyPath)).toBe(true);
+      expect(await readFile(legacyPath, "utf8")).toBe(legacyContent);
     });
 
     it("groups each agent's legacy-retirement row with that agent's own rows, not after every agent's rows", async () => {
