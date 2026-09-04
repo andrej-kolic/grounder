@@ -14,16 +14,31 @@ import path from "node:path";
 /**
  * True when `filePath` sits under one of `prefixes` (a directory, matched
  * exactly or via a `prefix + separator` boundary — never a bare substring
- * match). Callers use this to keep a ledger's extra/stray entries — a
- * hand-edited or corrupted `state.json`, say — from ever being treated as
- * delete candidates for paths outside the directories an adapter actually
- * manages. `reconcile()` itself stays agnostic to this (see its own docs);
- * callers filter `ledger` before passing it in.
+ * match, and never a `..`-segment escape). Callers use this to keep a
+ * ledger's extra/stray entries — a hand-edited or corrupted `state.json`,
+ * say — from ever being treated as delete candidates for paths outside the
+ * directories an adapter actually manages. Comparison is lexical
+ * (`path.resolve` + `path.relative`, no symlink following): both sides are
+ * resolved to absolute form first, so a `../` segment in `filePath` cannot
+ * walk back out of a prefix it superficially starts with.
+ * `reconcile()` itself stays agnostic to this (see its own docs); callers
+ * filter `ledger` before passing it in.
  */
 export function isUnderOwnedPrefix(filePath: string, prefixes: readonly string[]): boolean {
-  return prefixes.some(
-    (prefix) => filePath === prefix || filePath.startsWith(`${prefix}${path.sep}`),
-  );
+  const target = path.resolve(filePath);
+  return prefixes.some((prefix) => {
+    const root = path.resolve(prefix);
+    if (root === target) {
+      return true;
+    }
+    const relative = path.relative(root, target);
+    return (
+      relative !== "" &&
+      relative !== ".." &&
+      !relative.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relative)
+    );
+  });
 }
 
 export type DriftKind = "create" | "update";

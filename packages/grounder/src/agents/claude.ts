@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { resolveHomeDir } from "../connector/home.js";
 import { fileExists } from "../util/fs.js";
 import { mergeJsonFile } from "../util/merge-json.js";
-import { isAlreadyConverged, removeMatchingEntries } from "./hook-fragment.js";
+import { removeMatchingEntries } from "./hook-fragment.js";
 import {
   installHookRuntime,
   isGrounderPeekHookCommand,
@@ -153,16 +153,29 @@ function isMatcherGroup(group: unknown): group is Record<string, unknown> {
   return group !== null && typeof group === "object" && !Array.isArray(group);
 }
 
-/** Every Grounder hook entry across every matcher group, flattened. */
-function findAllPeekHooks(sessionStart: readonly unknown[]): unknown[] {
-  const found: unknown[] = [];
+/** One Grounder hook entry plus the matcher group it was found under. */
+interface PlacedPeekHook {
+  matcher: unknown;
+  hook: unknown;
+}
+
+/** Every Grounder hook entry across every matcher group, tagged with its group's matcher. */
+function findAllPeekHooksPlaced(sessionStart: readonly unknown[]): PlacedPeekHook[] {
+  const found: PlacedPeekHook[] = [];
   for (const group of sessionStart) {
     if (!isMatcherGroup(group) || !Array.isArray(group.hooks)) {
       continue;
     }
-    found.push(...group.hooks.filter(isClaudeHookEntry));
+    for (const hook of group.hooks.filter(isClaudeHookEntry)) {
+      found.push({ matcher: group.matcher, hook });
+    }
   }
   return found;
+}
+
+/** Every Grounder hook entry across every matcher group, flattened. */
+function findAllPeekHooks(sessionStart: readonly unknown[]): unknown[] {
+  return findAllPeekHooksPlaced(sessionStart).map((placed) => placed.hook);
 }
 
 /** Remove every Grounder hook entry from every matcher group's `hooks` array. */
@@ -198,10 +211,12 @@ async function peekHookHadGrounderEntry(filePath: string): Promise<boolean> {
 }
 
 /**
- * Skip only when exactly one canonical entry is already present *and* the
+ * Skip only when exactly one canonical entry is already present *under the
+ * canonical matcher group* ({@link CLAUDE_SESSION_START_MATCHER}) *and* the
  * runtime is current for the running grounder version/source. Anything else
  * — no entry, a legacy `npx` form, a drifted command, more than one match
- * (however scattered across matcher groups) — always converges.
+ * (however scattered across matcher groups), or the one match sitting under
+ * the wrong matcher — always converges.
  */
 async function peekHookUpToDate(filePath: string, homeDir?: string): Promise<boolean> {
   if (!(await fileExists(filePath))) {
@@ -215,7 +230,11 @@ async function peekHookUpToDate(filePath: string, homeDir?: string): Promise<boo
     if (!sessionStart) {
       return false;
     }
-    return isAlreadyConverged(findAllPeekHooks(sessionStart), () => true, peekHookEntry(homeDir));
+    const placed = findAllPeekHooksPlaced(sessionStart);
+    if (placed.length !== 1 || placed[0].matcher !== CLAUDE_SESSION_START_MATCHER) {
+      return false;
+    }
+    return JSON.stringify(placed[0].hook) === JSON.stringify(peekHookEntry(homeDir));
   } catch {
     return false;
   }
@@ -231,6 +250,10 @@ async function peekHookUpToDate(filePath: string, homeDir?: string): Promise<boo
  * 1. A matcher group with `matcher === CLAUDE_SESSION_START_MATCHER` exists
  *    (possibly the very one a match was just removed from) → append there.
  * 2. Else → push a new matcher group with Grounder's hook.
+ *
+ * Any matcher group the removal step emptied — e.g. a Grounder-only hook
+ * that lived under a non-canonical matcher — is dropped rather than left
+ * behind as clutter, matching {@link removeClaudeHooks}'s uninstall path.
  *
  * @param current - Parsed settings.json root (object). Other top-level keys untouched.
  * @param homeDir - Home override for the canonical command path
@@ -262,6 +285,9 @@ function mergeClaudeHooks(
   } else {
     nextSessionStart = [...cleaned, { matcher: CLAUDE_SESSION_START_MATCHER, hooks: [entry] }];
   }
+  nextSessionStart = nextSessionStart.filter(
+    (group) => !isMatcherGroup(group) || !Array.isArray(group.hooks) || group.hooks.length > 0,
+  );
 
   return { ...current, hooks: { ...hooks, SessionStart: nextSessionStart } };
 }

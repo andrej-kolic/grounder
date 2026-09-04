@@ -294,6 +294,48 @@ describe("agents/claude hooks", () => {
       expect(await readFile(dest, "utf8")).toBe(original);
     });
 
+    it("converges a byte-identical canonical entry sitting under the wrong matcher group instead of reporting it as already up to date", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+
+      const dest = claudeSettingsJsonPath(env.home);
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(
+        dest,
+        `${JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                {
+                  matcher: "*",
+                  hooks: [{ type: "command", command: claudePeekHookCommand(env.home) }],
+                },
+              ],
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const result = await claude.installHooks?.({ homeDir: env.home });
+
+      // Not "skipped": the entry's bytes matched but it lived under the wrong
+      // matcher, so this must still converge it into the canonical group —
+      // and not leave the now-empty "*" group behind.
+      expect(result?.artifacts[dest]).toBe("overwritten");
+      expect(JSON.parse(await readFile(dest, "utf8"))).toEqual({
+        hooks: {
+          SessionStart: [
+            {
+              matcher: CLAUDE_SESSION_START_MATCHER,
+              hooks: [{ type: "command", command: claudePeekHookCommand(env.home) }],
+            },
+          ],
+        },
+      });
+    });
+
     it("dedupes a legacy npx entry and a runtime-form entry scattered across two matcher groups into exactly one canonical entry", async () => {
       const env = await createTempEnv({ initGit: false });
       cleanup = env.cleanup;

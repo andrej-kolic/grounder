@@ -173,4 +173,15 @@ describe("util/merge-json", () => {
     const raw = await readFile(filePath, "utf8");
     expect(raw).toBe(`${JSON.stringify({ a: 1, b: { c: 2 } }, null, 2)}\n`);
   });
+
+  it("a merge that returns its input by reference is a no-op, even with differently-formatted on-disk JSON", async () => {
+    const filePath = await tempFile();
+    const original = '{\n    "a": 1,\n    "b": 2\n}\n';
+    await writeFile(filePath, original);
+
+    const result = await mergeJsonFile(filePath, (current) => current);
+
+    expect(result).toEqual({ ok: true, created: false, changed: false });
+    expect(await readFile(filePath, "utf8")).toBe(original);
+  });
 });

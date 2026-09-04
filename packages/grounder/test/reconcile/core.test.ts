@@ -24,6 +24,14 @@ describe("reconcile/core", () => {
     it("rejects a path under none of the given prefixes", () => {
       expect(isUnderOwnedPrefix("/etc/passwd", ["/a/b", "/a/c"])).toBe(false);
     });
+
+    it("rejects a `..` escape that superficially starts with the prefix", () => {
+      expect(isUnderOwnedPrefix("/a/b/../../../etc/passwd", ["/a/b"])).toBe(false);
+    });
+
+    it("still matches a path whose `..` segments resolve back under the prefix", () => {
+      expect(isUnderOwnedPrefix("/a/b/x/../c.md", ["/a/b"])).toBe(true);
+    });
   });
 
   describe("desiredDrift", () => {
