@@ -96,7 +96,13 @@ export function homeSkillsLayout(options: HomeSkillsLayoutOptions): HomeSkillsLa
     expectedArtifacts: (homeDir) =>
       SKILL_FILES.map((filename) => path.join(skillsDir(homeDir), filename)),
 
-    async desiredArtifacts(homeDir) {
+    // Arrow function, not a shorthand method — every member of this object
+    // must be reachable with no bound `this` (see the file-level doc comment
+    // on why `cursor.ts`/`claude.ts` detach these off the closure), and a
+    // shorthand method is the one member shape that can silently start using
+    // `this` and type-check fine while breaking only at those detached call
+    // sites.
+    desiredArtifacts: async (homeDir) => {
       const cli = runtimeInvocation(homeDir);
       const dir = skillsDir(homeDir);
       const desired: Record<string, string> = {};
