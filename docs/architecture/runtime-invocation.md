@@ -25,7 +25,11 @@ No registry fetch and no reliance on `PATH` at invocation time. Paths are shell-
 | Source | Mode | Stay current |
 | --- | --- | --- |
 | Durable (monorepo checkout, global install, linked dep) | Symlink `dist/` to source | Upgrade / `pnpm build` overwrites in place — no re-run needed |
-| Ephemeral (bare `npx`, version-keyed cache) | Copy `dist/` | Re-run `grounder migrate` (or `setup`) after upgrading |
+| Ephemeral (bare `npx`, version-keyed cache) | Copy `dist/`, `package.json`, and `templates/` (if present) | Re-run `grounder migrate` (or `setup`) after upgrading |
+
+Copy mode needs `package.json` and `templates/` alongside `dist/`, not just `dist/` itself: `src/index.ts` reads `VERSION` from `<pkgRoot>/package.json` eagerly at import, and `home-skills.ts` reads `<pkgRoot>/templates` on demand (`desiredArtifacts()`, and the drift check `status`/`doctor`/`peek` run). Symlink mode needs neither copied, since Node resolves `import.meta.url` through `dist/`'s own symlink back to the real package root — and it actively removes any copy-mode siblings a prior install left behind, so a symlinked `dist/` never ends up with stale siblings next to it.
+
+All artifacts (`dist/`, and in copy mode, `package.json` / `templates/`) are staged first, then promoted together (`installArtifacts` in `agents/hook-runtime.ts`) — a promote failure after an earlier artifact has already promoted rolls that artifact back too, rather than leaving it and the failed one in a mixed state. This isn't a true single filesystem transaction (POSIX has no atomic rename across independent paths), but it also self-heals regardless: the manifest is only written after every artifact succeeds, so any failed upgrade leaves the old (mismatched) manifest version in place, which the next `isHookRuntimeStale` check reads as stale and retries.
 
 Session hooks stay fast and side-effect-free: they never self-heal the runtime. Refresh is an explicit, idempotent install step.
 

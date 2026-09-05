@@ -12,7 +12,7 @@
 
 import { fileExists } from "../util/fs.js";
 import { mergeJsonFile } from "../util/merge-json.js";
-import { installHookRuntime } from "./hook-runtime.js";
+import { installHookRuntime, isHookRuntimeStale } from "./hook-runtime.js";
 import type { AgentInstallOptions, AgentInstallResult, ArtifactStatus } from "./types.js";
 
 export interface HookFragmentInstall {
@@ -39,8 +39,17 @@ export interface HookFragmentInstall {
 
 /**
  * Install (or converge) a hook fragment, also materializing `~/.grounder/runtime`
- * on a real run. Always converges — no `--force` gate; `force` only affects
- * whole-file skill artifacts, never a shared-JSON fragment.
+ * on a real run if it's stale. Always converges the fragment itself — no
+ * `--force` gate; `force` only affects whole-file skill artifacts, never a
+ * shared-JSON fragment.
+ *
+ * The runtime materialization is gated on {@link isHookRuntimeStale}, not
+ * unconditional: an invocation running through the materialized runtime's
+ * own `dist/cli.js` (e.g. `{{GROUNDER_CLI}}` in a skill) has
+ * `defaultPackageRoot` resolve to the runtime itself, which
+ * {@link installHookRuntime} refuses to materialize from (see its doc
+ * comment) — skipping the call here when the runtime is already current
+ * avoids that throw.
  *
  * Never clobbers: an unparseable config backs off inside {@link mergeJsonFile},
  * and a `merge` that refuses (see `readHooksObject`) throws before any write.
@@ -55,7 +64,7 @@ export async function installHookFragment(
     return { artifacts: { [dest]: "skipped" } };
   }
 
-  if (!opts.dryRun) {
+  if (!opts.dryRun && (await isHookRuntimeStale(opts.homeDir))) {
     await installHookRuntime({ homeDir: opts.homeDir });
   }
 

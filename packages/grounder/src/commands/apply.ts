@@ -147,12 +147,12 @@ export async function applyAgentInstalls(
     // `force` isn't needed to justify a reinstall — only actual staleness is.
     const stale = await isHookRuntimeStale(homeDir);
     if (!stale) {
-      runtime = { cliPath, status: "skipped", mode: runtimeMode() };
+      runtime = { cliPath, status: "skipped", mode: await runtimeMode() };
     } else if (dryRun) {
       runtime = {
         cliPath,
         status: (await fileExists(cliPath)) ? "overwritten" : "created",
-        mode: runtimeMode(),
+        mode: await runtimeMode(),
       };
     } else {
       runtime = await installHookRuntime({ homeDir });

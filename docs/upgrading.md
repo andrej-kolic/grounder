@@ -59,7 +59,8 @@ Hooks *and* skills both run `~/.grounder/runtime/dist/cli.js` directly (never
 - **Real install** (`npm i -g grounder`, `pnpm add -g grounder`, or a monorepo checkout)
   → symlinked. Upgrading overwrites the same path in place, so both stay current with
   **no re-run needed**.
-- **Bare** `npx grounder setup …` (nothing installed) → copied, since each `npx`
+- **Bare** `npx grounder setup …` (nothing installed) → copied (`dist/`, plus
+  `package.json` and `templates/` alongside it), since each `npx`
   invocation resolves to a disposable, version-pinned cache dir that can't be symlinked
   durably. Re-run `grounder migrate` (or `setup`) after upgrading to refresh — no
   `--force` needed.
