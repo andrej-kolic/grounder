@@ -159,6 +159,17 @@ Subcommands:
   --json          Structured output (relativePath, fileUri, alsoMatchedHint per hit)`,
   },
   {
+    id: "overview",
+    group: "Retrieve",
+    summary: "Bird's-eye view: counts + recent titles across notes/handoffs/plans",
+    listUsage: "overview",
+    usage: "grounder overview [--limit <n>] [--markdown] [--json]",
+    flags: `Flags:
+  --limit <n>  Max recent titles to print per bucket (default: 3)
+  --markdown   Agent relay: [bucketRelativePath](fileUri) title lines
+  --json       Structured output (count, truncated, items per bucket)`,
+  },
+  {
     id: "path notes",
     group: "Paths",
     summary: "Print resolved notes directory",
@@ -272,6 +283,7 @@ export const DISPATCHED_COMMAND_IDS = [
   "plan",
   "plan list",
   "search",
+  "overview",
   "path",
   "path notes",
   "path logs",

@@ -46,7 +46,7 @@ async function findTemplateFiles(): Promise<string[]> {
 }
 
 /** `{{GROUNDER_CLI}} note …` / `handoff list …` / `plan …` — a real invocation. */
-const INVOCATION = /^\s+(note|handoff|plan|search)(?:\s+([a-z]+))?\b/;
+const INVOCATION = /^\s+(note|handoff|plan|search|overview)(?:\s+([a-z]+))?\b/;
 /** `Run {{GROUNDER_CLI}} with \`required_permissions…\`` — generic prose, not an invocation. */
 const PROSE_REFERENCE = /^\s+with\s+`/;
 /** Long-form flags (`--title`, `--limit`, …) mentioned within a documented invocation's own span. */
