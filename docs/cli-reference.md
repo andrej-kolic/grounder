@@ -9,6 +9,7 @@ full synopsis, `grounder --help`.
 - [Plan flags](#plan-flags)
 - [Search flags](#search-flags)
 - [Doctor flags](#doctor-flags)
+- [Status flags](#status-flags)
 - [Status vs doctor](#status-vs-doctor)
 
 See also: [Configuration](configuration.md) · [Upgrading](upgrading.md) ·
@@ -136,6 +137,18 @@ default, full-reads the top four hits, and synthesizes a short answer — see
 | Flag       | Description                                    |
 | ---------- | ---------------------------------------------- |
 | `--global` | Machine-only checks (skip project/link checks) |
+
+## Status flags
+
+| Flag     | Description                                                                     |
+| -------- | -------------------------------------------------------------------------------- |
+| `--json` | Single-line JSON payload (`machine` + `project`, flat camelCase fields) instead of formatted text — for scripts/agents (e.g. the VS Code extension) that need link state without parsing text or reading `.grounder.json` / `~/.grounder/config.json` directly. |
+
+State fields in the JSON output (`machine.configState`, `machine.state.status`,
+`project.configState`) are fixed enums meant for a consumer to switch on. Human fix hints
+(e.g. `"missing → grounder link"` in the text output) are not part of those enums — the
+JSON output only carries `packageVersionNotice`, a plain-language sentence, not the
+CLI's arrow-style hint.
 
 ## Status vs doctor
 
