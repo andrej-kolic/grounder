@@ -1,4 +1,4 @@
-import { access, constants, mkdir, rename, unlink, writeFile } from "node:fs/promises";
+import { access, chmod, constants, mkdir, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { collisionSuffix } from "./timestamp-slug.js";
 
@@ -30,11 +30,23 @@ export async function isExecutable(filePath: string): Promise<boolean> {
  * never leaves a truncated file at the real path. Creates the destination
  * directory if needed; best-effort removes the tmp file if `rename` itself
  * throws, so a failed write doesn't leave an orphaned `.tmp-*` sibling behind.
+ * `mode` (e.g. the pre-existing file's permission bits), when given, is
+ * applied to the tmp file before the rename — otherwise the replaced file
+ * would pick up the tmp file's default umask permissions instead of keeping
+ * whatever the file already had, which matters for host-owned config files
+ * edited by other tools.
  */
-export async function writeFileAtomic(filePath: string, content: string): Promise<void> {
+export async function writeFileAtomic(
+  filePath: string,
+  content: string,
+  options: { mode?: number } = {},
+): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
   await writeFile(tmpPath, content, "utf8");
+  if (options.mode !== undefined) {
+    await chmod(tmpPath, options.mode);
+  }
   try {
     await rename(tmpPath, filePath);
   } catch (error) {

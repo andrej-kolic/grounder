@@ -1,7 +1,7 @@
-import { chmod, mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { fileExists, isExecutable } from "../../src/util/fs.js";
+import { fileExists, isExecutable, writeFileAtomic } from "../../src/util/fs.js";
 import { createTempEnv } from "../helpers.js";
 
 describe("util/fs", () => {
@@ -53,5 +53,29 @@ describe("util/fs", () => {
         expect(await isExecutable(plainPath)).toBe(false);
       },
     );
+  });
+
+  describe("writeFileAtomic", () => {
+    it("creates parent directories and writes content, leaving no tmp sibling", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+      const filePath = path.join(env.home, "nested", "config.json");
+
+      await writeFileAtomic(filePath, "content\n");
+
+      const dirEntries = await readdir(path.dirname(filePath));
+      expect(dirEntries).toEqual([path.basename(filePath)]);
+      expect(await readFile(filePath, "utf8")).toBe("content\n");
+    });
+
+    it.skipIf(process.platform === "win32")("applies mode to the file when given", async () => {
+      const env = await createTempEnv({ initGit: false });
+      cleanup = env.cleanup;
+      const filePath = path.join(env.home, "config.json");
+
+      await writeFileAtomic(filePath, "{}\n", { mode: 0o640 });
+
+      expect((await stat(filePath)).mode & 0o777).toBe(0o640);
+    });
   });
 });

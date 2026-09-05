@@ -1,6 +1,5 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { fileExists } from "./fs.js";
+import { readFile, stat } from "node:fs/promises";
+import { fileExists, writeFileAtomic } from "./fs.js";
 
 export type MergeJsonResult =
   | { ok: true; created: boolean; changed: boolean }
@@ -61,8 +60,12 @@ export async function mergeJsonFile(
   const changed = next !== current && nextRaw !== originalRaw;
 
   if (changed && !options.dryRun) {
-    await mkdir(path.dirname(filePath), { recursive: true });
-    await writeFile(filePath, nextRaw, "utf8");
+    // Preserve the existing file's permission bits across the tmp+rename
+    // swap — these are host-owned config files (Cursor/Claude Code), not
+    // Grounder's own state, so a rename shouldn't reset them to the tmp
+    // file's default umask.
+    const mode = existed ? (await stat(filePath)).mode & 0o777 : undefined;
+    await writeFileAtomic(filePath, nextRaw, mode !== undefined ? { mode } : {});
   }
   return { ok: true, created: !existed, changed };
 }

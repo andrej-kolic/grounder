@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { chmod, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { fileExists } from "../../src/util/fs.js";
@@ -184,4 +184,27 @@ describe("util/merge-json", () => {
     expect(result).toEqual({ ok: true, created: false, changed: false });
     expect(await readFile(filePath, "utf8")).toBe(original);
   });
+
+  it("writes via tmp file + rename, leaving no tmp sibling behind", async () => {
+    const filePath = await tempFile();
+    await writeFile(filePath, "{}\n");
+
+    await mergeJsonFile(filePath, () => ({ a: 1 }));
+
+    const entries = await readdir(path.dirname(filePath));
+    expect(entries).toEqual([path.basename(filePath)]);
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "preserves the existing file's permission bits across a write",
+    async () => {
+      const filePath = await tempFile();
+      await writeFile(filePath, "{}\n");
+      await chmod(filePath, 0o640);
+
+      await mergeJsonFile(filePath, () => ({ a: 1 }));
+
+      expect((await stat(filePath)).mode & 0o777).toBe(0o640);
+    },
+  );
 });
