@@ -56,7 +56,7 @@ one template directory.
 
 Design notes (not user how-tos):
 
-- [Schema versioning and install migration](docs/architecture/schema-versioning.md) — `state.json`, hash drift, `grounder migrate`, forward-compat
+- [State reconciliation](docs/architecture/state-reconciliation.md) — `state.json`, hash drift, tombstoned legacy paths, `grounder migrate`, forward-compat
 - [Runtime invocation](docs/architecture/runtime-invocation.md) — baked Node + `~/.grounder/runtime`, doctor dangling-interpreter check
 - [Vault search](docs/architecture/vault-search.md) — how `grounder search` scans and ranks
 

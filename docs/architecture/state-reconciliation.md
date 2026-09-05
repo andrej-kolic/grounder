@@ -14,13 +14,11 @@ on the machine (skill files, hook fragments, `~/.grounder/runtime`). Those artif
 drift from what the new binary expects, and a previous install shape can leave files behind
 that the current shape no longer wants at all.
 
-An earlier design tracked this with per-agent `commandsSchema`/`hooksSchema` integers plus a
-hand-written `migrations/` list of one-off cleanup steps. Both were re-derivations of facts
-already recoverable from the filesystem — the schema ints duplicated what a content-hash
-compare already answered, and the migration list had to be re-registered by hand every time
-retirement logic changed. This doc describes the reconciler that replaced them: `setup`,
-`migrate`, `doctor`, `status`, and `handoff peek` now all call one of two shared pure
-functions instead of each maintaining its own opinion about what changed.
+An earlier design tracked this with per-agent `commandsSchema`/`hooksSchema` integers — a
+re-derivation of facts already recoverable from the filesystem, since the schema ints
+duplicated what a content-hash compare already answered. This doc describes the reconciler
+that replaced it: `setup`, `migrate`, `doctor`, `status`, and `handoff peek` now all call one
+of two shared pure functions instead of each maintaining its own opinion about what changed.
 
 ## Prior art
 
