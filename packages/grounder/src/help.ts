@@ -196,7 +196,9 @@ Subcommands:
     group: "Maintain",
     summary: "Snapshot of machine + project link + resolved paths",
     listUsage: "status",
-    usage: "grounder status",
+    usage: "grounder status [--json]",
+    flags: `Flags:
+  --json  Print a single-line JSON payload instead of formatted text`,
   },
   {
     id: "doctor",
