@@ -1,0 +1,40 @@
+{
+  "name": "grounder-vscode-extension",
+  "displayName": "Grounder (spike)",
+  "description": "Drag-and-drop spike for the Grounder VS Code extension. Not a real release — see README.",
+  "version": "0.0.1",
+  "private": true,
+  "publisher": "grounder-dev",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "grounderSpike",
+          "name": "Grounder (spike)"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run build",
+    "build": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "npx --yes @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@types/node": "^26.0.1",
+    "typescript": "^6.0.3"
+  }
+}
