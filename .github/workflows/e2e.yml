@@ -24,8 +24,6 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm build
-
       - name: E2E
+        # e2e target runs build+test
         run: pnpm e2e
