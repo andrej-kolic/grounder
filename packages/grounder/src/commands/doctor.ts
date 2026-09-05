@@ -7,16 +7,15 @@ import {
   isHookRuntimeStale,
 } from "../agents/hook-runtime.js";
 import type { AgentAdapter, AgentInstallResult } from "../agents/index.js";
-import { resolveAgents } from "../agents/index.js";
+import { ownedLedgerFiles, resolveAgents } from "../agents/index.js";
 import { findGitRoot } from "../connector/git.js";
 import { homeConfigPath, readHomeConfig, withHomeDir } from "../connector/home.js";
 import { findLinkedRepoRoot, readRepoConfig } from "../connector/repo.js";
 import {
   type GrounderState,
-  isHooksSchemaAhead,
+  ledgerFilesFor,
   readGrounderState,
-  recordedCommandsSchema,
-  recordedHooksSchema,
+  recordedHooksEnabled,
   statePath,
 } from "../connector/state.js";
 import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
@@ -28,7 +27,10 @@ import {
 } from "../connector/vault.js";
 import { helpExitCode } from "../help.js";
 import { VERSION } from "../index.js";
+import { type PlanEntry, reconcile } from "../reconcile/core.js";
+import { readDiskHashes } from "../reconcile/disk.js";
 import { fileExists, isExecutable } from "../util/fs.js";
+import { hashContent } from "../util/hash.js";
 import { flagBool, parseArgs } from "../util/parse-args.js";
 import { projectsParent } from "../vault/layout.js";
 import { type CheckResult, failCheck, okCheck, warnCheck } from "./check.js";
@@ -190,6 +192,16 @@ async function loadInstallState(homeDir?: string): Promise<{
     };
   } catch (error: unknown) {
     const detail = error instanceof Error ? error.message : String(error);
+    // Stays `failCheck` either way: `runMachineChecks` derives `stateReadable`
+    // from `level !== "fail"`, and that flag is what stops
+    // `checkAgentArtifacts`/`checkAgentHooks` from inventing drift against a
+    // `null` state.
+    if (isUnsupportedSchemaError(error)) {
+      return {
+        state: null,
+        check: failCheck("install-state", `install state unsupported: ${detail}`, UPGRADE_GROUNDER),
+      };
+    }
     return {
       state: null,
       check: failCheck(
@@ -213,84 +225,52 @@ function checkPackageVersion(state: GrounderState | null): CheckResult | null {
   return warnCheck("package-version", notice.message, notice.fix);
 }
 
-function commandsSchemaAhead(
-  agent: AgentAdapter,
-  state: GrounderState | null,
-  stateReadable: boolean,
-): boolean {
-  if (!stateReadable) {
-    return false;
+function pendingWriteMessage(kind: string, created: number, updated: number): string {
+  if (created > 0 && updated > 0) {
+    return `${created + updated} ${kind} would install or update on next migrate`;
   }
-  return recordedCommandsSchema(state, agent.id) > agent.commandsSchema;
-}
-
-function commandsSchemaBehind(
-  agent: AgentAdapter,
-  state: GrounderState | null,
-  stateReadable: boolean,
-): boolean {
-  if (!stateReadable || !state?.agents[agent.id]) {
-    return false;
+  if (created > 0) {
+    return `${created} ${kind} would install on next migrate`;
   }
-  return recordedCommandsSchema(state, agent.id) < agent.commandsSchema;
-}
-
-function hooksSchemaAhead(
-  agent: AgentAdapter,
-  state: GrounderState | null,
-  stateReadable: boolean,
-): boolean {
-  if (!stateReadable || agent.hooksSchema === undefined) {
-    return false;
-  }
-  return isHooksSchemaAhead(state?.agents[agent.id]?.hooksSchema, agent.hooksSchema);
-}
-
-/** Match {@link isInstallSchemaStale}: only when a hooks version was recorded. */
-function hooksSchemaBehindInLedger(
-  agent: AgentAdapter,
-  state: GrounderState | null,
-  stateReadable: boolean,
-): boolean {
-  if (!stateReadable || agent.hooksSchema === undefined) {
-    return false;
-  }
-  const recorded = state?.agents[agent.id]?.hooksSchema;
-  if (recorded === undefined) {
-    return false;
-  }
-  return recorded < agent.hooksSchema;
+  return `${updated} ${kind} would update on next migrate`;
 }
 
 /**
- * When on-disk files already match templates but `state.json` schema numbers
- * lag, surface the same migrate hint `status` shows for ledger staleness.
+ * Map a reconciled plan onto a doctor check. `conflict` needs `--force`;
+ * `create`/`update` would write on plain migrate. `noop`/`forget` count as
+ * up to date (a `forget`-only plan has nothing on disk to act on).
  */
-function applyLedgerSchemaLag(
-  check: CheckResult,
-  opts: {
-    id: string;
-    agentName: string;
-    kind: "commands" | "hooks";
-    recorded: number;
-    current: number;
-    behind: boolean;
-  },
+function checkFromPlan(
+  id: string,
+  agentName: string,
+  kind: string,
+  plan: readonly PlanEntry[],
+  upToDateMessage: string,
 ): CheckResult {
-  if (check.level !== "ok" || !opts.behind) {
-    return check;
+  const conflicts = plan.filter((e) => e.action === "conflict").length;
+  const created = plan.filter((e) => e.action === "create").length;
+  const updated = plan.filter((e) => e.action === "update").length;
+  const wouldWrite = created + updated;
+
+  if (conflicts === 0 && wouldWrite === 0) {
+    return okCheck(id, upToDateMessage);
+  }
+  if (conflicts === 0) {
+    return warnCheck(id, `${agentName}: ${pendingWriteMessage(kind, created, updated)}`, MIGRATE);
   }
   return warnCheck(
-    opts.id,
-    `${opts.agentName}: ${opts.kind} schema behind in ledger (recorded ${opts.recorded}, current ${opts.current}; files match)`,
-    MIGRATE,
+    id,
+    `${agentName}: ${conflicts} ${kind} locally modified (needs --force to refresh)` +
+      (wouldWrite > 0 ? `, ${wouldWrite} would auto-update` : ""),
+    MIGRATE_FORCE,
   );
 }
 
 /**
- * Map migrate dry-run artifact statuses onto a doctor check.
- * `modified` needs `--force`; `overwritten` / `created` would write on plain migrate.
- * Only `skipped` counts as up to date.
+ * Map the hook install preview onto a doctor check. Hooks always-converge —
+ * no conflict/`--force` gate (see `AgentAdapter#installHooks`'s own docs) —
+ * so unlike {@link checkFromPlan}'s whole-file artifacts, there's no
+ * "locally modified" case to report here.
  */
 function checkFromInstallPreview(
   id: string,
@@ -300,45 +280,98 @@ function checkFromInstallPreview(
   upToDateMessage: string,
 ): CheckResult {
   const statuses = Object.values(preview.artifacts);
-  const modified = statuses.filter((s) => s === "modified").length;
   const created = statuses.filter((s) => s === "created").length;
   const overwritten = statuses.filter((s) => s === "overwritten").length;
   const wouldWrite = created + overwritten;
 
-  if (modified === 0 && wouldWrite === 0) {
+  if (wouldWrite === 0) {
     return okCheck(id, upToDateMessage);
   }
-  if (modified === 0) {
-    return warnCheck(
-      id,
-      `${agentName}: ${pendingWriteMessage(kind, created, overwritten)}`,
-      MIGRATE,
-    );
-  }
-  return warnCheck(
-    id,
-    `${agentName}: ${modified} ${kind} locally modified (needs --force to refresh)` +
-      (wouldWrite > 0 ? `, ${wouldWrite} would auto-update` : ""),
-    MIGRATE_FORCE,
-  );
+  return warnCheck(id, `${agentName}: ${pendingWriteMessage(kind, created, overwritten)}`, MIGRATE);
 }
 
-function pendingWriteMessage(kind: string, created: number, overwritten: number): string {
-  if (created > 0 && overwritten > 0) {
-    return `${created + overwritten} ${kind} would install or update on next migrate`;
+interface AgentPlan {
+  skillEntries: PlanEntry[];
+  legacyEntries: PlanEntry[];
+  /**
+   * Ledger-tracked paths that fell out of the desired set without being
+   * added to {@link AgentAdapter.tombstones} — a skill dropped from the
+   * current release with nobody remembering to tombstone the old path.
+   * `reconcile()` already plans these (they're in `allPaths` via
+   * `ledgerFiles`) and `migrate` already acts on them; before this bucket
+   * existed, `computeAgentPlan`'s two-way split silently dropped their plan
+   * entries on the floor, so doctor could never warn about them ahead of a
+   * `migrate` that deletes or forgets them.
+   */
+  orphanedEntries: PlanEntry[];
+}
+
+/**
+ * One reconcile() call per agent covering desired skill files, tombstoned
+ * legacy paths, and any other ledger-recorded path, then split three ways by
+ * which side of the diff each path fell on — the same plan `migrate`/`setup`
+ * would apply, so doctor can never disagree with what a real run would do
+ * (see {@link AgentPlan.orphanedEntries} for why the split isn't just two-way).
+ */
+async function computeAgentPlan(
+  agent: AgentAdapter,
+  state: GrounderState | null,
+  homeDir?: string,
+): Promise<AgentPlan> {
+  const desired = await agent.desiredArtifacts(homeDir);
+  const tombstones = agent.tombstones(homeDir);
+  const ledgerFiles = ownedLedgerFiles(agent, ledgerFilesFor(state, agent.id), homeDir);
+  const diskPaths = new Set<string>([
+    ...Object.keys(desired),
+    ...Object.keys(ledgerFiles ?? {}),
+    ...tombstones,
+  ]);
+  const disk = await readDiskHashes(diskPaths);
+  const desiredHashes: Record<string, string> = {};
+  for (const [p, content] of Object.entries(desired)) {
+    desiredHashes[p] = hashContent(content);
   }
-  if (created > 0) {
-    return `${created} ${kind} would install on next migrate`;
+
+  const plan = reconcile(desiredHashes, tombstones, ledgerFiles, disk, false);
+  const desiredPaths = new Set(Object.keys(desired));
+  const tombstonePaths = new Set(tombstones);
+  return {
+    skillEntries: plan.filter((e) => desiredPaths.has(e.path)),
+    legacyEntries: plan.filter((e) => tombstonePaths.has(e.path) && !desiredPaths.has(e.path)),
+    orphanedEntries: plan.filter((e) => !desiredPaths.has(e.path) && !tombstonePaths.has(e.path)),
+  };
+}
+
+type AgentPlanResult = { ok: true; plan: AgentPlan } | { ok: false; error: unknown };
+
+/**
+ * Compute each agent's plan exactly once per doctor run, shared between
+ * `checkAgentArtifacts` and `checkLegacyCommands` — both split the same
+ * `computeAgentPlan` result, so a failure (e.g. an unreadable template) must
+ * be caught once here rather than risking an unguarded second call.
+ */
+async function computeAgentPlansSafe(
+  agents: readonly AgentAdapter[],
+  state: GrounderState | null,
+  homeDir?: string,
+): Promise<Map<string, AgentPlanResult>> {
+  const results = new Map<string, AgentPlanResult>();
+  for (const agent of agents) {
+    try {
+      results.set(agent.id, { ok: true, plan: await computeAgentPlan(agent, state, homeDir) });
+    } catch (error: unknown) {
+      results.set(agent.id, { ok: false, error });
+    }
   }
-  return `${overwritten} ${kind} would update on next migrate`;
+  return results;
 }
 
 async function checkAgentArtifacts(
-  state: GrounderState | null,
+  agents: readonly AgentAdapter[],
+  agentPlans: Map<string, AgentPlanResult>,
   stateReadable: boolean,
   homeDir?: string,
 ): Promise<CheckResult[]> {
-  const agents = await resolveAgents();
   const checks: CheckResult[] = [];
 
   for (const agent of agents) {
@@ -348,7 +381,7 @@ async function checkAgentArtifacts(
     const id = `agent-${agent.id}`;
 
     if (presentCount === expected.length) {
-      // Missing/non-executable baked Node in slash-command markdown → fail.
+      // Missing/non-executable baked Node in skill markdown → fail.
       // Do not compare to process.execPath. Legacy npx / non-runtime shapes skip.
       const texts = await Promise.all(
         expected.map(async (p) => {
@@ -367,60 +400,46 @@ async function checkAgentArtifacts(
         checks.push(
           failCheck(
             id,
-            `${agent.name} command Node interpreter missing or not executable (${danglingNode})`,
+            `${agent.name} skill Node interpreter missing or not executable (${danglingNode})`,
             MIGRATE,
           ),
         );
-      } else if (commandsSchemaAhead(agent, state, stateReadable)) {
-        const recorded = recordedCommandsSchema(state, agent.id);
-        checks.push(
-          failCheck(
-            id,
-            `${agent.name} commands schema newer than this grounder (recorded ${recorded}, supported ${agent.commandsSchema})`,
-            UPGRADE_GROUNDER,
-          ),
-        );
       } else if (stateReadable) {
-        try {
-          const preview = await agent.install({ force: false, dryRun: true, homeDir });
-          const previewCheck = checkFromInstallPreview(
-            id,
-            agent.name,
-            "command file(s)",
-            preview,
-            `${agent.name} command files up to date`,
-          );
+        const result = agentPlans.get(agent.id);
+        if (result?.ok) {
           checks.push(
-            applyLedgerSchemaLag(previewCheck, {
+            checkFromPlan(
               id,
-              agentName: agent.name,
-              kind: "commands",
-              recorded: recordedCommandsSchema(state, agent.id),
-              current: agent.commandsSchema,
-              behind: commandsSchemaBehind(agent, state, stateReadable),
-            }),
+              agent.name,
+              "skill file(s)",
+              result.plan.skillEntries,
+              `${agent.name} skill files up to date`,
+            ),
           );
-        } catch (error: unknown) {
-          const detail = error instanceof Error ? error.message : String(error);
+        } else {
+          const detail =
+            result?.error instanceof Error ? result.error.message : String(result?.error);
           checks.push(
-            warnCheck(id, `${agent.name}: could not verify command drift (${detail})`, MIGRATE),
+            warnCheck(id, `${agent.name}: could not verify skill drift (${detail})`, MIGRATE),
           );
         }
       } else {
-        checks.push(okCheck(id, `${agent.name} command files present`));
+        checks.push(okCheck(id, `${agent.name} skill files present`));
       }
       continue;
     }
 
-    const fix = `${MIGRATE_FORCE} (or --agent=${agent.id})`;
+    // Missing files are always safe to create with a plain migrate — no
+    // conflict to override, since a missing path always plans as `create`.
+    const fix = `${MIGRATE} (or --agent=${agent.id})`;
     if (presentCount === 0) {
-      checks.push(warnCheck(id, `${agent.name} detected but no Grounder command files`, fix));
+      checks.push(warnCheck(id, `${agent.name} detected but no Grounder skill files`, fix));
     } else {
       const missing = expected.filter((_, i) => !present[i]);
       checks.push(
         failCheck(
           id,
-          `${agent.name} missing ${missing.length} command file(s): ${missing.map((p) => path.basename(p)).join(", ")}`,
+          `${agent.name} missing ${missing.length} skill file(s): ${missing.map((p) => path.join(path.basename(path.dirname(p)), path.basename(p))).join(", ")}`,
           fix,
         ),
       );
@@ -431,20 +450,115 @@ async function checkAgentArtifacts(
 }
 
 /**
+ * Detect pre-skill `grounder-*.md` command files a schema-3→4 upgrade should
+ * have retired but hasn't — the tombstone side of {@link computeAgentPlan}'s
+ * plan, reported separately from the main `agent-<id>` check.
+ *
+ * Both `conflict` (hand-edited, or a pre-ledger install with no recorded
+ * hash — needs `--force`) and `delete` (hash matches; a plain `migrate`
+ * would clean it up) are reported. `delete` isn't noise here: doctor can't
+ * assume the user's next command is `migrate` — `setup --force` is a
+ * documented repair/upgrade path that never retires legacy files, so a
+ * hash-matching leftover can sit on disk causing the duplicate-command-menu
+ * problem indefinitely unless flagged. `noop`/`forget` stay unreported —
+ * nothing left to act on.
+ */
+async function checkLegacyCommands(
+  agents: readonly AgentAdapter[],
+  agentPlans: Map<string, AgentPlanResult>,
+): Promise<CheckResult[]> {
+  const checks: CheckResult[] = [];
+  for (const agent of agents) {
+    const result = agentPlans.get(agent.id);
+    if (!result?.ok) {
+      // Already reported by `checkAgentArtifacts`'s "could not verify skill
+      // drift" warning — nothing new to add here.
+      continue;
+    }
+    for (const entry of result.plan.legacyEntries) {
+      if (entry.action === "conflict") {
+        checks.push(
+          warnCheck(
+            `agent-${agent.id}-legacy-commands`,
+            `${agent.name}: leftover pre-skill command file (superseded by skill, may duplicate the menu entry): ${entry.path}`,
+            MIGRATE_FORCE,
+          ),
+        );
+      } else if (entry.action === "delete") {
+        checks.push(
+          warnCheck(
+            `agent-${agent.id}-legacy-commands`,
+            `${agent.name}: leftover pre-skill command file, safe to clean up (superseded by skill, may duplicate the menu entry): ${entry.path}`,
+            MIGRATE,
+          ),
+        );
+      }
+    }
+  }
+  return checks;
+}
+
+/**
+ * Detect ledger-tracked paths dropped from the current desired set without a
+ * matching {@link AgentAdapter.tombstones} entry — the other half of
+ * {@link AgentPlan.orphanedEntries}, reported separately from
+ * {@link checkLegacyCommands}'s tombstone-derived leftovers since the wording
+ * ("superseded by skill") doesn't apply to a plain removed skill file.
+ *
+ * Same reporting rule as `checkLegacyCommands`: both `conflict` (needs
+ * `--force`) and `delete` (a plain `migrate` cleans it up) are reported;
+ * `noop`/`forget` stay silent — nothing left to act on.
+ */
+async function checkOrphanedLedgerFiles(
+  agents: readonly AgentAdapter[],
+  agentPlans: Map<string, AgentPlanResult>,
+): Promise<CheckResult[]> {
+  const checks: CheckResult[] = [];
+  for (const agent of agents) {
+    const result = agentPlans.get(agent.id);
+    if (!result?.ok) {
+      // Already reported by `checkAgentArtifacts`'s "could not verify skill
+      // drift" warning — nothing new to add here.
+      continue;
+    }
+    for (const entry of result.plan.orphanedEntries) {
+      if (entry.action === "conflict") {
+        checks.push(
+          warnCheck(
+            `agent-${agent.id}-orphaned`,
+            `${agent.name}: Grounder-managed file no longer part of the current install, locally modified (needs --force to retire): ${entry.path}`,
+            MIGRATE_FORCE,
+          ),
+        );
+      } else if (entry.action === "delete") {
+        checks.push(
+          warnCheck(
+            `agent-${agent.id}-orphaned`,
+            `${agent.name}: Grounder-managed file no longer part of the current install, safe to clean up: ${entry.path}`,
+            MIGRATE,
+          ),
+        );
+      }
+    }
+  }
+  return checks;
+}
+
+/**
  * Warn-only: session hooks are opt-in. Missing entry never fails doctor.
  * One check per detected agent that declares `expectedHookArtifacts`.
  *
- * Slash commands and session hooks both depend on the shared
+ * Skills and session hooks both depend on the shared
  * `~/.grounder/runtime` materialization, so it's checked whenever *either* is
  * installed — stale mainly for bare-npx copy installs after an upgrade
  * (symlink installs stay current without re-init).
  */
 async function checkAgentHooks(
+  agents: readonly AgentAdapter[],
   state: GrounderState | null,
   stateReadable: boolean,
   homeDir?: string,
 ): Promise<CheckResult[]> {
-  const agents = await resolveAgents();
   const checks: CheckResult[] = [];
   let anyHooksInstalled = false;
 
@@ -489,36 +603,19 @@ async function checkAgentHooks(
             MIGRATE,
           ),
         );
-      } else if (hooksSchemaAhead(agent, state, stateReadable)) {
-        const recorded = recordedHooksSchema(state, agent.id);
-        checks.push(
-          failCheck(
-            id,
-            `${agent.name} hooks schema newer than this grounder (recorded ${recorded}, supported ${agent.hooksSchema})`,
-            UPGRADE_GROUNDER,
-          ),
-        );
       } else if (runtimeStale) {
         checks.push(okCheck(id, `${agent.name} session hook installed`));
       } else if (stateReadable && agent.installHooks) {
         try {
           const preview = await agent.installHooks({ force: false, dryRun: true, homeDir });
-          const previewCheck = checkFromInstallPreview(
-            id,
-            agent.name,
-            "session hook file(s)",
-            preview,
-            `${agent.name} session hook up to date`,
-          );
           checks.push(
-            applyLedgerSchemaLag(previewCheck, {
+            checkFromInstallPreview(
               id,
-              agentName: agent.name,
-              kind: "hooks",
-              recorded: recordedHooksSchema(state, agent.id),
-              current: agent.hooksSchema ?? 0,
-              behind: hooksSchemaBehindInLedger(agent, state, stateReadable),
-            }),
+              agent.name,
+              "session hook file(s)",
+              preview,
+              `${agent.name} session hook up to date`,
+            ),
           );
         } catch (error: unknown) {
           const detail = error instanceof Error ? error.message : String(error);
@@ -533,6 +630,9 @@ async function checkAgentHooks(
       } else {
         checks.push(okCheck(id, `${agent.name} session hook installed`));
       }
+    } else if (recordedHooksEnabled(state, agent.id) === false) {
+      // Explicitly turned off via `--no-hooks` — nothing to warn about.
+      checks.push(okCheck(id, `${agent.name} session hooks disabled (--no-hooks)`));
     } else {
       checks.push(
         warnCheck(id, `${agent.name} detected but no Grounder session hook`, MIGRATE_HOOKS),
@@ -567,7 +667,7 @@ async function runMachineChecks(homeDir?: string): Promise<{
   const { check: vaultCheck, vaultRoot } = await checkVault(home);
   const projectsCheck = await checkProjectsDir(vaultRoot);
   const { state, check: stateCheck } = await loadInstallState(homeDir);
-  // Corrupt ledger: don't invent schema-0 migrate warns on top of the fail.
+  // Corrupt ledger: don't invent drift warns on top of the fail.
   const stateReadable = stateCheck.level !== "fail";
   const packageVersionCheck = checkPackageVersion(state);
 
@@ -585,14 +685,25 @@ async function runMachineChecks(homeDir?: string): Promise<{
   };
 }
 
+/**
+ * Detect installed agents once per doctor run and hand the same list to every
+ * check below. Each `resolveAgents()` call probes the filesystem for every
+ * adapter, and — more to the point — re-detecting per check would let two
+ * sections of one report disagree about which agents exist if the filesystem
+ * changed mid-run.
+ */
 async function runAgentChecks(
   state: GrounderState | null,
   stateReadable: boolean,
   homeDir?: string,
 ): Promise<CheckResult[]> {
-  const agentChecks = await checkAgentArtifacts(state, stateReadable, homeDir);
-  const hookChecks = await checkAgentHooks(state, stateReadable, homeDir);
-  return [...agentChecks, ...hookChecks];
+  const agents = await resolveAgents();
+  const agentPlans = await computeAgentPlansSafe(agents, state, homeDir);
+  const agentChecks = await checkAgentArtifacts(agents, agentPlans, stateReadable, homeDir);
+  const legacyChecks = await checkLegacyCommands(agents, agentPlans);
+  const orphanedChecks = await checkOrphanedLedgerFiles(agents, agentPlans);
+  const hookChecks = await checkAgentHooks(agents, state, stateReadable, homeDir);
+  return [...agentChecks, ...legacyChecks, ...orphanedChecks, ...hookChecks];
 }
 
 async function runProjectChecks(

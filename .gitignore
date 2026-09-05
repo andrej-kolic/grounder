@@ -10,3 +10,6 @@ coverage/
 .grounder.json
 fixtures/dev/.grounder.json
 .tmp/
+
+# Claude Code machine-local permissions (nvm paths, etc.)
+.claude/settings.local.json

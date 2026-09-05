@@ -1,33 +1,23 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { resolveHomeDir } from "../connector/home.js";
 import { fileExists } from "../util/fs.js";
-import { mergeJsonFile } from "../util/merge-json.js";
+import { homeSkillsLayout } from "./home-skills.js";
 import {
-  installHookRuntime,
-  isGrounderPeekHookCommand,
-  isHookRuntimeStale,
-  peekHookCommand,
-} from "./hook-runtime.js";
-import { installCommandFile, recordCommandFileHashes } from "./install-command.js";
-import type {
-  AgentAdapter,
-  AgentInstallOptions,
-  AgentInstallResult,
-  ArtifactStatus,
-} from "./types.js";
+  isAlreadyConverged,
+  readEventEntries,
+  readHooksObject,
+  removeMatchingEntries,
+} from "./hook-fragment.js";
+import { installHookFragment, removeHookFragment } from "./hook-install.js";
+import { isGrounderPeekHookCommand, isHookRuntimeStale, peekHookCommand } from "./hook-runtime.js";
+import type { AgentAdapter, AgentInstallOptions, AgentInstallResult } from "./types.js";
 
-const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const templateDir = path.join(pkgRoot, "templates", "agents", "cursor", "commands");
+/** Whole-file artifacts: `~/.cursor/skills/` plus the retired `~/.cursor/commands/`. */
+const layout = homeSkillsLayout({ id: "cursor", agentDir: ".cursor" });
 
-const COMMANDS = [
-  "grounder-note.md",
-  "grounder-search.md",
-  "grounder-plan.md",
-  "grounder-task-handoff.md",
-  "grounder-task.md",
-] as const;
+/** Hook event Grounder owns in `hooks.json`. */
+const SESSION_START_EVENT = "sessionStart";
 
 /**
  * Canonical sessionStart command for Cursor (home-local runtime, not `npx`).
@@ -41,8 +31,8 @@ export function cursorPeekHookCommand(
   return peekHookCommand(homeDir, extraArgs);
 }
 
-export function cursorCommandsDir(homeDir?: string): string {
-  return path.join(resolveHomeDir(homeDir), ".cursor", "commands");
+export function cursorSkillsDir(homeDir?: string): string {
+  return layout.skillsDir(homeDir);
 }
 
 /** Absolute path to Cursor's shared hooks config (`~/.cursor/hooks.json`). */
@@ -51,23 +41,23 @@ export function cursorHooksJsonPath(homeDir?: string): string {
 }
 
 export function grounderNoteCommandPath(homeDir?: string): string {
-  return path.join(cursorCommandsDir(homeDir), "grounder-note.md");
+  return layout.skillPath("grounder-note", homeDir);
 }
 
 export function grounderPlanCommandPath(homeDir?: string): string {
-  return path.join(cursorCommandsDir(homeDir), "grounder-plan.md");
+  return layout.skillPath("grounder-plan", homeDir);
 }
 
 export function grounderTaskHandoffCommandPath(homeDir?: string): string {
-  return path.join(cursorCommandsDir(homeDir), "grounder-task-handoff.md");
+  return layout.skillPath("grounder-task-handoff", homeDir);
 }
 
 export function grounderTaskCommandPath(homeDir?: string): string {
-  return path.join(cursorCommandsDir(homeDir), "grounder-task.md");
+  return layout.skillPath("grounder-task", homeDir);
 }
 
 export function expectedArtifacts(homeDir?: string): string[] {
-  return COMMANDS.map((filename) => path.join(cursorCommandsDir(homeDir), filename));
+  return layout.expectedArtifacts(homeDir);
 }
 
 /** Paths of hook config this adapter touches — currently just `hooks.json`. */
@@ -98,42 +88,40 @@ export function expectedHookArtifacts(homeDir?: string): string[] {
 //   - hook entry     → { command: string }
 //
 // Unlike Claude Code, Cursor has no matcher groups — sessionStart is a flat
-// array. Idempotency: {@link isGrounderPeekHookCommand} (runtime path or legacy npx).
+// array. Idempotency / recognizer: {@link isGrounderPeekHookCommand} (runtime
+// path or legacy npx). Always-converge (Ansible `blockinfile` / Kubernetes
+// Server-Side Apply sole-owner model): every recognizer match is removed and
+// replaced with exactly one canonical entry — no conflict / `--force` gate.
 // ---------------------------------------------------------------------------
 
-function findPeekHookIndex(sessionStart: unknown[]): number {
-  return sessionStart.findIndex(
-    (item) =>
-      item &&
-      typeof item === "object" &&
-      !Array.isArray(item) &&
-      isGrounderPeekHookCommand((item as { command?: unknown }).command),
+function isCursorPeekEntry(item: unknown): item is { command: string } {
+  return (
+    item !== null &&
+    typeof item === "object" &&
+    !Array.isArray(item) &&
+    isGrounderPeekHookCommand((item as { command?: unknown }).command)
   );
+}
+
+/** `hooks.sessionStart` from a hooks.json on disk; `null` if absent or unreadable. */
+async function readSessionStart(filePath: string): Promise<unknown[] | null> {
+  try {
+    return readEventEntries(JSON.parse(await readFile(filePath, "utf8")), SESSION_START_EVENT);
+  } catch {
+    return null;
+  }
 }
 
 /** Whether `hooks.json` already lists any Grounder peek command (for status labeling). */
 async function peekHookHadGrounderEntry(filePath: string): Promise<boolean> {
-  try {
-    const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return false;
-    }
-    const hooks = (parsed as Record<string, unknown>).hooks;
-    if (!hooks || typeof hooks !== "object" || Array.isArray(hooks)) {
-      return false;
-    }
-    const sessionStart = (hooks as Record<string, unknown>).sessionStart;
-    return Array.isArray(sessionStart) && findPeekHookIndex(sessionStart) >= 0;
-  } catch {
-    return false;
-  }
+  return ((await readSessionStart(filePath)) ?? []).some(isCursorPeekEntry);
 }
 
 /**
- * Skip only when the canonical command is already present *and* the runtime is
- * current for the running grounder version/source. Legacy `npx` entries or a
- * stale runtime (missing, or symlinked/copied from a different source) always
- * refresh — no `--force` required to migrate or to pick up an upgrade.
+ * Skip only when exactly one canonical entry is already present *and* the
+ * runtime is current for the running grounder version/source. Anything else
+ * — no entry, a legacy `npx` form, a drifted command, more than one match —
+ * always converges. No `--force` required to migrate or pick up an upgrade.
  */
 async function peekHookUpToDate(filePath: string, homeDir?: string): Promise<boolean> {
   if (!(await fileExists(filePath))) {
@@ -142,39 +130,23 @@ async function peekHookUpToDate(filePath: string, homeDir?: string): Promise<boo
   if (await isHookRuntimeStale(homeDir)) {
     return false;
   }
-  try {
-    const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return false;
-    }
-    const hooks = (parsed as Record<string, unknown>).hooks;
-    if (!hooks || typeof hooks !== "object" || Array.isArray(hooks)) {
-      return false;
-    }
-    const sessionStart = (hooks as Record<string, unknown>).sessionStart;
-    if (!Array.isArray(sessionStart)) {
-      return false;
-    }
-    const idx = findPeekHookIndex(sessionStart);
-    if (idx < 0) {
-      return false;
-    }
-    const command = (sessionStart[idx] as { command?: unknown }).command;
-    return command === cursorPeekHookCommand(homeDir);
-  } catch {
+  const sessionStart = await readSessionStart(filePath);
+  if (!sessionStart) {
     return false;
   }
+  return isAlreadyConverged(sessionStart, isCursorPeekEntry, {
+    command: cursorPeekHookCommand(homeDir),
+  });
 }
 
 /**
- * Deep-merge Grounder's sessionStart hook into an existing hooks.json object.
+ * Converge Grounder's sessionStart hook into an existing hooks.json object:
+ * remove every recognizer match (runtime-form or legacy npx, however many),
+ * append exactly one canonical entry.
  *
- * Preserves every key except the nested path it owns. Strategy:
- * 1. If a Grounder peek hook already exists (runtime or legacy npx) → replace in place.
- * 2. Else → append Grounder's entry to `hooks.sessionStart`.
- *
- * On a brand-new file (`isFreshFile`), also sets `version: 1` when absent.
- * Existing files keep whatever `version` (or lack of it) they already have.
+ * Preserves every key except the nested path it owns. On a brand-new file
+ * (`isFreshFile`), also sets `version: 1` when absent. Existing files keep
+ * whatever `version` (or lack of it) they already have.
  *
  * @param current - Parsed hooks.json root (object). Other top-level keys untouched.
  * @param isFreshFile - True when the file did not exist before this write
@@ -191,104 +163,78 @@ function mergeCursorHooks(
     next.version = 1;
   }
 
-  const hooks =
-    next.hooks && typeof next.hooks === "object" && !Array.isArray(next.hooks)
-      ? { ...(next.hooks as Record<string, unknown>) }
-      : {};
-  const existing = Array.isArray(hooks.sessionStart) ? [...hooks.sessionStart] : [];
-  const entry = { command: cursorPeekHookCommand(homeDir) };
-  const idx = findPeekHookIndex(existing);
-  if (idx >= 0) {
-    // Path 1: refresh existing Grounder hook entry in place
-    existing[idx] = entry;
-  } else {
-    // Path 2: append — first install, or file had other sessionStart hooks only
-    existing.push(entry);
-  }
+  const hooks = readHooksObject(next, cursorHooksJsonPath(homeDir));
+  const raw = hooks[SESSION_START_EVENT];
+  const existing = Array.isArray(raw) ? raw : [];
+  const cleaned = removeMatchingEntries(existing, isCursorPeekEntry);
+  cleaned.push({ command: cursorPeekHookCommand(homeDir) });
 
-  next.hooks = { ...hooks, sessionStart: existing };
+  next.hooks = { ...hooks, [SESSION_START_EVENT]: cleaned };
   return next;
 }
 
 /**
- * Install (or refresh) Grounder's sessionStart teaser hook into `~/.cursor/hooks.json`.
- *
- * Also materializes `~/.grounder/runtime` (see {@link installHookRuntime}).
- *
- * Force semantics:
- * - Up-to-date canonical entry + fresh runtime and `force` false → skip
- * - Otherwise → refresh runtime + merge host config
- *
- * Unparseable hooks.json: {@link mergeJsonFile} backs off and this throws (never clobbers).
+ * Remove every Grounder peek entry from `hooks.sessionStart`, touching
+ * nothing else. Returns `current` verbatim (no restructuring at all) when
+ * there's no Grounder entry to remove, so `mergeJsonFile` sees no change and
+ * leaves an unrelated `hooks.json` untouched instead of reformatting it.
+ */
+function removeCursorHooks(current: Record<string, unknown>): Record<string, unknown> {
+  const hooks =
+    current.hooks && typeof current.hooks === "object" && !Array.isArray(current.hooks)
+      ? (current.hooks as Record<string, unknown>)
+      : undefined;
+  const raw = hooks?.[SESSION_START_EVENT];
+  const existing = Array.isArray(raw) ? raw : [];
+  const cleaned = removeMatchingEntries(existing, isCursorPeekEntry);
+  if (cleaned.length === existing.length) {
+    return current;
+  }
+  return {
+    ...current,
+    hooks: { ...hooks, [SESSION_START_EVENT]: cleaned },
+  };
+}
+
+/**
+ * Install (or converge) Grounder's sessionStart teaser hook into `~/.cursor/hooks.json`.
+ * @see {@link installHookFragment} for the shared install/report scaffolding.
  */
 async function installHooks(opts: AgentInstallOptions): Promise<AgentInstallResult> {
-  const dest = cursorHooksJsonPath(opts.homeDir);
-  const upToDate = await peekHookUpToDate(dest, opts.homeDir);
-
-  if (upToDate && !opts.force) {
-    return { artifacts: { [dest]: "skipped" } };
-  }
-
-  if (opts.dryRun) {
-    const fileExisted = await fileExists(dest);
-    const hadGrounderEntry = fileExisted && (await peekHookHadGrounderEntry(dest));
-    const status: ArtifactStatus = hadGrounderEntry ? "overwritten" : "created";
-    return { artifacts: { [dest]: status } };
-  }
-
-  await installHookRuntime({ homeDir: opts.homeDir });
-  const fileExisted = await fileExists(dest);
-  const hadGrounderEntry = fileExisted && (await peekHookHadGrounderEntry(dest));
-  const result = await mergeJsonFile(dest, (current) =>
-    mergeCursorHooks(current, !fileExisted, opts.homeDir),
+  return installHookFragment(
+    {
+      dest: cursorHooksJsonPath(opts.homeDir),
+      isUpToDate: (filePath) => peekHookUpToDate(filePath, opts.homeDir),
+      hasGrounderEntry: peekHookHadGrounderEntry,
+      merge: (current, fileExisted) => mergeCursorHooks(current, !fileExisted, opts.homeDir),
+    },
+    opts,
   );
+}
 
-  if (!result.ok) {
-    throw new Error(result.message);
-  }
-
-  const status: ArtifactStatus = hadGrounderEntry ? "overwritten" : "created";
-  return { artifacts: { [dest]: status } };
+/**
+ * Remove Grounder's sessionStart hook entry entirely (`--no-hooks`) — the
+ * opt-out must also remove the fragment, not just flip `hooksEnabled` false,
+ * or the session hook keeps firing and the next plain `migrate` would find
+ * nothing to converge against (an absent entry looks like "never installed",
+ * which is exactly what makes the tri-state's `false` sticky in the first
+ * place).
+ */
+async function removeHooks(opts: AgentInstallOptions): Promise<AgentInstallResult> {
+  return removeHookFragment(cursorHooksJsonPath(opts.homeDir), removeCursorHooks, opts);
 }
 
 export const cursor: AgentAdapter = {
   id: "cursor",
   name: "Cursor",
-  commandsSchema: 3,
-  hooksSchema: 1,
 
-  async isInstalled(): Promise<boolean> {
-    return fileExists(path.join(resolveHomeDir(), ".cursor"));
-  },
-
+  isInstalled: layout.isInstalled,
   expectedArtifacts,
   expectedHookArtifacts,
-
-  async install(opts: AgentInstallOptions): Promise<AgentInstallResult> {
-    const artifacts: Record<string, ArtifactStatus> = {};
-    const files: Record<string, { hash: string }> = {};
-    for (const filename of COMMANDS) {
-      const { dest, status, hash } = await installCommandFile({
-        ...opts,
-        agentId: cursor.id,
-        templateDir,
-        commandsDir: cursorCommandsDir(opts.homeDir),
-        filename,
-      });
-      artifacts[dest] = status;
-      if (hash) {
-        files[dest] = { hash };
-      }
-    }
-    await recordCommandFileHashes({
-      agentId: cursor.id,
-      commandsSchema: cursor.commandsSchema,
-      files,
-      homeDir: opts.homeDir,
-      dryRun: opts.dryRun,
-    });
-    return { artifacts };
-  },
+  desiredArtifacts: layout.desiredArtifacts,
+  tombstones: layout.tombstones,
+  ownedPrefixes: layout.ownedPrefixes,
 
   installHooks,
+  removeHooks,
 };

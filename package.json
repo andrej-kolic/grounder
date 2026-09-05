@@ -11,7 +11,8 @@
     "test": "pnpm -r test",
     "demo:cast": "pnpm --filter @grounder/demo-casts build",
     "grounder": "node packages/grounder/dist/cli.js",
-    "fixture:setup": "node scripts/fixture-setup.mjs"
+    "fixture:setup": "node scripts/fixture-setup.mjs",
+    "e2e": "pnpm build && pnpm --filter @grounder/e2e e2e"
   },
   "license": "MIT",
   "devDependencies": {

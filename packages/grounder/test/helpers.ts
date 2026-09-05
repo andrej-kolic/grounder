@@ -59,6 +59,31 @@ export function withGroundedHome(home: string): NodeJS.ProcessEnv {
   };
 }
 
+/**
+ * True when a `render-artifact-table.ts` table in `out` has a row with this
+ * exact status and path. Pass `target` to also pin the TARGET column (e.g.
+ * `"cursor hook"` vs. `"cursor"`) rather than matching any target.
+ */
+export function hasRow(
+  out: string,
+  status: string,
+  artifactPath: string,
+  target?: string,
+): boolean {
+  return out.split("\n").some((line) => {
+    const trimmed = line.trimEnd();
+    if (!trimmed.endsWith(artifactPath)) {
+      return false;
+    }
+    const rest = trimmed.slice(0, trimmed.length - artifactPath.length).trim();
+    const words = rest.split(/\s+/);
+    if (words[0] !== status) {
+      return false;
+    }
+    return target === undefined || words.slice(1).join(" ") === target;
+  });
+}
+
 export async function captureStdout(
   fn: () => Promise<number>,
 ): Promise<{ code: number; out: string }> {
@@ -70,6 +95,21 @@ export async function captureStdout(
   try {
     const code = await fn();
     return { code, out: chunks.join("") };
+  } finally {
+    spy.mockRestore();
+  }
+}
+
+/** Like `captureStdout`, for sync void-returning renderers (no exit code to report). */
+export function captureSyncStdout(fn: () => void): string {
+  const chunks: string[] = [];
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+    chunks.push(String(chunk));
+    return true;
+  });
+  try {
+    fn();
+    return chunks.join("");
   } finally {
     spy.mockRestore();
   }

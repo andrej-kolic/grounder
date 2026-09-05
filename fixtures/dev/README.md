@@ -28,7 +28,7 @@ Run `link` from this folder — it writes `.grounder.json` here (not at the mono
 
 After editing `packages/grounder/src`, run `pnpm build` from the repo root — the bin runs `dist/cli.js`.
 
-Both slash commands and (with `--hooks`) session-start hooks run through `~/.grounder/runtime/dist/cli.js`, never `npx`. Because `pnpm grounder` here runs straight from this checkout (`node packages/grounder/dist/cli.js`), `setup` **symlinks** `~/.grounder/runtime/dist` to this checkout's `dist/` — after that one-time run, `pnpm build` alone keeps slash commands *and* hooks current. No need to re-run `setup` after every change, and no risk of them silently running a different (published) version — see the [Session-start hooks](../../packages/grounder/README.md#session-start-hooks) section of `packages/grounder/README.md` for the symlink/copy mechanism.
+Both skills and (with `--hooks`) session-start hooks run through `~/.grounder/runtime/dist/cli.js`, never `npx`. Because `pnpm grounder` here runs straight from this checkout (`node packages/grounder/dist/cli.js`), `setup` **symlinks** `~/.grounder/runtime/dist` to this checkout's `dist/` — after that one-time run, `pnpm build` alone keeps skills *and* hooks current. No need to re-run `setup` after every change, and no risk of them silently running a different (published) version — see the [Session-start hooks](../../packages/grounder/README.md#session-start-hooks) section of `packages/grounder/README.md` for the symlink/copy mechanism.
 
 ## Session handoff loop
 
@@ -97,7 +97,7 @@ pnpm grounder handoff peek          # linked + handoff → one line; else silent
 
 The teaser never auto-loads the full handoff and never blocks a session — run `/grounder-task` only when you want the body.
 
-All four slash commands run through the symlinked runtime described above, so they always exercise this checkout's build — `pnpm build` after editing `src/` is enough; no re-run of `setup` needed to pick up code changes. Re-run only after editing **templates** (`templates/agents/*/commands/*.md`), since template content is copied at install time:
+All four skills run through the symlinked runtime described above, so they always exercise this checkout's build — `pnpm build` after editing `src/` is enough; no re-run of `setup` needed to pick up code changes. Re-run only after editing **templates** (`templates/agents/*/skills/*/SKILL.md`), since template content is copied at install time:
 
 ```bash
 pnpm grounder setup <path-to-your-vault> --force --yes --hooks

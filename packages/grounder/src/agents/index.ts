@@ -1,5 +1,5 @@
-import { recordAgentInstall } from "../connector/state.js";
-import { VERSION } from "../index.js";
+import type { AgentFileState } from "../connector/state.js";
+import { isUnderOwnedPrefix } from "../reconcile/core.js";
 import { claude } from "./claude.js";
 import { cursor } from "./cursor.js";
 import type { AgentAdapter } from "./types.js";
@@ -38,31 +38,23 @@ export async function resolveAgents(ids?: string[]): Promise<AgentAdapter[]> {
 }
 
 /**
- * Write this agent's install version info into `~/.grounder/state.json` after
- * install. If hooks were installed and the agent supports them, store the hooks
- * version; otherwise leave any existing hooks version as-is.
- *
- * When `advanceCommandsSchema` is false (every command file was left alone
- * because it looked locally edited or from an old install), do not bump the
- * commands version in state — otherwise doctor/peek would stop warning even
- * though the files were never updated. Use `--force` (or a real write) first.
+ * Restrict a ledger-recorded agent's file manifest to paths under this
+ * adapter's own {@link AgentAdapter.ownedPrefixes} before it ever reaches
+ * `reconcile()`. Defends a known agent's `state.json` entry against becoming
+ * a delete/forget candidate for a path this binary doesn't actually manage
+ * for it — a stray or hand-edited entry stays in the ledger, untouched,
+ * rather than being planned against.
  */
-export async function recordAgentInstallState(
+export function ownedLedgerFiles(
   agent: AgentAdapter,
-  opts: {
-    hooksInstalled?: boolean;
-    homeDir?: string;
-    /** Default true. Pass false when no command file was written or already up to date. */
-    advanceCommandsSchema?: boolean;
-  } = {},
-): Promise<void> {
-  const advanceCommandsSchema = opts.advanceCommandsSchema !== false;
-  await recordAgentInstall({
-    agentId: agent.id,
-    ...(advanceCommandsSchema ? { commandsSchema: agent.commandsSchema } : {}),
-    hooksSchema:
-      opts.hooksInstalled && agent.hooksSchema !== undefined ? agent.hooksSchema : undefined,
-    grounderVersion: VERSION,
-    homeDir: opts.homeDir,
-  });
+  ledgerFiles: Record<string, AgentFileState> | undefined,
+  homeDir?: string,
+): Record<string, AgentFileState> | undefined {
+  if (!ledgerFiles) {
+    return ledgerFiles;
+  }
+  const owned = agent.ownedPrefixes(homeDir);
+  return Object.fromEntries(
+    Object.entries(ledgerFiles).filter(([p]) => isUnderOwnedPrefix(p, owned)),
+  );
 }

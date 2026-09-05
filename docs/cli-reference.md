@@ -66,11 +66,12 @@ in place (preserving `created`), while `note` and `handoff` always write a new d
 | ---------------- | ------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `--yes`          | `setup`, `link`                 | Skip confirmation prompts                                                                         |
 | `--dry-run`      | `setup`, `link`, `migrate`      | Preview without writing                                                                           |
-| `--force`        | `setup`, `link`, `migrate`      | Overwrite existing generated / locally-modified files                                             |
+| `--force`        | `setup`, `link`, `migrate`      | Overwrite existing generated / locally-modified files. On `migrate`, also deletes locally-edited pre-skill `grounder-*.md` command files left over from before 0.6 (edits are not ported — see [Upgrading](upgrading.md)) |
 | `--id <id>`      | `link`                          | Override detected project id                                                                      |
 | `--vault <path>` | `link`                          | Override home vault root for this run                                                             |
 | `--agent <id>`   | `setup`, `migrate`              | Install for a specific agent (repeatable; default: auto-detect). Supported: `cursor`, `claude`    |
 | `--hooks`        | `setup`, `migrate`              | Also install session-start teaser hooks (opt-in; see [Session-start hooks](session-hooks.md)) |
+| `--no-hooks`     | `migrate`                       | Turn hooks off and remove the installed hook entry (sticky — a later plain `migrate` will not re-enable it) |
 
 Both `setup` and `link` preview what they'll write and ask to confirm; add `--yes` to
 skip the prompt (e.g. in scripts), or `--dry-run` to print the same preview without
@@ -111,7 +112,7 @@ Searches `*.md` under that folder — not the git repo, not sibling projects.
 
 ```bash
 grounder search "handling migrations of slash commands" \
-  --terms "slash commands,grounder migrate,commandsSchema,state.json,hash drift" \
+  --terms "slash commands,grounder migrate,hooksEnabled,state.json,hash drift" \
   --json
 ```
 
@@ -147,6 +148,6 @@ Both are read-only. `status` exits `0` even when unlinked; `doctor` fails when c
 fail. Use `doctor --global` to check the machine without a project link.
 
 `status` only reads the install ledger (`Schemas: current` / `Schemas: ledger stale` —
-it does not open agent command/hook files). `doctor` checks on-disk drift via migrate
+it does not open agent skill/hook files). `doctor` checks on-disk drift via migrate
 dry-run, and also warns when files already match but the ledger schema is still behind,
 so both point at `grounder migrate` in that case.

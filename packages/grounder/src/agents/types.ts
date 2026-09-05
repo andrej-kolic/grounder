@@ -1,10 +1,12 @@
 /**
  * - `created` / `overwritten` — wrote new content
  * - `skipped` — already current (or dry-run would no-op)
- * - `modified` — on-disk content differs from last Grounder write; left alone
- *   unless `--force`
+ *
+ * No `modified`/conflict status here: hook fragments always-converge (see
+ * `installHooks`'s own docs on `AgentAdapter`) — unlike whole-file artifacts,
+ * there is no `--force` gate to report a blocked state for.
  */
-export type ArtifactStatus = "created" | "skipped" | "overwritten" | "modified";
+export type ArtifactStatus = "created" | "skipped" | "overwritten";
 
 export interface AgentInstallOptions {
   force?: boolean;
@@ -23,24 +25,46 @@ export interface AgentAdapter {
   readonly id: string;
   /** Human-readable display name, e.g. "Cursor". */
   readonly name: string;
-  /**
-   * Bump when `install()` output's contract changes (placeholders, file set,
-   * frontmatter). Recorded in `~/.grounder/state.json`.
-   */
-  readonly commandsSchema: number;
-  /**
-   * Bump when `installHooks()` output's contract changes. Omit when the
-   * adapter has no hooks. Recorded in `~/.grounder/state.json`.
-   */
-  readonly hooksSchema?: number;
   /** Returns true when this agent appears to be installed on the machine. */
   isInstalled(): Promise<boolean>;
-  /** Absolute paths of artifacts this adapter installs (read-only inspect). */
+  /** Absolute paths of whole-file artifacts this adapter installs (read-only inspect). */
   expectedArtifacts(homeDir?: string): string[];
-  /** Install all agent-specific artifacts (commands, rules, etc.). */
-  install(opts: AgentInstallOptions): Promise<AgentInstallResult>;
-  /** Optional: install session hooks (separate from slash-command install). */
+  /**
+   * Pure render (package-local template read only, no host filesystem
+   * touched): every whole-file artifact this adapter currently wants
+   * installed, path → rendered content. Reconciled against the ledger and
+   * disk by `reconcile()`.
+   */
+  desiredArtifacts(homeDir?: string): Promise<Record<string, string>>;
+  /**
+   * Historical paths a previous install shape wrote that the current shape no
+   * longer wants at all (e.g. pre-Agent-Skills command markdown) — unioned
+   * into the "previous desired" side of `reconcile()`'s diff so they retire
+   * even when the ledger never recorded them (pre-hash-tracking installs).
+   */
+  tombstones(homeDir?: string): string[];
+  /**
+   * Directories this adapter is allowed to create in and delete from for its
+   * whole-file artifacts (skills dir, legacy commands dir) — never hook
+   * config, which is a shared JSON file merged/unmerged in place, not
+   * whole-file reconciled. Callers use this to keep a stray ledger entry
+   * (hand-edited or corrupted `state.json`) from being treated as a delete
+   * candidate just because it happens to share this agent's id.
+   */
+  ownedPrefixes(homeDir?: string): string[];
+  /**
+   * Optional: converge session hooks (separate from whole-file artifact
+   * install) — always-converge, no conflict/`--force` gate: removes every
+   * recognizer match and inserts exactly one canonical entry.
+   */
   installHooks?(opts: AgentInstallOptions): Promise<AgentInstallResult>;
+  /**
+   * Optional: remove Grounder's hook fragment entirely (`--no-hooks`). Must
+   * actually delete the entry, not just report it as absent — an opt-out
+   * that leaves the fragment in place isn't sticky against the next
+   * `migrate`.
+   */
+  removeHooks?(opts: AgentInstallOptions): Promise<AgentInstallResult>;
   /** Optional: absolute path(s) of hook config this adapter would touch. */
   expectedHookArtifacts?(homeDir?: string): string[];
 }

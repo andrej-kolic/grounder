@@ -19,7 +19,7 @@ import { createTempEnv, type TempEnv, withGroundedHome } from "../helpers.js";
  * Behavioral e2e: drives `setup` + `link` through the real built CLI
  * (subprocess, temp HOME/vault/repo — same shape as `test/cli.test.ts`), then
  * executes the exact runtime-prefixed shell strings baked into the installed
- * command files and hook configs, exactly as Cursor/Claude would run them
+ * skill files and hook configs, exactly as Cursor/Claude would run them
  * (raw shell string, no internal function calls). Proves the full pipeline —
  * "commands visible, do not throw" — without a live agent or LLM.
  *
@@ -53,7 +53,7 @@ function assertOk(result: SpawnSyncReturns<string>, label: string): void {
 }
 
 /**
- * Slice the exact invocation embedded in an installed command file: find
+ * Slice the exact invocation embedded in an installed skill file: find
  * `afterPrefix` (verbatim template text, including any `<placeholder>`
  * tokens) in `content`, assert it is immediately preceded by the canonical
  * runtime invocation (byte-for-byte — not merely "no `{{GROUNDER_CLI}}` left
@@ -123,7 +123,7 @@ describe("e2e/agent-pipeline", () => {
     }
   });
 
-  it("fully renders every command file — no leftover placeholder, real runtime invocation", async () => {
+  it("fully renders every skill file — no leftover placeholder, real runtime invocation", async () => {
     const runtime = runtimeInvocation(env.home);
     for (const artifactPath of allExpectedArtifacts(env.home)) {
       const content = await readFile(artifactPath, "utf8");

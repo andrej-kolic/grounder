@@ -9,7 +9,7 @@ import {
 } from "../../../src/commands/handoff/peek.js";
 import { runLinkWithOptions } from "../../../src/commands/link.js";
 import { runSetupWithOptions } from "../../../src/commands/setup.js";
-import { writeGrounderState } from "../../../src/connector/state.js";
+import { readGrounderState, writeGrounderState } from "../../../src/connector/state.js";
 import { captureStdout, createTempEnv, withGroundedHome } from "../../helpers.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -409,17 +409,26 @@ body
     });
   });
 
-  it("appends migrate nudge when install schemas are stale", async () => {
+  it("appends migrate nudge when install is outdated", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
     await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    // Agent present in the ledger, but no file hashes recorded — every
+    // desired skill file counts as drift (a newly-added skill would surface
+    // the same way).
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
     await writeGrounderState(
-      {
-        grounderVersion: "0.2.0",
-        agents: { cursor: { commandsSchema: 0, hooksSchema: 0, files: {} } },
-      },
+      { ...state, agents: { ...state.agents, cursor: { files: {} } } },
       env.home,
     );
 
@@ -446,17 +455,23 @@ body
     );
   });
 
-  it("prints migrate-only teaser when schemas are stale and there is no handoff", async () => {
+  it("prints migrate-only teaser when install is outdated and there is no handoff", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
     await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
     await writeGrounderState(
-      {
-        grounderVersion: "0.2.0",
-        agents: { cursor: { commandsSchema: 0, files: {} } },
-      },
+      { ...state, agents: { ...state.agents, cursor: { files: {} } } },
       env.home,
     );
 
@@ -468,24 +483,28 @@ body
     expect(out).toBe("[grounder] Install outdated — run: grounder migrate.\n");
   });
 
-  it("stays silent on a stale grounderVersion alone (schemas current) — schema-only by design", async () => {
-    // docs/architecture/schema-versioning.md: "Schemas vs package version
-    // (keep separate)" — peek must not nag "run migrate" for a plain package
-    // bump; that can also mean "upgrade Grounder", which is the CLI banner's
-    // job, not peek's.
+  it("stays silent on a stale grounderVersion alone — install-content drift only, by design", async () => {
+    // docs/architecture/state-reconciliation.md: package version and install
+    // content are separate checks — peek must not nag "run migrate" for a
+    // plain package bump; that can also mean "upgrade Grounder", which is
+    // the CLI banner's job, not peek's.
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
-    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
     await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
-    // Schemas match current (see agents/cursor.ts) so only grounderVersion is stale.
-    await writeGrounderState(
-      {
-        grounderVersion: "0.0.1",
-        agents: { cursor: { commandsSchema: 3, hooksSchema: 1, files: {} } },
-      },
-      env.home,
-    );
+    // File hashes still match current templates (see agents/cursor.ts) so
+    // only grounderVersion is stale.
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
+    await writeGrounderState({ ...state, grounderVersion: "0.0.1" }, env.home);
 
     const { code, out } = await captureStdout(() =>
       runHandoffPeekWithOptions({ cwd: env.repo, homeDir: env.home }),

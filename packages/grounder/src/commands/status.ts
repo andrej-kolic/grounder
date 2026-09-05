@@ -1,5 +1,4 @@
 import path from "node:path";
-import { ALL_AGENTS } from "../agents/index.js";
 import { currentBranch, findGitRoot } from "../connector/git.js";
 import { type HomeConfig, homeConfigPath, readHomeConfig, withHomeDir } from "../connector/home.js";
 import {
@@ -8,7 +7,7 @@ import {
   readRepoConfig,
   repoConfigPath,
 } from "../connector/repo.js";
-import { isInstallSchemaStale, readGrounderState, statePath } from "../connector/state.js";
+import { readGrounderState, statePath } from "../connector/state.js";
 import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
 import {
   resolveLogsDir,
@@ -19,6 +18,7 @@ import {
 } from "../connector/vault.js";
 import { helpExitCode } from "../help.js";
 import { VERSION } from "../index.js";
+import { installDriftDetected } from "./install-drift.js";
 import { writeSection } from "./output.js";
 import { packageVersionNotice } from "./package-version-notice.js";
 
@@ -106,13 +106,17 @@ async function writeInstallStateLine(homeDir?: string): Promise<void> {
     if (packageNotice) {
       process.stdout.write(statusLine("Package:", packageNotice.status));
     }
-    if (isInstallSchemaStale(state, ALL_AGENTS)) {
-      process.stdout.write(statusLine("Schemas:", `ledger stale → ${MIGRATE}`));
+    if (await installDriftDetected(state, homeDir)) {
+      process.stdout.write(statusLine("Install:", `outdated → ${MIGRATE}`));
     } else {
-      process.stdout.write(statusLine("Schemas:", "current"));
+      process.stdout.write(statusLine("Install:", "current"));
     }
-  } catch {
-    process.stdout.write(statusLine("State:", `invalid → ${MIGRATE_FORCE}`));
+  } catch (error: unknown) {
+    process.stdout.write(
+      isUnsupportedSchemaError(error)
+        ? statusLine("State:", `unsupported → ${UPGRADE_GROUNDER}`)
+        : statusLine("State:", `invalid → ${MIGRATE_FORCE}`),
+    );
   }
 }
 
@@ -188,7 +192,7 @@ export async function runStatusWithOptions(options: StatusOptions = {}): Promise
     process.stdout.write(statusLine("Config:", repoConfigPath(linkedRoot)));
     process.stdout.write(statusLine("Id:", repo.projectId));
     if (home) {
-      process.stdout.write(statusLine("Project Vault Root:", resolveProjectVaultRoot(home, repo)));
+      process.stdout.write(statusLine("In Vault:", resolveProjectVaultRoot(home, repo)));
       process.stdout.write(statusLine("Notes:", resolveNotesDir(home, repo)));
       process.stdout.write(statusLine("Logs:", resolveLogsDir(home, repo)));
       process.stdout.write(statusLine("Plans:", resolvePlansDir(home, repo)));

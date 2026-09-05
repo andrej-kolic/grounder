@@ -3,26 +3,39 @@ import path from "node:path";
 import { fileExists } from "./fs.js";
 
 export type MergeJsonResult =
-  | { ok: true; created: boolean }
+  | { ok: true; created: boolean; changed: boolean }
   | { ok: false; error: "unparseable"; message: string };
 
+export interface MergeJsonFileOptions {
+  /** Compute the result without writing to disk. */
+  dryRun?: boolean;
+}
+
 /**
- * Read a JSON object file (default `{}` if missing), apply `merge`, write pretty-printed.
+ * Read a JSON object file (default `{}` if missing), apply `merge`, write pretty-printed —
+ * only when the merged content actually differs from what's on disk, so callers can trust
+ * `changed` to mean a real content change rather than "we ran the merge function."
+ * A `merge` that returns its `current` argument by reference is treated as a no-op and
+ * never writes, even if the file's on-disk formatting (indentation, line endings, key
+ * order) differs from `JSON.stringify(current, null, 2)` — callers rely on this to leave
+ * a file with nothing to change byte-for-byte untouched instead of reformatting it.
  * On parse failure or non-object root: leaves the file untouched and returns an error
  * so callers can warn without clobbering shared config.
  */
 export async function mergeJsonFile(
   filePath: string,
   merge: (current: Record<string, unknown>) => Record<string, unknown>,
+  options: MergeJsonFileOptions = {},
 ): Promise<MergeJsonResult> {
   const existed = await fileExists(filePath);
   let current: Record<string, unknown> = {};
+  let originalRaw: string | undefined;
 
   if (existed) {
-    const raw = await readFile(filePath, "utf8");
+    originalRaw = await readFile(filePath, "utf8");
     let parsed: unknown;
     try {
-      parsed = JSON.parse(raw);
+      parsed = JSON.parse(originalRaw);
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       return {
@@ -44,7 +57,12 @@ export async function mergeJsonFile(
   }
 
   const next = merge(current);
-  await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
-  return { ok: true, created: !existed };
+  const nextRaw = `${JSON.stringify(next, null, 2)}\n`;
+  const changed = next !== current && nextRaw !== originalRaw;
+
+  if (changed && !options.dryRun) {
+    await mkdir(path.dirname(filePath), { recursive: true });
+    await writeFile(filePath, nextRaw, "utf8");
+  }
+  return { ok: true, created: !existed, changed };
 }

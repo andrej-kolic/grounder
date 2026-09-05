@@ -1,0 +1,29 @@
+name: E2E (manual)
+
+# Manual only — not wired into push/PR ci.yml. These scripts spawn the real
+# built CLI against isolated GROUNDER_HOME/vault temp dirs (see scripts/e2e-*.mjs),
+# unlike the vitest suite which calls the internal functions in-process.
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: E2E
+        # e2e target runs build+test
+        run: pnpm e2e

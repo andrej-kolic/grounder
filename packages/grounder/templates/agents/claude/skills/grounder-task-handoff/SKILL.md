@@ -1,3 +1,9 @@
+---
+name: grounder-task-handoff
+description: Write a session handoff checkpoint to the markdown vault for this project.
+disable-model-invocation: true
+---
+
 Write a session handoff checkpoint to the markdown vault for this project.
 
 Summarize the session into a structured handoff — not a chat transcript.
@@ -52,7 +58,7 @@ EOF
 )"
 ```
 
-Run {{GROUNDER_CLI}} with `required_permissions: ["all"]` (vault is outside the workspace).
+The vault is outside the workspace — grant shell permissions if Claude Code prompts you.
 
 Do not compute vault paths or write files yourself — the CLI handles it.
 Report the CLI output path from stdout to the user.

@@ -15,6 +15,6 @@ pages are the reference material behind it.
 
 Not user how-tos — these explain why the internals look the way they do.
 
-- [Schema versioning and install migration](architecture/schema-versioning.md) — `state.json`, hash drift, `grounder migrate`, forward-compat
+- [State reconciliation](architecture/state-reconciliation.md) — `state.json`, hash drift, tombstoned legacy paths, `grounder migrate`, forward-compat
 - [Runtime invocation](architecture/runtime-invocation.md) — baked Node + `~/.grounder/runtime`, doctor dangling-interpreter check
 - [Vault search](architecture/vault-search.md) — how `grounder search` scans and ranks

@@ -1,14 +1,14 @@
 import path from "node:path";
 import { readCursorHookWorkspaceRoot } from "../../agents/cursor-hook-input.js";
-import { ALL_AGENTS } from "../../agents/index.js";
 import { withHomeDir } from "../../connector/home.js";
 import { resolveLinkedProject } from "../../connector/linked.js";
-import { isInstallSchemaStale, readGrounderState } from "../../connector/state.js";
+import { readGrounderState } from "../../connector/state.js";
 import { resolveLogsDir } from "../../connector/vault.js";
 import { helpExitCode } from "../../help.js";
 import { parseHandoffFrontmatter } from "../../util/frontmatter.js";
 import { flagBool, parseArgs } from "../../util/parse-args.js";
 import { findUsableHandoff } from "../../vault/find-usable-handoff.js";
+import { installDriftDetected } from "../install-drift.js";
 
 /** Options for {@link runHandoffPeekWithOptions} (CLI and tests). */
 export interface HandoffPeekOptions {
@@ -105,16 +105,19 @@ function resolveCursorHookCwd(stdinWorkspaceRoot: string | undefined): string | 
 
 /**
  * Whether to print the "run grounder migrate" line from session peek.
- * Only looks at `~/.grounder/state.json` — does not open Cursor/Claude files.
+ * Cheap by design: a package-local template render/hash per ledger-recorded
+ * agent (`installDriftDetected`) — no Cursor/Claude host-file I/O.
  *
- * If hooks were never enabled (no hooks version in state), that is not "out of
- * date" here. Doctor is the place that checks whether hook files exist on disk.
- * If state is missing or unreadable, stay quiet — doctor reports that.
+ * Hook-content-only drift is not surfaced here (see
+ * `docs/architecture/state-reconciliation.md`) — that ships with a package
+ * version bump, which the upgrade banner already covers, and doctor catches
+ * it on the next full check. If state is missing or unreadable, stay quiet —
+ * doctor reports that.
  */
 async function schemaMigrateNeeded(homeDir?: string): Promise<boolean> {
   try {
     const state = await readGrounderState(homeDir);
-    return isInstallSchemaStale(state, ALL_AGENTS);
+    return await installDriftDetected(state, homeDir);
   } catch {
     return false;
   }

@@ -1,4 +1,4 @@
-import { access, constants, writeFile } from "node:fs/promises";
+import { access, constants, mkdir, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { collisionSuffix } from "./timestamp-slug.js";
 
@@ -22,6 +22,24 @@ export async function isExecutable(filePath: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Write `content` to `filePath` via tmp file + rename, so a crash mid-write
+ * never leaves a truncated file at the real path. Creates the destination
+ * directory if needed; best-effort removes the tmp file if `rename` itself
+ * throws, so a failed write doesn't leave an orphaned `.tmp-*` sibling behind.
+ */
+export async function writeFileAtomic(filePath: string, content: string): Promise<void> {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+  await writeFile(tmpPath, content, "utf8");
+  try {
+    await rename(tmpPath, filePath);
+  } catch (error) {
+    await unlink(tmpPath).catch(() => {});
+    throw error;
   }
 }
 

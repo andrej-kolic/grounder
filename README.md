@@ -7,7 +7,7 @@ Session summaries, plans, and notes in files you own.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/what-dark.svg">
-  <img alt="Grounder connects Cursor, Claude Code, and more agents to one markdown vault through slash commands and the CLI. The vault is a folder tree: 10-Projects/your-project/ containing plans (updated across sessions), notes (always a new file), and logs (saved session summaries). Caption: Any agent. One vault. Only when you ask." src="docs/assets/what.svg">
+  <img alt="Grounder connects Cursor, Claude Code, and more agents to one markdown vault through skills and the CLI. The vault is a folder tree: 10-Projects/your-project/ containing plans (updated across sessions), notes (always a new file), and logs (saved session summaries). Caption: Any agent. One vault. Only when you ask." src="docs/assets/what.svg">
 </picture>
 
 <div>&nbsp;</div>
@@ -22,7 +22,7 @@ Session summaries, plans, and notes in files you own.
 directory. Because it's files instead of chat history, work started in Cursor can be
 picked up in Claude Code, weeks later, on a different machine.
 
-The daily loop is five slash commands — [examples](#examples) show what you type.
+The daily loop is five skills, typed as `/name` — [examples](#examples) show what you type.
 
 ## The problem
 
@@ -37,9 +37,9 @@ The daily loop is five slash commands — [examples](#examples) show what you ty
 - **Plans live, sessions accumulate** — a plan updates in place across sessions; notes and handoffs are dated files, kept to go back to. `search` ranks across all of them.
 - **Deliberate** — nothing is read or written until you run a command. No auto-capture, no RAG, no tokens spent otherwise.
 - **Follows you across machines** — the vault is just a folder, so git (or Syncthing, or Dropbox) is all the sync you need.
-- **Cursor and Claude Code today** — slash commands for both; more agents on the [roadmap](#roadmap).
+- **Cursor and Claude Code today** — skills for both; more agents on the [roadmap](#roadmap).
 
-**Requirements:** Node.js 18+ and a folder to keep the files in — an existing Obsidian
+**Requirements:** Node.js 22+ and a folder to keep the files in — an existing Obsidian
 vault, or an empty directory Grounder fills over time. Git is optional.
 
 ## Install
@@ -61,7 +61,7 @@ run it (e.g. "set up grounder"). Skip the global install entirely with
 ## Quickstart
 
 ```bash
-# Once per machine — connect to a vault + install agent slash commands
+# Once per machine — connect to a vault + install agent skills
 grounder setup <path-to-your-vault> --hooks
 
 # Once per project folder
@@ -79,7 +79,7 @@ one-line reminder at session start when a saved session exists — see
 Work from the agent's chat. A typical loop starts by resuming the last saved session and
 ends by saving a short summary.
 
-Anything after a slash command is an instruction, not file content. The agent follows
+Anything after the skill name is an instruction, not file content. The agent follows
 it — writes a plan, saves a note, or searches the vault. `/grounder-task` and
 `/grounder-task-handoff` don't need text at all.
 
@@ -104,7 +104,7 @@ Later, update the living plan or resume a named session:
 
 ### Demo
 
-![Daily-use session loop across the five slash commands](packages/demo-casts/out/readme.gif)
+![Daily-use session loop across the five skills](packages/demo-casts/out/readme.gif)
 
 ## How it works
 
@@ -161,7 +161,7 @@ Machine config, the link marker, and how commands find the project:
 
 ## Commands
 
-No agent, or want to write by hand? Each slash command has a matching CLI command.
+No agent, or want to write by hand? Each skill has a matching CLI command.
 Pass the file text (or search query) — not an instruction for the agent.
 
 ```bash
@@ -186,7 +186,7 @@ They're complements — `/grounder-task` reads the latest saved session *and* `A
 
 ### Is this an MCP server?
 
-No. It's a CLI plus slash command files. Nothing is registered with the agent, nothing
+No. It's a CLI plus skill files. Nothing is registered with the agent, nothing
 runs in the background, and no tokens are spent until you type a command.
 
 ### Do I need Obsidian?
@@ -202,7 +202,7 @@ with the project.
 
 ### What does it put in my repo?
 
-Only `.grounder.json` — two lines, safe to commit. Slash commands go under `~/.cursor` and
+Only `.grounder.json` — two lines, safe to commit. Skill files go under `~/.cursor` and
 `~/.claude`; vault content stays outside the project tree entirely.
 
 ### Does it capture my conversations automatically?

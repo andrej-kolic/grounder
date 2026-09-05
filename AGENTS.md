@@ -5,6 +5,7 @@ Grounder is a Node CLI (`packages/grounder`) that links project folders to perso
 ## Layout
 
 - `packages/grounder/` — publishable package; all implementation lives here
+- `packages/e2e/` — real-CLI smoke scripts (`pnpm e2e`), not the vitest suite in `packages/grounder/test/`
 - `skills/grounder-setup/` — skills.sh meta-skill (CLI driver; not in the npm tarball)
 - `fixtures/minimal-git-repo/` — stable test fixture (automated tests)
 - `fixtures/dev/` — local CLI sandbox (`pnpm fixture:setup`)
@@ -22,6 +23,7 @@ absolute URLs for images and links, since relative paths break outside the tarba
 connector/          # repo ↔ vault wiring (config stores + resolution)
   home.ts             # ~/.grounder/config.json
   state.ts            # ~/.grounder/state.json install ledger (schemas + file hashes)
+  ledger-migrations.ts # ledgerSchema upgrade table + walker (state.json shape only)
   unsupported-schema.ts # forward-compat hard stop (newer on-disk schema)
   repo.ts             # .grounder.json marker, findLinkedRepoRoot
   linked.ts           # resolveLinkedProject (home + marker Result)
@@ -45,24 +47,35 @@ commands/             # mirrors CLI structure
   setup.ts            # grounder setup (agent-blind; uses agents registry)
   link.ts             # grounder link (creates notes/ + logs/ + plans/)
   note.ts             # grounder note
+  note/list.ts        # grounder note list
   handoff.ts          # grounder handoff
   handoff/list.ts     # grounder handoff list
+  handoff/peek.ts      # grounder handoff peek (session-start hook teaser)
   plan.ts             # grounder plan
   plan/list.ts        # grounder plan list
   path/notes.ts       # grounder path notes
   path/logs.ts        # grounder path logs
   path/plans.ts       # grounder path plans
+  check.ts            # shared ok/warn/fail CheckResult type (doctor)
   doctor.ts           # grounder doctor
   status.ts           # grounder status
+  install-drift.ts    # cheap ledger-only "would migrate change something" (status/peek)
   output.ts           # shared formatting (doctor/status + vault item lists)
   migrate.ts          # grounder migrate (refresh install after upgrade)
-  apply-agent-installs.ts # shared agent install loop (setup + migrate)
+  apply.ts            # shared agent install loop (setup + migrate)
+  render-artifact-table.ts # shared STATUS/TARGET/PATH table + summary (setup + migrate)
+  package-version-notice.ts # package-vs-ledger version comparison (doctor/status)
   upgrade-banner.ts   # stderr notice when package version ahead of ledger
+reconcile/            # pure desired/ledger/disk plan core + its I/O edges
+  core.ts             # reconcile(), desiredDrift(), planChangesLedger() — no I/O
+  disk.ts             # readDiskHashes() — the only disk-read edge
+  apply.ts            # applyPlan() — the only disk-write edge
 agents/               # AgentAdapter registry (pluggable install targets)
   types.ts            # AgentAdapter interface
-  index.ts            # resolveAgents(), detect
-  install-command.ts  # shared slash-command install + hash drift detection
+  index.ts            # resolveAgents(), ownedLedgerFiles(), detect
+  hook-fragment.ts    # shared always-converge JSON fragment helpers (cursor/claude hooks)
   hook-runtime.ts     # ~/.grounder/runtime for session hooks (symlink durable source / copy npx cache)
+  cursor-hook-input.ts # Cursor sessionStart hook stdin parsing
   cursor.ts           # Cursor adapter
   claude.ts           # Claude Code adapter
 util/                 # shared helpers (fs, parse-args, prompt, slugs, path)
@@ -77,20 +90,20 @@ Agent-agnostic core = `connector/`, `vault/`, most of `commands/`, `util/`. Agen
 ```text
 packages/grounder/templates/
   agents/
-    cursor/commands/
-      grounder-note.md
-      grounder-task.md            # recall — read-only hydrate
-      grounder-task-handoff.md    # write session checkpoint
-      grounder-plan.md            # named living plan
-      grounder-search.md          # vault retrieval — CLI ranks, agent synthesizes
-    claude/commands/
-      grounder-note.md
-      grounder-task.md
-      grounder-task-handoff.md
-      grounder-plan.md
-      grounder-search.md
+    cursor/skills/
+      grounder-note/SKILL.md
+      grounder-task/SKILL.md            # recall — read-only hydrate
+      grounder-task-handoff/SKILL.md    # write session checkpoint
+      grounder-plan/SKILL.md            # named living plan
+      grounder-search/SKILL.md          # vault retrieval — CLI ranks, agent synthesizes
+    claude/skills/
+      grounder-note/SKILL.md
+      grounder-task/SKILL.md
+      grounder-task-handoff/SKILL.md
+      grounder-plan/SKILL.md
+      grounder-search/SKILL.md
   vault/
-    session-handoff.md            # lean section reference for slash commands
+    session-handoff.md            # lean section reference for skills
     plan.md                       # section reference for /grounder-plan
   bridge/                         # deferred (Phase 2+)
 ```
@@ -107,6 +120,7 @@ pnpm test             # unit + CLI smoke tests
 pnpm check            # build + typecheck + lint + test (CI / local one-shot)
 pnpm grounder --version
 pnpm fixture:setup    # print dev fixture next steps
+pnpm e2e              # real-CLI smoke scripts (packages/e2e/), not part of `check`
 ```
 
 Root scripts are the quality contract — CI and agents should call these entrypoints, not ad-hoc tool invocations. Keep dependencies minimal.
@@ -125,3 +139,8 @@ Root scripts are the quality contract — CI and agents should call these entryp
 - Templates ship in `packages/grounder/templates/` (included in npm `files`)
 - Idempotent file generation — never clobber user-edited vault content without `--force`
 - New agents: add `src/agents/<id>.ts` + `templates/agents/<id>/`, register in `agents/index.ts`
+- Lead with the plain statement — in comments/docblocks *and* in chat replies to the user.
+  Sentence one says what the thing is, does, or is about; caveats, exceptions, and
+  cross-references come after, never before and never tangled into it. If sentence one is a
+  "not X because Y" clause, the reader has to decrypt the whole paragraph before learning the
+  subject — rewrite it so the plain statement leads.

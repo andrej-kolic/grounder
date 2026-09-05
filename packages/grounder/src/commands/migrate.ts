@@ -1,14 +1,30 @@
 import { type AgentAdapter, ALL_AGENTS, resolveAgents } from "../agents/index.js";
 import { readHomeConfig, withHomeDir } from "../connector/home.js";
-import { assertAgentSchemasSupported, readGrounderState, statePath } from "../connector/state.js";
+import {
+  type GrounderState,
+  ledgerVersionChanged,
+  readGrounderState,
+  statePath,
+} from "../connector/state.js";
 import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
 import { helpExitCode } from "../help.js";
+import { VERSION } from "../index.js";
 import { flagBool, flagStrings, parseArgs } from "../util/parse-args.js";
-import { applyAgentInstalls } from "./apply-agent-installs.js";
+import { applyAgentInstalls } from "./apply.js";
+import {
+  renderAgentErrors,
+  renderModifiedNote,
+  renderSummary,
+  renderTable,
+  rowsFromApplyResult,
+  stateRow,
+} from "./render-artifact-table.js";
 
 export interface MigrateOptions {
   force?: boolean;
   hooks?: boolean;
+  /** Turn hooks off (sticky — removes the fragment, flips hooksEnabled false). */
+  noHooks?: boolean;
   dryRun?: boolean;
   homeDir?: string;
   /** Agent ids to migrate. Defaults to ledger keys, else auto-detect. */
@@ -22,18 +38,22 @@ export interface MigrateOptions {
  * 3. Else auto-detect installed agents (legacy / pre-ledger)
  *
  * Ledger keys from a newer Grounder (agents this binary does not know) are
- * skipped with a stderr warning — same forward-compat idea as schema hard-stops,
- * but migrate can still refresh the agents it understands.
+ * skipped with a stderr warning — same forward-compat idea as the version
+ * hard stop, but migrate can still refresh the agents it understands.
+ *
+ * Takes the already-read `state` rather than reading it itself — the caller
+ * has already read it once (and needs it again for the too-new guard and the
+ * trailing state row), so this stays pure lookup logic instead of a second
+ * read of the same file.
  */
 export async function resolveMigrateAgents(
   explicitIds: string[] | undefined,
-  homeDir?: string,
+  state: GrounderState | null,
 ): Promise<AgentAdapter[]> {
   if (explicitIds && explicitIds.length > 0) {
     return resolveAgents(explicitIds);
   }
 
-  const state = await readGrounderState(homeDir);
   const recordedIds = state ? Object.keys(state.agents) : [];
   if (recordedIds.length === 0) {
     return resolveAgents();
@@ -57,9 +77,16 @@ export async function runMigrate(argv: string[]): Promise<number> {
 
   const { flags, repeated } = parseArgs(argv);
   const agents = flagStrings(repeated, "agent");
+  const hooks = flagBool(flags, "hooks");
+  const noHooks = flagBool(flags, "no-hooks");
+  if (hooks && noHooks) {
+    process.stderr.write("Cannot pass both --hooks and --no-hooks.\n");
+    return 1;
+  }
   return runMigrateWithOptions({
     force: flagBool(flags, "force", "f"),
-    hooks: flagBool(flags, "hooks"),
+    hooks,
+    noHooks,
     dryRun: flagBool(flags, "dry-run"),
     agents: agents.length > 0 ? agents : undefined,
   });
@@ -70,6 +97,7 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
     const homeDir = options.homeDir;
     const force = options.force ?? false;
     const hooks = options.hooks ?? false;
+    const noHooks = options.noHooks ?? false;
     const dryRun = options.dryRun ?? false;
 
     const home = await readHomeConfig();
@@ -78,11 +106,14 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
       return 1;
     }
 
-    const agents = await resolveMigrateAgents(options.agents, homeDir);
-
+    // Read once, up front, inside this guard — `resolveMigrateAgents` used to
+    // trigger a second, unguarded read (migrate.ts:46 pre-refactor) that a
+    // too-new ledger threw through before this catch was ever reached.
+    let state: GrounderState | null;
+    let agents: AgentAdapter[];
     try {
-      const state = await readGrounderState(homeDir);
-      assertAgentSchemasSupported(state, agents);
+      state = await readGrounderState(homeDir);
+      agents = await resolveMigrateAgents(options.agents, state);
     } catch (error: unknown) {
       if (isUnsupportedSchemaError(error)) {
         process.stderr.write(`${error.message}\n`);
@@ -93,38 +124,59 @@ export async function runMigrateWithOptions(options: MigrateOptions = {}): Promi
 
     process.stdout.write(`Vault root: ${home.vaultRoot}\n`);
     process.stdout.write(
-      "Refresh Grounder after an upgrade (slash commands/hooks; vault path unchanged).\n",
+      "Refresh Grounder after an upgrade (skills/hooks; vault path unchanged).\n",
     );
-    process.stdout.write(dryRun ? "Would refresh:\n" : "Will refresh:\n");
-    if (agents.length === 0) {
-      process.stdout.write("  (no agents recorded or detected)\n");
-    } else {
-      for (const agent of agents) {
-        for (const artifactPath of agent.expectedArtifacts(homeDir)) {
-          process.stdout.write(`  ${agent.id.padEnd(8)} ${artifactPath}\n`);
-        }
-      }
-      process.stdout.write(
-        "  hooks    previously installed or --hooks (owned JSON always refreshed)\n",
-      );
-      process.stdout.write(`  state    ${statePath(homeDir)}\n`);
-    }
-    process.stdout.write("\n");
 
     if (agents.length === 0) {
-      process.stdout.write("Nothing to migrate.\n");
+      process.stdout.write(
+        "No agents recorded or detected — nothing to migrate.\n" +
+          "Run `grounder setup` first, or pass --agent to target one explicitly.\n",
+      );
       return 0;
     }
 
-    await applyAgentInstalls({
-      agents,
-      force,
-      hooks,
-      refreshInstalledHooks: true,
-      dryRun,
-      homeDir,
-    });
+    if (dryRun) {
+      process.stdout.write("Dry run — no files will be written.\n");
+    }
+    process.stdout.write("\n");
 
-    return 0;
+    let applyResult: Awaited<ReturnType<typeof applyAgentInstalls>>;
+    try {
+      applyResult = await applyAgentInstalls({
+        agents,
+        force,
+        hooks,
+        noHooks,
+        refreshInstalledHooks: true,
+        dryRun,
+        homeDir,
+        grounderVersion: VERSION,
+      });
+    } catch (error: unknown) {
+      if (isUnsupportedSchemaError(error)) {
+        process.stderr.write(`${error.message}\n`);
+        return 1;
+      }
+      throw error;
+    }
+
+    const rows = rowsFromApplyResult(applyResult);
+
+    // Computed once, by the same code, whether or not this is `--dry-run` —
+    // `applyAgentInstalls` decides "would this write change the ledger" from
+    // the reconciled plan itself, and only actually writes when it's real. So
+    // there's no separate prediction to keep in sync here: real and dry-run
+    // report the exact same thing for the exact same reason.
+    const ledgerChanged =
+      applyResult.agents.some((a) => a.ledgerChanged) || ledgerVersionChanged(state, VERSION);
+    rows.push(stateRow(ledgerChanged, state, statePath(homeDir)));
+
+    renderTable(rows);
+    process.stdout.write("\n");
+    renderSummary(rows, dryRun);
+    renderModifiedNote(rows, "grounder migrate");
+    renderAgentErrors(applyResult);
+
+    return applyResult.agents.some((a) => a.error !== undefined) ? 1 : 0;
   });
 }

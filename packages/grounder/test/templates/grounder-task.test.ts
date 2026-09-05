@@ -8,11 +8,20 @@ const templatesRoot = path.resolve(
   "../../templates/agents",
 );
 
-const cursorTaskTemplate = path.join(templatesRoot, "cursor/commands/grounder-task.md");
-const claudeTaskTemplate = path.join(templatesRoot, "claude/commands/grounder-task.md");
+const cursorTaskTemplate = path.join(templatesRoot, "cursor/skills/grounder-task/SKILL.md");
+const claudeTaskTemplate = path.join(templatesRoot, "claude/skills/grounder-task/SKILL.md");
 const taskTemplates = [cursorTaskTemplate, claudeTaskTemplate] as const;
 
 describe("templates/grounder-task", () => {
+  it("has the intersection skill frontmatter", async () => {
+    for (const filePath of taskTemplates) {
+      const body = await readFile(filePath, "utf8");
+      expect(body).toContain("name: grounder-task");
+      expect(body).toContain("disable-model-invocation: true");
+      expect(body).toMatch(/^description: .+$/m);
+    }
+  });
+
   it("documents the list-and-stop special case and named-session lookup wording", async () => {
     for (const filePath of taskTemplates) {
       const body = await readFile(filePath, "utf8");

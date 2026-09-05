@@ -9,13 +9,28 @@ import {
   withHomeDir,
   writeHomeConfig,
 } from "../connector/home.js";
-import { assertAgentSchemasSupported, readGrounderState } from "../connector/state.js";
+import {
+  type GrounderState,
+  ledgerVersionChanged,
+  readGrounderState,
+  statePath,
+} from "../connector/state.js";
+import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
 import { helpExitCode } from "../help.js";
+import { VERSION } from "../index.js";
 import { flagBool, flagStrings, parseArgs } from "../util/parse-args.js";
 import { resolveUserPath } from "../util/path.js";
 import { confirm } from "../util/prompt.js";
 import { projectsParent } from "../vault/layout.js";
-import { applyAgentInstalls } from "./apply-agent-installs.js";
+import { applyAgentInstalls } from "./apply.js";
+import {
+  renderAgentErrors,
+  renderModifiedNote,
+  renderSummary,
+  renderTable,
+  rowsFromApplyResult,
+  stateRow,
+} from "./render-artifact-table.js";
 
 export interface SetupOptions {
   vaultPath: string;
@@ -111,18 +126,28 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
     process.stdout.write(`Vault root: ${vaultRoot}\n`);
     process.stdout.write("Connect to a markdown vault (once per machine).\n");
     process.stdout.write(dryRun ? "Would write:\n" : "Will write:\n");
-    process.stdout.write(`  home   ${homeConfigPath(homeDir)}\n`);
-    process.stdout.write("  vault  10-Projects/ (if missing)\n");
+    // One label column shared by every preview line — "runtime" (not "grounder
+    // runtime") so it's no wider than it needs to be and lines up with the
+    // agent ids instead of forcing its own, much wider, column.
+    const previewLabelWidth = Math.max(
+      "home".length,
+      "vault".length,
+      "runtime".length,
+      ...agents.map((agent) => agent.id.length),
+    );
+    process.stdout.write(`  ${"home".padEnd(previewLabelWidth)} ${homeConfigPath(homeDir)}\n`);
+    process.stdout.write(`  ${"vault".padEnd(previewLabelWidth)} 10-Projects/ (if missing)\n`);
     if (agents.length > 0) {
-      process.stdout.write(`  grounder runtime ${runtimeCliPath(homeDir)}\n`);
+      process.stdout.write(`  ${"runtime".padEnd(previewLabelWidth)} ${runtimeCliPath(homeDir)}\n`);
     }
     for (const agent of agents) {
+      const label = agent.id.padEnd(previewLabelWidth);
       for (const artifactPath of agent.expectedArtifacts(homeDir)) {
-        process.stdout.write(`  ${agent.id.padEnd(8)} ${artifactPath}\n`);
+        process.stdout.write(`  ${label} ${artifactPath}\n`);
       }
       if (hooks && agent.expectedHookArtifacts) {
         for (const hookPath of agent.expectedHookArtifacts(homeDir)) {
-          process.stdout.write(`  ${agent.id.padEnd(8)} hook ${hookPath}\n`);
+          process.stdout.write(`  ${label} hook ${hookPath}\n`);
         }
       }
     }
@@ -132,15 +157,52 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
     process.stdout.write("\n");
 
     if (dryRun) {
+      let priorState: GrounderState | null;
+      let applyResult: Awaited<ReturnType<typeof applyAgentInstalls>>;
       try {
-        const state = await readGrounderState(homeDir);
-        assertAgentSchemasSupported(state, agents);
+        priorState = await readGrounderState(homeDir);
+        applyResult = await applyAgentInstalls({
+          agents,
+          force,
+          hooks,
+          // `setup` never retires legacy pre-skill command files, even with
+          // `--force` — see docs/upgrading.md and ApplyAgentInstallsOptions#retireLegacy.
+          retireLegacy: false,
+          dryRun: true,
+          homeDir,
+          grounderVersion: VERSION,
+        });
       } catch (error: unknown) {
+        if (isUnsupportedSchemaError(error)) {
+          process.stderr.write(`${error.message}\n`);
+          return 1;
+        }
         const detail = error instanceof Error ? error.message : String(error);
         process.stderr.write(`Dry run failed: agent install would not succeed:\n  ${detail}\n`);
         return 1;
       }
-      return 0;
+
+      if (agents.length === 0) {
+        return 0;
+      }
+
+      // A dry run never writes `~/.grounder/config.json` — if it doesn't
+      // already exist (first-time setup, or one whose config is invalid and
+      // would be replaced), `grounder migrate --force` would fail with "No
+      // home config found" until this exact command is re-run without
+      // `--dry-run`. Point the reader at that instead of a command that
+      // can't work yet.
+      const forceCommand = existingHome
+        ? "grounder migrate"
+        : `grounder setup ${options.vaultPath}`;
+      const hadAgentError = reportAgentInstalls(
+        applyResult,
+        priorState,
+        homeDir,
+        true,
+        forceCommand,
+      );
+      return hadAgentError ? 1 : 0;
     }
 
     if (!yes) {
@@ -157,21 +219,73 @@ export async function runSetupWithOptions(options: SetupOptions): Promise<number
     process.stdout.write("✓ Wrote home config\n");
     process.stdout.write(`✓ Vault scaffold: ${projectsDir}\n`);
 
+    let priorState: GrounderState | null;
+    let applyResult: Awaited<ReturnType<typeof applyAgentInstalls>>;
     try {
-      await applyAgentInstalls({
+      priorState = await readGrounderState(homeDir);
+      applyResult = await applyAgentInstalls({
         agents,
         force,
         hooks,
+        retireLegacy: false,
         homeDir,
+        grounderVersion: VERSION,
       });
     } catch (error: unknown) {
+      if (isUnsupportedSchemaError(error)) {
+        process.stderr.write(`${error.message}\n`);
+        return 1;
+      }
       const detail = error instanceof Error ? error.message : String(error);
       process.stderr.write(
-        `\nHome config and vault scaffold were written, but agent command files/hooks were not installed:\n  ${detail}\n`,
+        `\nHome config and vault scaffold were written, but agent skill files/hooks were not installed:\n  ${detail}\n`,
       );
       return 1;
     }
 
-    return 0;
+    if (agents.length === 0) {
+      return 0;
+    }
+
+    // Real setup has already written a valid home config by this point
+    // (above), so `grounder migrate --force` always works as the remediation
+    // command here.
+    const hadAgentError = reportAgentInstalls(
+      applyResult,
+      priorState,
+      homeDir,
+      false,
+      "grounder migrate",
+    );
+    return hadAgentError ? 1 : 0;
   });
+}
+
+/**
+ * Render the table/summary/conflict-note block shared by a dry-run preview
+ * and a real apply — same rows, same wording, only `renderSummary`'s tense
+ * differs, so a dry run tells the truth about what a real run would show.
+ * Returns whether any agent's hook step failed (see
+ * `AgentApplyResult#error`), so the caller can exit non-zero without
+ * duplicating that check.
+ */
+function reportAgentInstalls(
+  applyResult: Awaited<ReturnType<typeof applyAgentInstalls>>,
+  priorState: GrounderState | null,
+  homeDir: string | undefined,
+  dryRun: boolean,
+  forceCommand: string,
+): boolean {
+  const rows = rowsFromApplyResult(applyResult);
+  const ledgerChanged =
+    applyResult.agents.some((a) => a.ledgerChanged) || ledgerVersionChanged(priorState, VERSION);
+  rows.push(stateRow(ledgerChanged, priorState, statePath(homeDir)));
+
+  process.stdout.write("\n");
+  renderTable(rows);
+  process.stdout.write("\n");
+  renderSummary(rows, dryRun);
+  renderModifiedNote(rows, forceCommand);
+  renderAgentErrors(applyResult);
+  return applyResult.agents.some((a) => a.error !== undefined);
 }

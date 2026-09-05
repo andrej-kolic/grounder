@@ -1,3 +1,9 @@
+---
+name: grounder-search
+description: Search this project's vault content for relevant context.
+disable-model-invocation: true
+---
+
 Search this project's vault content for relevant context.
 
 **Silence:** write **no assistant text** until step 3. Rounds 1–2 are tool calls with an empty/absent text part — not “I’ll search…”, not “I’ll read…”, not “**Analyzing…**”, not query/terms narration.
@@ -129,7 +135,7 @@ Parse JSON privately. Take hits in CLI order (`hits[0]` …). For links use `rel
    - Full-read CLI hits **1–4** in rank order, **all in one parallel batch**.
    - Read path = `hits[i].file` (absolute). Link title/href = `hits[i].relativePath` + `hits[i].fileUri`.
    - **No skips, no substitutions, no “maybe also hit 5.”** Trust CLI order; judge relevance only when writing the answer.
-   - Request vault read permissions as needed.
+   - Grant read permissions for vault paths outside the workspace when needed.
 
 4. **Answer** — synthesize immediately after reads:
    - Claims only from files you full-read. Unread hits must not grow new facts.
@@ -139,6 +145,6 @@ Parse JSON privately. Take hits in CLI order (`hits[0]` …). For links use `rel
    - Prefer design/archive docs when they are the authority among the files you read.
 
 Run from the linked project folder or any subdirectory beneath it.
-Run {{GROUNDER_CLI}} with `required_permissions: ["all"]` (vault is outside the workspace).
+The vault is outside the workspace — grant shell permissions if Claude Code prompts you.
 Do not write to vault files during search.
 Do not grep the vault yourself — the CLI ranks; you read and synthesize.
