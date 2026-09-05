@@ -35,6 +35,7 @@ describe("agents/cursor", () => {
       expect(cursor.expectedArtifacts("/home/user")).toEqual([
         "/home/user/.cursor/skills/grounder-note/SKILL.md",
         "/home/user/.cursor/skills/grounder-search/SKILL.md",
+        "/home/user/.cursor/skills/grounder-overview/SKILL.md",
         "/home/user/.cursor/skills/grounder-plan/SKILL.md",
         "/home/user/.cursor/skills/grounder-task-handoff/SKILL.md",
         "/home/user/.cursor/skills/grounder-task/SKILL.md",

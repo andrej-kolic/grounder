@@ -27,6 +27,7 @@ const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.
 const SKILL_NAMES = [
   "grounder-note",
   "grounder-search",
+  "grounder-overview",
   "grounder-plan",
   "grounder-task-handoff",
   "grounder-task",

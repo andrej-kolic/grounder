@@ -35,6 +35,7 @@ describe("agents/claude", () => {
       expect(claude.expectedArtifacts("/home/user")).toEqual([
         "/home/user/.claude/skills/grounder-note/SKILL.md",
         "/home/user/.claude/skills/grounder-search/SKILL.md",
+        "/home/user/.claude/skills/grounder-overview/SKILL.md",
         "/home/user/.claude/skills/grounder-plan/SKILL.md",
         "/home/user/.claude/skills/grounder-task-handoff/SKILL.md",
         "/home/user/.claude/skills/grounder-task/SKILL.md",

@@ -11,6 +11,7 @@ const templatesRoot = path.resolve(
 const SKILLS = [
   "grounder-note",
   "grounder-search",
+  "grounder-overview",
   "grounder-plan",
   "grounder-task-handoff",
   "grounder-task",

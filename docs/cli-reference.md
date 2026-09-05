@@ -8,6 +8,7 @@ full synopsis, `grounder --help`.
 - [Note / handoff flags](#note--handoff-flags)
 - [Plan flags](#plan-flags)
 - [Search flags](#search-flags)
+- [Overview flags](#overview-flags)
 - [Doctor flags](#doctor-flags)
 - [Status flags](#status-flags)
 - [Status vs doctor](#status-vs-doctor)
@@ -35,6 +36,7 @@ Write
 
 Retrieve
   grounder search <query>       Rank matching files in this project's vault
+  grounder overview             Bird's-eye view: counts + recent titles across notes/handoffs/plans
 
 Paths
   grounder path notes           Print resolved notes directory
@@ -131,6 +133,22 @@ grounder search "handling migrations of slash commands" \
 `--markdown` and `--json` are mutually exclusive. `/grounder-search` uses `--json` by
 default, full-reads the top four hits, and synthesizes a short answer — see
 [vault search architecture](architecture/vault-search.md) for contributor details.
+
+## Overview flags
+
+`grounder overview` composes `note list` / `handoff list` / `plan list` into one call: a
+per-bucket count plus capped recent titles across `notes/`, `logs/`, and `plans/` — the
+gap between `status` (wiring health only) and running those three list commands
+separately.
+
+| Flag          | Description                                                                    |
+| ------------- | ------------------------------------------------------------------------------- |
+| `--limit <n>` | Max recent titles to print per bucket (default: 3)                              |
+| `--markdown`  | Agent relay: `[bucketRelativePath](fileUri)` title lines                       |
+| `--json`      | Structured output: `{ count, truncated, items }` per bucket (notes/handoffs/plans) |
+
+`--markdown` and `--json` are mutually exclusive. Kept separate from `status` (wiring
+health) and `handoff peek` (hydrate teaser) — three distinct jobs.
 
 ## Doctor flags
 

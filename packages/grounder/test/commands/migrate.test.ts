@@ -258,7 +258,7 @@ describe("commands/migrate", () => {
     const { code, out } = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
 
     expect(code).toBe(0);
-    expect(out).toContain("5 files left alone");
+    expect(out).toContain("6 files left alone");
     expect(out).toContain("grounder migrate --force");
 
     const state = await readGrounderState(env.home);
