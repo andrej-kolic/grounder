@@ -28,6 +28,17 @@ export interface AgentLedgerEntry {
    * flip a user's `--no-hooks` opt-out back on.
    */
   hooksEnabled?: boolean;
+  /**
+   * The exact `{{GROUNDER_CLI}}` substitution (`runtimeInvocation()`) used the
+   * last time `setup`/`migrate` actually wrote this agent's files. Lets the
+   * cheap drift check (`installDriftDetected`) re-render "desired" content
+   * with the *same* invocation baked in last time, instead of the checking
+   * process's own `process.execPath` — see
+   * docs/architecture/runtime-invocation.md's "Repair loop" section for why
+   * that distinction matters. `undefined` for a ledger predating this field;
+   * self-heals on the next real `setup`/`migrate`.
+   */
+  lastInvocation?: string;
 }
 
 export interface GrounderState {
@@ -130,7 +141,7 @@ export async function readGrounderState(homeDir?: string): Promise<GrounderState
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
       throw new Error(`Invalid grounder state at ${filePath}: bad agent entry "${id}"`);
     }
-    const e = entry as { files?: unknown; hooksEnabled?: unknown };
+    const e = entry as { files?: unknown; hooksEnabled?: unknown; lastInvocation?: unknown };
     const filesRaw = e.files;
     // Drop, rather than cast through, any file entry whose `hash` isn't a
     // string — a corrupted or hand-edited `{ hash: 123 }` / `{}` entry would
@@ -146,7 +157,19 @@ export async function readGrounderState(homeDir?: string): Promise<GrounderState
       }
     }
     const hooksEnabled = typeof e.hooksEnabled === "boolean" ? e.hooksEnabled : undefined;
-    agents[id] = { files, ...(hooksEnabled !== undefined ? { hooksEnabled } : {}) };
+    // Empty string treated as missing, not as a real (empty) override — a
+    // hand-edited `"lastInvocation": ""` would otherwise pass `?? ` in
+    // `desiredArtifacts()`'s override check and render with no interpreter
+    // baked in at all.
+    const lastInvocation =
+      typeof e.lastInvocation === "string" && e.lastInvocation.length > 0
+        ? e.lastInvocation
+        : undefined;
+    agents[id] = {
+      files,
+      ...(hooksEnabled !== undefined ? { hooksEnabled } : {}),
+      ...(lastInvocation !== undefined ? { lastInvocation } : {}),
+    };
   }
 
   return { ledgerSchema: LEDGER_SCHEMA, grounderVersion: upgraded.grounderVersion, agents };
@@ -180,6 +203,14 @@ export function recordedHooksEnabled(
   agentId: string,
 ): boolean | undefined {
   return state?.agents[agentId]?.hooksEnabled;
+}
+
+/** The `{{GROUNDER_CLI}}` invocation used at this agent's last real install, or `undefined`. */
+export function recordedInvocation(
+  state: GrounderState | null,
+  agentId: string,
+): string | undefined {
+  return state?.agents[agentId]?.lastInvocation;
 }
 
 function withUpdatedAgent(
@@ -267,6 +298,30 @@ export async function setHooksEnabled(opts: {
     existing,
     opts.agentId,
     (prev) => ({ ...prev, hooksEnabled: opts.enabled }),
+    opts.grounderVersion,
+  );
+  await writeGrounderState(next, opts.homeDir);
+}
+
+/**
+ * Persist the exact invocation used for this agent's just-completed real
+ * install, so the cheap drift check can replay it later instead of the
+ * checking process's own `process.execPath`. No-op if already current.
+ */
+export async function setLedgerInvocation(opts: {
+  agentId: string;
+  invocation: string;
+  grounderVersion: string;
+  homeDir?: string;
+}): Promise<void> {
+  const existing = await readGrounderState(opts.homeDir);
+  if (existing?.agents[opts.agentId]?.lastInvocation === opts.invocation) {
+    return;
+  }
+  const next = withUpdatedAgent(
+    existing,
+    opts.agentId,
+    (prev) => ({ ...prev, lastInvocation: opts.invocation }),
     opts.grounderVersion,
   );
   await writeGrounderState(next, opts.homeDir);

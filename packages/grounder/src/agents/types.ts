@@ -34,8 +34,25 @@ export interface AgentAdapter {
    * touched): every whole-file artifact this adapter currently wants
    * installed, path → rendered content. Reconciled against the ledger and
    * disk by `reconcile()`.
+   *
+   * `options.invocation`, when given, replaces the live process's own
+   * `runtimeInvocation()` for the `{{GROUNDER_CLI}}` substitution. The real
+   * write path (`setup`/`migrate`, and `doctor`'s dry-run preview of it) must
+   * never pass this — it needs the live `process.execPath` so switching Node
+   * and re-running `migrate` still repairs a stale interpreter path (see
+   * docs/architecture/runtime-invocation.md's "Repair loop"). Only the cheap
+   * drift check (`status`/`peek`) passes the ledger's last-recorded
+   * invocation, so a *different* checking process never manufactures false
+   * drift purely from its own `process.execPath` differing from whatever
+   * process last ran a real install. An options object rather than a second
+   * positional string, deliberately: this is the one call that must never be
+   * passed on the write path, and a bare positional is easy to pass by
+   * mistake once a third parameter exists.
    */
-  desiredArtifacts(homeDir?: string): Promise<Record<string, string>>;
+  desiredArtifacts(
+    homeDir?: string,
+    options?: { invocation?: string },
+  ): Promise<Record<string, string>>;
   /**
    * Historical paths a previous install shape wrote that the current shape no
    * longer wants at all (e.g. pre-Agent-Skills command markdown) — unioned

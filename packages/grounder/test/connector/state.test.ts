@@ -11,8 +11,10 @@ import {
   readGrounderState,
   recordedFileHash,
   recordedHooksEnabled,
+  recordedInvocation,
   setHooksEnabled,
   setLedgerFileHash,
+  setLedgerInvocation,
   statePath,
   touchGrounderVersion,
   writeGrounderState,
@@ -64,6 +66,7 @@ describe("connector/state", () => {
     expect(await readGrounderState(env.home)).toBeNull();
     expect(ledgerFilesFor(null, "cursor")).toBeUndefined();
     expect(recordedHooksEnabled(null, "cursor")).toBeUndefined();
+    expect(recordedInvocation(null, "cursor")).toBeUndefined();
   });
 
   it("tolerates the pre-rewrite on-disk shape (commandsSchema/hooksSchema, no ledgerSchema)", async () => {
@@ -208,6 +211,44 @@ describe("connector/state", () => {
       homeDir: env.home,
     });
     expect(recordedHooksEnabled(await readGrounderState(env.home), "cursor")).toBe(false);
+  });
+
+  it("setLedgerInvocation records the last-used invocation and is a no-op when unchanged", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await setLedgerInvocation({
+      agentId: "cursor",
+      invocation: "'/a/node' '/a/cli.js'",
+      grounderVersion: "0.6.0",
+      homeDir: env.home,
+    });
+    expect(recordedInvocation(await readGrounderState(env.home), "cursor")).toBe(
+      "'/a/node' '/a/cli.js'",
+    );
+
+    // Same invocation, different grounderVersion — must be a true no-op (not
+    // just "same invocation value"), so the version bump must not land either.
+    const before = await readFile(statePath(env.home), "utf8");
+    await setLedgerInvocation({
+      agentId: "cursor",
+      invocation: "'/a/node' '/a/cli.js'",
+      grounderVersion: "0.6.1",
+      homeDir: env.home,
+    });
+    expect(await readFile(statePath(env.home), "utf8")).toBe(before);
+    expect((await readGrounderState(env.home))?.grounderVersion).toBe("0.6.0");
+
+    await setLedgerInvocation({
+      agentId: "cursor",
+      invocation: "'/b/node' '/b/cli.js'",
+      grounderVersion: "0.6.1",
+      homeDir: env.home,
+    });
+    expect(recordedInvocation(await readGrounderState(env.home), "cursor")).toBe(
+      "'/b/node' '/b/cli.js'",
+    );
+    expect((await readGrounderState(env.home))?.grounderVersion).toBe("0.6.1");
   });
 
   it("touchGrounderVersion stamps the version even with no agent changes, no-ops when already current", async () => {

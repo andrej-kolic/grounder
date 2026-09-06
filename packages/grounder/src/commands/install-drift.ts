@@ -1,5 +1,5 @@
 import { ALL_AGENTS, ownedLedgerFiles } from "../agents/index.js";
-import { type GrounderState, ledgerFilesFor } from "../connector/state.js";
+import { type GrounderState, ledgerFilesFor, recordedInvocation } from "../connector/state.js";
 import { desiredDrift } from "../reconcile/core.js";
 import { hashContent } from "../util/hash.js";
 
@@ -46,7 +46,15 @@ export async function installDriftDetected(
     if (!ledgerFiles) {
       continue;
     }
-    const desired = await agent.desiredArtifacts(homeDir);
+    // Replay the invocation baked in at this agent's last real install
+    // instead of this process's own `process.execPath` — otherwise a
+    // checking process with a different interpreter path (e.g. an editor
+    // extension host vs. a terminal) would manufacture drift that isn't
+    // real. See docs/architecture/runtime-invocation.md's "Repair loop".
+    // Falls back to the live invocation for a ledger predating this field.
+    const desired = await agent.desiredArtifacts(homeDir, {
+      invocation: recordedInvocation(state, agent.id),
+    });
     const desiredHashes: Record<string, string> = {};
     for (const [p, content] of Object.entries(desired)) {
       desiredHashes[p] = hashContent(content);
