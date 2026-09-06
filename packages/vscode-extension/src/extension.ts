@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { invokeCli, MIN_CLI_VERSION, meetsMinVersion } from "./cli.js";
-import { registerCommands } from "./commands.js";
+import { registerCommands, registerDebugCommands } from "./commands.js";
 import { GrounderDragAndDropController } from "./dragAndDrop.js";
 import { GrounderTreeDataProvider } from "./treeProvider.js";
 
@@ -33,6 +33,9 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 
   registerCommands(context, provider, view);
+  if (context.extensionMode === vscode.ExtensionMode.Development) {
+    registerDebugCommands(context);
+  }
 
   context.subscriptions.push(
     view,

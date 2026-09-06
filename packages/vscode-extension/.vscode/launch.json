@@ -13,6 +13,20 @@
       "preLaunchTask": "${defaultBuildTask}"
     },
     {
+      "name": "Run Extension (fixtures/dev, isolated home)",
+      "type": "extensionHost",
+      "request": "launch",
+      "env": {
+        "GROUNDER_HOME": "${workspaceFolder}/../../fixtures/dev-home"
+      },
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "${workspaceFolder}/../../fixtures/dev"
+      ],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "preLaunchTask": "${defaultBuildTask}"
+    },
+    {
       "name": "Run Extension (grounder itself)",
       "type": "extensionHost",
       "request": "launch",

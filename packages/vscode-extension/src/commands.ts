@@ -1,6 +1,8 @@
 import path from "node:path";
 import * as vscode from "vscode";
 import { type CliResult, invokeCli } from "./cli.js";
+import { resolveFolderState } from "./folderState.js";
+import { hasGrounderMarkerUpward } from "./grounderMarker.js";
 import { fetchStatus, type StatusProject } from "./status.js";
 import type { GrounderNode, GrounderTreeDataProvider } from "./treeProvider.js";
 
@@ -346,6 +348,49 @@ async function runSearch(
   });
   quickPick.onDidHide(() => quickPick.dispose());
   quickPick.show();
+}
+
+/**
+ * Resolves the same {@link FolderState} `childrenForFolder` renders from,
+ * via the same real I/O (a real `grounder status --json` invocation, a real
+ * `.grounder.json` marker check) — the piece an MCP driver reading the tree
+ * from outside can't substitute for, since VS Code exposes no generic way to
+ * read an arbitrary extension's TreeView contents. See
+ * `plans/vscode-extension-mcp-dogfood-automation.md`.
+ *
+ * `folderNameOrPath` filters to one workspace folder (matched by name or
+ * fsPath) for a multi-root workspace; omitted, every open folder is resolved
+ * and keyed by name.
+ */
+async function debugState(folderNameOrPath?: string): Promise<Record<string, unknown>> {
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  const targets = folderNameOrPath
+    ? folders.filter((f) => f.name === folderNameOrPath || f.uri.fsPath === folderNameOrPath)
+    : folders;
+  const results: Record<string, unknown> = {};
+  for (const folder of targets) {
+    const status = await fetchStatus(folder.uri.fsPath);
+    const hasMarker =
+      status.kind === "no-runtime" ? hasGrounderMarkerUpward(folder.uri.fsPath) : false;
+    results[folder.name] = resolveFolderState(status, hasMarker);
+  }
+  return results;
+}
+
+/**
+ * Dev-host-only debug surface for the MCP dogfooding automation plan.
+ * Deliberately not in `package.json`'s `commands` contribution (so it never
+ * shows in the Command Palette) and only ever registered by `extension.ts`
+ * when `context.extensionMode === vscode.ExtensionMode.Development` — an F5
+ * Extension Development Host — so it never registers, let alone ships, in a
+ * packaged/production install.
+ */
+export function registerDebugCommands(context: vscode.ExtensionContext): void {
+  context.subscriptions.push(
+    vscode.commands.registerCommand("grounder._debugState", (folderNameOrPath?: string) =>
+      debugState(folderNameOrPath),
+    ),
+  );
 }
 
 export function registerCommands(
