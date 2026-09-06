@@ -46,6 +46,7 @@ that genuinely needs a one-way, ordered transform.
 | Hook config fragment | Grounder-owned key in a shared file | Fragment reconciler (always-converge) — see "Session hooks" |
 | Runtime materialization (`~/.grounder/runtime/`) | Grounder-owned | Own health check, not modeled as reconciler state (see below) |
 | Install ledger (`~/.grounder/state.json`) | Grounder-owned | `ledgerSchema` int, file-format only |
+| Last-used `{{GROUNDER_CLI}}` invocation (`AgentLedgerEntry.lastInvocation`) | Grounder-owned | Not reconciler state — a plain recorded string, replayed only by `desiredDrift`'s caller (see below) |
 | Home config (`~/.grounder/config.json`) | Grounder-owned | Not reconciler-managed — see "Out of scope" |
 | Repo marker (`.grounder.json`) | Grounder-owned, often committed | Not reconciler-managed — see "Out of scope" |
 
@@ -67,6 +68,17 @@ Scoping is baked into the function, not left to callers to remember: `ledger ===
 configured would get a permanent "run migrate" nag with no command able to silence it. Within
 a ledger-recorded agent, a desired path *missing* from its `files` map still counts as drift
 — that's how a newly added skill file surfaces here.
+
+One caller-side nuance worth calling out explicitly: `commands/install-drift.ts` (the only
+caller) does **not** always render `desired` against its own `process.execPath` the way
+`reconcile()`'s caller does. Skill templates bake in a `{{GROUNDER_CLI}}` invocation string,
+and that string is invoker-specific (see `docs/architecture/runtime-invocation.md`'s "Drift
+checks must not use the checking process's own interpreter path"). `install-drift.ts` instead
+replays `AgentLedgerEntry.lastInvocation` — the invocation recorded at this agent's last real
+install — so a `status`/`peek` check from a *different* process than whatever last ran
+`setup`/`migrate` doesn't manufacture drift purely from that difference. `reconcile()`'s own
+callers (`apply.ts`, `doctor.ts`) never do this substitution; they need the live process's own
+invocation so a genuine Node switch still surfaces as real drift.
 
 ### `reconcile(desired, tombstones, ledger, disk, force) -> PlanEntry[]`
 

@@ -93,6 +93,7 @@ describe("commands/setup", () => {
       agents: {
         cursor: {
           files: await expectedFileLedger(cursor.expectedArtifacts(env.home)),
+          lastInvocation: cli,
         },
       },
     });
@@ -665,6 +666,7 @@ describe("commands/setup", () => {
           ],
         },
       });
+      const cli = runtimeInvocation(env.home);
       expect(await readGrounderState(env.home)).toEqual({
         ledgerSchema: LEDGER_SCHEMA,
         grounderVersion: VERSION,
@@ -672,10 +674,12 @@ describe("commands/setup", () => {
           cursor: {
             hooksEnabled: true,
             files: await expectedFileLedger(cursor.expectedArtifacts(env.home)),
+            lastInvocation: cli,
           },
           claude: {
             hooksEnabled: true,
             files: await expectedFileLedger(claude.expectedArtifacts(env.home)),
+            lastInvocation: cli,
           },
         },
       });

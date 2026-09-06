@@ -3,7 +3,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { grounderNoteCommandPath as claudeNoteCommandPath } from "../../src/agents/claude.js";
 import { cursor, cursorHooksJsonPath, grounderNoteCommandPath } from "../../src/agents/cursor.js";
-import { runtimeCliPath } from "../../src/agents/hook-runtime.js";
+import { runtimeCliPath, runtimeInvocation } from "../../src/agents/hook-runtime.js";
 import { runMigrate, runMigrateWithOptions } from "../../src/commands/migrate.js";
 import { runSetupWithOptions } from "../../src/commands/setup.js";
 import {
@@ -124,6 +124,143 @@ describe("commands/migrate", () => {
     expect(hasRow(real.out, "updated", statePath(env.home))).toBe(true);
     const after = await readGrounderState(env.home);
     expect(after?.grounderVersion).not.toBe("0.0.1");
+    expect(after?.agents.cursor?.files).toEqual(state.agents.cursor?.files);
+  });
+
+  it("does not overwrite lastInvocation when every desired path is left as a conflict", async () => {
+    // Regression: setLedgerInvocation used to fire unconditionally after
+    // applyPlan(), even when every desired path conflicted and nothing was
+    // actually written. lastInvocation means "the {{GROUNDER_CLI}} baked
+    // into files' recorded hashes" — recording the live invocation here
+    // would falsify that (the hashes still reflect whatever was really
+    // written last, not this run), making the cheap check replay the wrong
+    // invocation against them and report drift forever, even after the
+    // conflict is later resolved by an unrelated run.
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
+    const recordedBefore = state.agents.cursor?.lastInvocation;
+    expect(recordedBefore).toBeDefined();
+
+    // Simulate the last real install having used a different invocation than
+    // this test process's own, and every skill file being locally modified
+    // since — every desired path becomes a conflict (on-disk matches neither
+    // the ledger's recorded hash nor a fresh render), so a plain migrate
+    // writes nothing for this agent at all.
+    const fakeInvocation = "'/other/process/node' '/other/process/.grounder/runtime/dist/cli.js'";
+    await writeGrounderState(
+      {
+        ...state,
+        agents: {
+          ...state.agents,
+          cursor: { ...state.agents.cursor, lastInvocation: fakeInvocation },
+        },
+      },
+      env.home,
+    );
+    for (const p of cursor.expectedArtifacts(env.home)) {
+      await writeFile(p, "my local edits\n", "utf8");
+    }
+
+    const result = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+    expect(result.code).toBe(0);
+    expect(hasRow(result.out, "conflict", grounderNoteCommandPath(env.home))).toBe(true);
+    expect(hasRow(result.out, "unchanged", statePath(env.home))).toBe(true);
+    expect((await readGrounderState(env.home))?.agents.cursor?.lastInvocation).toBe(fakeInvocation);
+  });
+
+  it("overwrites lastInvocation on a mixed run — some desired paths fixed, one still a conflict", async () => {
+    // Counterpart to the all-conflict case above: as long as *some* desired
+    // path gets a live hash this run, recording the live invocation is
+    // correct — the fixed paths need it to replay correctly later, and the
+    // one still-conflicted path showing drift under the cheap check is real
+    // remaining work (it needs --force), not a false positive.
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
+    const fakeInvocation = "'/other/process/node' '/other/process/.grounder/runtime/dist/cli.js'";
+    await writeGrounderState(
+      {
+        ...state,
+        agents: {
+          ...state.agents,
+          cursor: { ...state.agents.cursor, lastInvocation: fakeInvocation },
+        },
+      },
+      env.home,
+    );
+    // Only one of the five skill files is locally modified — the rest still
+    // match what setup wrote, so they come back `noop` (a live hash this
+    // run), not `conflict`.
+    const noteDest = grounderNoteCommandPath(env.home);
+    await writeFile(noteDest, "my local edits\n", "utf8");
+
+    const result = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+    expect(result.code).toBe(0);
+    expect(hasRow(result.out, "conflict", noteDest)).toBe(true);
+    expect((await readGrounderState(env.home))?.agents.cursor?.lastInvocation).toBe(
+      runtimeInvocation(env.home),
+    );
+  });
+
+  it("reports state.json as updated on an all-noop real run whose ledger predates lastInvocation (dry-run/real agreement)", async () => {
+    // Regression: setLedgerInvocation's write has no corresponding entry in
+    // planChangesLedger()/hooksLedgerChanged — without folding it into
+    // ledgerChanged too, a ledger missing `lastInvocation` (pre-fix, or
+    // stripped by hand) would self-heal silently: files all noop, hooks
+    // unchanged, so the only actual write is the new field, and the table
+    // would misreport "unchanged" for state.json even though it changed.
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({
+      vaultPath: env.vault,
+      yes: true,
+      homeDir: env.home,
+      agents: ["cursor"],
+    });
+    const state = await readGrounderState(env.home);
+    if (!state) {
+      throw new Error("expected install state after setup");
+    }
+    const { lastInvocation: _lastInvocation, ...cursorWithoutInvocation } = state.agents.cursor ?? {
+      files: {},
+    };
+    await writeGrounderState(
+      { ...state, agents: { ...state.agents, cursor: cursorWithoutInvocation } },
+      env.home,
+    );
+
+    const dry = await captureStdout(() =>
+      runMigrateWithOptions({ homeDir: env.home, dryRun: true }),
+    );
+    expect(hasRow(dry.out, "updated", statePath(env.home))).toBe(true);
+    expect((await readGrounderState(env.home))?.agents.cursor?.lastInvocation).toBeUndefined();
+
+    const real = await captureStdout(() => runMigrateWithOptions({ homeDir: env.home }));
+    expect(hasRow(real.out, "updated", statePath(env.home))).toBe(true);
+    const after = await readGrounderState(env.home);
+    expect(after?.agents.cursor?.lastInvocation).toBeDefined();
     expect(after?.agents.cursor?.files).toEqual(state.agents.cursor?.files);
   });
 

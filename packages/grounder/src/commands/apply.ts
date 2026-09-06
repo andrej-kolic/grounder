@@ -3,6 +3,7 @@ import {
   installHookRuntime,
   isHookRuntimeStale,
   runtimeCliPath,
+  runtimeInvocation,
   runtimeMode,
 } from "../agents/hook-runtime.js";
 import { ownedLedgerFiles } from "../agents/index.js";
@@ -12,7 +13,9 @@ import {
   ledgerFilesFor,
   readGrounderState,
   recordedHooksEnabled,
+  recordedInvocation,
   setHooksEnabled,
+  setLedgerInvocation,
   touchGrounderVersion,
 } from "../connector/state.js";
 import { isUnsupportedSchemaError } from "../connector/unsupported-schema.js";
@@ -162,6 +165,12 @@ export async function applyAgentInstalls(
   const results: AgentApplyResult[] = [];
 
   for (const agent of agents) {
+    // No invocation override here, deliberately: this is the real write path
+    // (`setup`/`migrate`), which must always render against the live
+    // process's own `process.execPath` so switching Node and re-running
+    // `migrate` still repairs a stale interpreter path. See
+    // docs/architecture/runtime-invocation.md's "Repair loop" — only the
+    // cheap drift check (`install-drift.ts`) replays a stored invocation.
     const desired = await agent.desiredArtifacts(homeDir);
     const tombstones = retireLegacy ? agent.tombstones(homeDir) : [];
     let ledgerFiles = ownedLedgerFiles(agent, ledgerFilesFor(state, agent.id), homeDir);
@@ -189,6 +198,31 @@ export async function applyAgentInstalls(
 
     const plan = reconcile(desiredHashes, tombstones, ledgerFiles, disk, force);
 
+    // `lastInvocation` only means "the {{GROUNDER_CLI}} baked into files'
+    // recorded hashes" if applying this plan actually gives every desired
+    // path a live hash. A desired path stuck on `conflict` (force not passed,
+    // on-disk content Grounder can't vouch for) keeps whatever hash it had
+    // before — recording the live invocation anyway would make the cheap
+    // check replay it against that stale hash and report drift forever, even
+    // after the conflict is resolved by an unrelated later run. Only skip
+    // when *nothing* for this agent got a live hash this run (every desired
+    // path conflicted) — a mixed run still records it: the paths that did
+    // get a live hash now correctly replay, and the still-conflicted ones
+    // showing drift is real remaining work (they need `--force`), not a
+    // false positive.
+    const hasLiveDesiredWrite = plan.some(
+      (entry) => entry.action !== "conflict" && desiredHashes[entry.path] !== undefined,
+    );
+    // Computed unconditionally (not just inside the `!dryRun` write below) so
+    // dry-run and a real run report the same "would state.json change?"
+    // verdict — matching `hooksLedgerChanged`'s pattern below. A self-heal
+    // case (a current install whose ledger predates this field) has an
+    // all-noop `plan` and unchanged hooks, so without this, `ledgerChanged`
+    // would miss the one write `setLedgerInvocation` is about to make.
+    const invocation = runtimeInvocation(homeDir);
+    const invocationChanged =
+      hasLiveDesiredWrite && recordedInvocation(state, agent.id) !== invocation;
+
     if (!dryRun) {
       await applyPlan({
         agentId: agent.id,
@@ -198,6 +232,20 @@ export async function applyAgentInstalls(
         homeDir,
         ownedPrefixes: agent.ownedPrefixes(homeDir),
       });
+      if (hasLiveDesiredWrite) {
+        // Record what `{{GROUNDER_CLI}}` was actually rendered with above
+        // (the live process's own `process.execPath` — `desired` was never
+        // computed with an override), so the cheap drift check can replay
+        // the exact same invocation later instead of whichever process
+        // happens to be checking. See
+        // docs/architecture/runtime-invocation.md's "Repair loop".
+        await setLedgerInvocation({
+          agentId: agent.id,
+          invocation,
+          grounderVersion: opts.grounderVersion,
+          homeDir,
+        });
+      }
     }
 
     // A tombstoned path that's simply already gone (`noop`) carries nothing
@@ -261,7 +309,10 @@ export async function applyAgentInstalls(
       hooksError = error instanceof Error ? error.message : String(error);
     }
 
-    const ledgerChanged = planChangesLedger(plan, ledgerFiles, desiredHashes) || hooksLedgerChanged;
+    const ledgerChanged =
+      planChangesLedger(plan, ledgerFiles, desiredHashes) ||
+      hooksLedgerChanged ||
+      invocationChanged;
 
     results.push({
       agent,

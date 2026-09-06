@@ -81,6 +81,20 @@ async function linkProject(
   provider.refresh();
 }
 
+// These four must stay routed through a real integrated terminal
+// (`terminal.sendText`), never through `invokeCli()`'s spawn wrapper.
+// `invokeCli()` spawns under `process.execPath` + `ELECTRON_RUN_AS_NODE=1`,
+// i.e. this extension host's own Electron binary. `setup`/`migrate` are the
+// CLI's real write path — they bake *this process's own* `process.execPath`
+// into installed skill files and into the ledger's `lastInvocation`, so
+// routing either through `invokeCli()` would bake that Electron path into
+// real skill files (breaking them for later invocation, which won't have
+// that env var set) and corrupt `lastInvocation` for the cheap drift check.
+// `doctor` is read-only — it never writes skill files or the ledger — so
+// routing it through `invokeCli()` couldn't corrupt anything, only show a
+// misleading "would rewrite" preview (comparing against Electron's own path
+// instead of a terminal's). See docs/architecture/runtime-invocation.md's
+// "Drift checks must not use the checking process's own interpreter path".
 function showSetupHint(): void {
   const terminal = vscode.window.createTerminal("Grounder Setup");
   terminal.show();
