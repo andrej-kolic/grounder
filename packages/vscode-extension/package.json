@@ -1,7 +1,7 @@
 {
   "name": "grounder-vscode-extension",
-  "displayName": "Grounder (spike)",
-  "description": "Drag-and-drop spike for the Grounder VS Code extension. Not a real release — see README.",
+  "displayName": "Grounder",
+  "description": "Browse your Grounder vault (notes/handoffs/plans) and drag a doc into Cursor's or Claude Code's chat panel. Not yet published — see README.",
   "version": "0.0.1",
   "private": true,
   "publisher": "grounder-dev",
@@ -13,15 +13,268 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onView:grounderVault"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "views": {
       "explorer": [
         {
-          "id": "grounderSpike",
-          "name": "Grounder (spike)"
+          "id": "grounderVault",
+          "name": "Grounder"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Grounder",
+      "properties": {
+        "grounder.dimDates": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the date in note/handoff filenames as a dimmed secondary label instead of as part of the title."
+        },
+        "grounder.showAllVaultItems": {
+          "type": "boolean",
+          "default": true,
+          "description": "Also show folders and loose files under the project's vault folder besides Notes/Handoffs/Plans (e.g. a hand-made \"discussions\" folder, or a .md file at the vault folder's root)."
+        },
+        "grounder.revealOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Select an opened document in the Grounder tree (currently: after accepting a Search Vault result)."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "grounder.refresh",
+        "title": "Refresh",
+        "category": "Grounder",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "grounder.toggleDimDatesOn",
+        "title": "● Dim Dates in Notes/Handoffs",
+        "category": "Grounder"
+      },
+      {
+        "command": "grounder.toggleDimDatesOff",
+        "title": "○ Dim Dates in Notes/Handoffs",
+        "category": "Grounder"
+      },
+      {
+        "command": "grounder.toggleShowAllVaultItemsOn",
+        "title": "● Show All Vault Items",
+        "category": "Grounder"
+      },
+      {
+        "command": "grounder.toggleShowAllVaultItemsOff",
+        "title": "○ Show All Vault Items",
+        "category": "Grounder"
+      },
+      {
+        "command": "grounder.toggleRevealOnOpenOn",
+        "title": "● Reveal in Tree on Open",
+        "category": "Grounder"
+      },
+      {
+        "command": "grounder.toggleRevealOnOpenOff",
+        "title": "○ Reveal in Tree on Open",
+        "category": "Grounder"
+      },
+      {
+        "command": "grounder.search",
+        "title": "Search Vault",
+        "category": "Grounder",
+        "icon": "$(search)"
+      },
+      {
+        "command": "grounder.linkProject",
+        "title": "Link this Project",
+        "category": "Grounder"
+      },
+      {
+        "command": "grounder.copyMention",
+        "title": "Copy as @mention",
+        "category": "Grounder"
+      },
+      {
+        "command": "grounder.open",
+        "title": "Open",
+        "category": "Grounder"
+      },
+      {
+        "command": "grounder.openToSide",
+        "title": "Open to the Side",
+        "category": "Grounder"
+      },
+      {
+        "command": "grounder.openPreview",
+        "title": "Open Preview",
+        "category": "Grounder"
+      },
+      {
+        "command": "grounder.openPreviewToSide",
+        "title": "Open Preview to the Side",
+        "category": "Grounder"
+      },
+      {
+        "command": "grounder.revealInOS",
+        "title": "Reveal in Finder / Explorer",
+        "category": "Grounder"
+      },
+      {
+        "command": "grounder.copyPath",
+        "title": "Copy Path",
+        "category": "Grounder"
+      },
+      {
+        "command": "grounder.copyRelativePath",
+        "title": "Copy Relative Path",
+        "category": "Grounder"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "grounder.refresh",
+          "when": "view == grounderVault",
+          "group": "navigation"
+        },
+        {
+          "command": "grounder.search",
+          "when": "view == grounderVault",
+          "group": "navigation"
+        },
+        {
+          "command": "grounder.toggleDimDatesOn",
+          "when": "view == grounderVault && config.grounder.dimDates",
+          "group": "1_display@1"
+        },
+        {
+          "command": "grounder.toggleDimDatesOff",
+          "when": "view == grounderVault && !config.grounder.dimDates",
+          "group": "1_display@1"
+        },
+        {
+          "command": "grounder.toggleShowAllVaultItemsOn",
+          "when": "view == grounderVault && config.grounder.showAllVaultItems",
+          "group": "1_display@2"
+        },
+        {
+          "command": "grounder.toggleShowAllVaultItemsOff",
+          "when": "view == grounderVault && !config.grounder.showAllVaultItems",
+          "group": "1_display@2"
+        },
+        {
+          "command": "grounder.toggleRevealOnOpenOn",
+          "when": "view == grounderVault && config.grounder.revealOnOpen",
+          "group": "1_display@3"
+        },
+        {
+          "command": "grounder.toggleRevealOnOpenOff",
+          "when": "view == grounderVault && !config.grounder.revealOnOpen",
+          "group": "1_display@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "grounder.open",
+          "when": "view == grounderVault && viewItem == grounderDoc",
+          "group": "1_open@1"
+        },
+        {
+          "command": "grounder.openToSide",
+          "when": "view == grounderVault && viewItem == grounderDoc",
+          "group": "1_open@2"
+        },
+        {
+          "command": "grounder.openPreview",
+          "when": "view == grounderVault && viewItem == grounderDoc",
+          "group": "1_open@3"
+        },
+        {
+          "command": "grounder.openPreviewToSide",
+          "when": "view == grounderVault && viewItem == grounderDoc",
+          "group": "1_open@4"
+        },
+        {
+          "command": "grounder.revealInOS",
+          "when": "view == grounderVault && viewItem == grounderDoc",
+          "group": "2_reveal@1"
+        },
+        {
+          "command": "grounder.copyMention",
+          "when": "view == grounderVault && viewItem == grounderDoc",
+          "group": "3_copy@1"
+        },
+        {
+          "command": "grounder.copyPath",
+          "when": "view == grounderVault && viewItem == grounderDoc",
+          "group": "3_copy@2"
+        },
+        {
+          "command": "grounder.copyRelativePath",
+          "when": "view == grounderVault && viewItem == grounderDoc",
+          "group": "3_copy@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "grounder.toggleDimDatesOn",
+          "when": "config.grounder.dimDates"
+        },
+        {
+          "command": "grounder.toggleDimDatesOff",
+          "when": "!config.grounder.dimDates"
+        },
+        {
+          "command": "grounder.toggleShowAllVaultItemsOn",
+          "when": "config.grounder.showAllVaultItems"
+        },
+        {
+          "command": "grounder.toggleShowAllVaultItemsOff",
+          "when": "!config.grounder.showAllVaultItems"
+        },
+        {
+          "command": "grounder.toggleRevealOnOpenOn",
+          "when": "config.grounder.revealOnOpen"
+        },
+        {
+          "command": "grounder.toggleRevealOnOpenOff",
+          "when": "!config.grounder.revealOnOpen"
+        },
+        {
+          "command": "grounder.copyMention",
+          "when": "false"
+        },
+        {
+          "command": "grounder.open",
+          "when": "false"
+        },
+        {
+          "command": "grounder.openToSide",
+          "when": "false"
+        },
+        {
+          "command": "grounder.openPreview",
+          "when": "false"
+        },
+        {
+          "command": "grounder.openPreviewToSide",
+          "when": "false"
+        },
+        {
+          "command": "grounder.revealInOS",
+          "when": "false"
+        },
+        {
+          "command": "grounder.copyPath",
+          "when": "false"
+        },
+        {
+          "command": "grounder.copyRelativePath",
+          "when": "false"
         }
       ]
     }
@@ -30,11 +283,13 @@
     "vscode:prepublish": "pnpm run build",
     "build": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "test:unit": "vitest run",
     "package": "npx --yes @vscode/vsce package --no-dependencies"
   },
   "devDependencies": {
     "@types/vscode": "^1.90.0",
     "@types/node": "^26.0.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }
