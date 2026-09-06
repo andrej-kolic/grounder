@@ -167,7 +167,7 @@ Subcommands:
     flags: `Flags:
   --limit <n>  Max recent titles to print per bucket (default: 3)
   --markdown   Agent relay: [bucketRelativePath](fileUri) title lines
-  --json       Structured output (count, truncated, items per bucket)`,
+  --json       Structured output (total, count, truncated, items per bucket)`,
   },
   {
     id: "path notes",

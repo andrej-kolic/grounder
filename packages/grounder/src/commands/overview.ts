@@ -84,23 +84,34 @@ export async function runOverview(argv: string[]): Promise<number> {
 interface Bucket {
   dir: string;
   noun: VaultItemListNoun;
-  paths: string[];
+  /** Every markdown file in this bucket, newest first (uncapped). */
+  all: string[];
+  /** `all` capped to the requested limit — what text/markdown mode prints. */
+  shown: string[];
 }
 
+/**
+ * Lists a bucket uncapped (each lister already builds this full sorted array
+ * internally before slicing, so this costs no extra traversal) and slices
+ * locally — giving `--json` an honest `total` instead of reporting the
+ * shown-count twice under different names.
+ */
 async function gatherBucket(
   dir: string,
   noun: VaultItemListNoun,
   limit: number,
-  lister: (dir: string, options: { limit: number }) => Promise<string[]>,
+  lister: (dir: string, options?: { limit?: number }) => Promise<string[]>,
 ): Promise<Bucket> {
-  return { dir, noun, paths: await lister(dir, { limit }) };
+  const all = await lister(dir);
+  return { dir, noun, all, shown: all.slice(0, limit) };
 }
 
-function jsonBucket(bucket: Bucket, limit: number) {
+function jsonBucket(bucket: Bucket) {
   return {
-    count: bucket.paths.length,
-    truncated: bucket.paths.length === limit,
-    items: bucket.paths.map((filePath) => ({
+    total: bucket.all.length,
+    count: bucket.shown.length,
+    truncated: bucket.all.length > bucket.shown.length,
+    items: bucket.shown.map((filePath) => ({
       path: filePath,
       relativePath: vaultRelativePath(bucket.dir, filePath),
       fileUri: toFileUri(filePath),
@@ -114,14 +125,14 @@ function writeTextOutput(buckets: readonly Bucket[], limit: number, markdown: bo
       process.stdout.write("\n");
     }
     writeSection(bucket.noun.plural[0]?.toUpperCase() + bucket.noun.plural.slice(1));
-    writeVaultItemList(bucket.paths, limit, bucket.noun, { markdown, titleRootDir: bucket.dir });
+    writeVaultItemList(bucket.shown, limit, bucket.noun, { markdown, titleRootDir: bucket.dir });
   });
 }
 
-function writeJsonOutput(buckets: readonly Bucket[], limit: number): void {
+function writeJsonOutput(buckets: readonly Bucket[]): void {
   const payload: Record<string, ReturnType<typeof jsonBucket>> = {};
   for (const bucket of buckets) {
-    payload[bucket.noun.plural] = jsonBucket(bucket, limit);
+    payload[bucket.noun.plural] = jsonBucket(bucket);
   }
   process.stdout.write(`${JSON.stringify(payload)}\n`);
 }
@@ -152,7 +163,7 @@ export async function runOverviewWithOptions(options: OverviewOptions = {}): Pro
     ]);
 
     if (options.json) {
-      writeJsonOutput(buckets, limit);
+      writeJsonOutput(buckets);
     } else {
       writeTextOutput(buckets, limit, options.markdown === true);
     }

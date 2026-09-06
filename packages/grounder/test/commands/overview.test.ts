@@ -108,7 +108,7 @@ describe("commands/overview", () => {
     expect(out).toContain(`1. [phase-1.md](${pathToFileURL(notePath).href})  \n  ${notePath}\n`);
   });
 
-  it("prints structured JSON with --json", async () => {
+  it("prints structured JSON with --json, covering all three buckets", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -116,8 +116,14 @@ describe("commands/overview", () => {
     await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
+    const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
+    const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
     const notePath = path.join(notesDir, "phase-1.md");
+    const handoffPath = path.join(logsDir, "2026-06-26-120000-session.md");
+    const planPath = path.join(plansDir, "auth-rewrite.md");
     await writeFile(notePath, "x", "utf8");
+    await writeFile(handoffPath, "y", "utf8");
+    await writeFile(planPath, "z", "utf8");
 
     const { code, out } = await captureStdout(() =>
       runOverviewWithOptions({ cwd: env.repo, homeDir: env.home, json: true }),
@@ -127,6 +133,7 @@ describe("commands/overview", () => {
     const payload = JSON.parse(out.trim());
     expect(payload).toEqual({
       notes: {
+        total: 1,
         count: 1,
         truncated: false,
         items: [
@@ -137,9 +144,69 @@ describe("commands/overview", () => {
           },
         ],
       },
-      handoffs: { count: 0, truncated: false, items: [] },
-      plans: { count: 0, truncated: false, items: [] },
+      handoffs: {
+        total: 1,
+        count: 1,
+        truncated: false,
+        items: [
+          {
+            path: handoffPath,
+            relativePath: "2026-06-26-120000-session.md",
+            fileUri: pathToFileURL(handoffPath).href,
+          },
+        ],
+      },
+      plans: {
+        total: 1,
+        count: 1,
+        truncated: false,
+        items: [
+          {
+            path: planPath,
+            relativePath: "auth-rewrite.md",
+            fileUri: pathToFileURL(planPath).href,
+          },
+        ],
+      },
     });
+  });
+
+  it("reports an honest total and only flags truncated past the limit", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
+    const a = path.join(notesDir, "a.md");
+    const b = path.join(notesDir, "b.md");
+    await writeFile(a, "a", "utf8");
+    await writeFile(b, "b", "utf8");
+    await touch(a, new Date("2026-06-26T13:00:00.000Z"));
+    await touch(b, new Date("2026-06-26T14:00:00.000Z"));
+
+    // Exactly `limit` notes: count === total, not truncated (boundary case
+    // the plain-text "there may be more" header conflates but --json must not).
+    const exact = await captureStdout(() =>
+      runOverviewWithOptions({ cwd: env.repo, homeDir: env.home, json: true, limit: 2 }),
+    );
+    const exactPayload = JSON.parse(exact.out.trim());
+    expect(exactPayload.notes).toMatchObject({ total: 2, count: 2, truncated: false });
+
+    // Fewer than `limit`: same, not truncated.
+    const under = await captureStdout(() =>
+      runOverviewWithOptions({ cwd: env.repo, homeDir: env.home, json: true, limit: 5 }),
+    );
+    const underPayload = JSON.parse(under.out.trim());
+    expect(underPayload.notes).toMatchObject({ total: 2, count: 2, truncated: false });
+
+    // More than `limit`: total stays the real count, only shown items are capped.
+    const capped = await captureStdout(() =>
+      runOverviewWithOptions({ cwd: env.repo, homeDir: env.home, json: true, limit: 1 }),
+    );
+    const cappedPayload = JSON.parse(capped.out.trim());
+    expect(cappedPayload.notes).toMatchObject({ total: 2, count: 1, truncated: true });
   });
 
   it("returns usage error for invalid --limit", async () => {
