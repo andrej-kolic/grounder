@@ -6,7 +6,7 @@ import { toFileUri, vaultRelativePath } from "../util/path.js";
 import { listHandoffs } from "../vault/list-handoffs.js";
 import { listNotes } from "../vault/list-notes.js";
 import { listPlans } from "../vault/list-plans.js";
-import { type VaultItemListNoun, writeSection, writeVaultItemList } from "./output.js";
+import { type VaultItemListNoun, writeSection, writeVaultItemListEntries } from "./output.js";
 import { requireLinkedProject } from "./require-linked.js";
 
 const DEFAULT_LIMIT = 3;
@@ -122,13 +122,35 @@ function jsonBucket(bucket: Bucket) {
   };
 }
 
-function writeTextOutput(buckets: readonly Bucket[], limit: number, markdown: boolean): void {
+/**
+ * Header line for one bucket's text/markdown section. Unlike the shared
+ * `note`/`handoff`/`plan list` header (`writeVaultItemList`'s
+ * `count === limit` → "there may be more" guess), overview already has the
+ * true total for free (see {@link gatherBucket}), so it reports an exact
+ * "N of M" instead of a maybe — the `--markdown` skill path relays this
+ * straight to the agent, where an honest count matters more than terseness.
+ */
+function bucketHeader(bucket: Bucket): string {
+  const total = bucket.all.length;
+  const shown = bucket.shown.length;
+  if (total === 0) {
+    return `No ${bucket.noun.plural}.\n`;
+  }
+  if (shown === total) {
+    const label = total === 1 ? bucket.noun.singular : bucket.noun.plural;
+    return `All ${total} ${label}:\n\n`;
+  }
+  return `Most recent ${shown} of ${total} ${bucket.noun.plural}:\n\n`;
+}
+
+function writeTextOutput(buckets: readonly Bucket[], markdown: boolean): void {
   buckets.forEach((bucket, index) => {
     if (index > 0) {
       process.stdout.write("\n");
     }
     writeSection(bucket.title);
-    writeVaultItemList(bucket.shown, limit, bucket.noun, { markdown, titleRootDir: bucket.dir });
+    process.stdout.write(bucketHeader(bucket));
+    writeVaultItemListEntries(bucket.shown, { markdown, titleRootDir: bucket.dir });
   });
 }
 
@@ -174,7 +196,7 @@ export async function runOverviewWithOptions(options: OverviewOptions = {}): Pro
     if (options.json) {
       writeJsonOutput(buckets);
     } else {
-      writeTextOutput(buckets, limit, options.markdown === true);
+      writeTextOutput(buckets, options.markdown === true);
     }
     return 0;
   });

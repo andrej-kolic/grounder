@@ -82,7 +82,7 @@ describe("commands/overview", () => {
     );
   });
 
-  it("caps recent titles per bucket at --limit and signals possible truncation", async () => {
+  it("caps recent titles per bucket at --limit and reports an honest N of M header", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
 
@@ -102,7 +102,7 @@ describe("commands/overview", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain("Most recent 1 note (there may be more):\n\n1. newer  \n");
+    expect(out).toContain("Most recent 1 of 2 notes:\n\n1. newer  \n");
   });
 
   it("prints markdown link title lines with --markdown", async () => {
@@ -202,8 +202,7 @@ describe("commands/overview", () => {
     await touch(a, new Date("2026-06-26T13:00:00.000Z"));
     await touch(b, new Date("2026-06-26T14:00:00.000Z"));
 
-    // Exactly `limit` notes: count === total, not truncated (boundary case
-    // the plain-text "there may be more" header conflates but --json must not).
+    // Exactly `limit` notes: count === total, not truncated.
     const exact = await captureStdout(() =>
       runOverviewWithOptions({ cwd: env.repo, homeDir: env.home, json: true, limit: 2 }),
     );
@@ -223,6 +222,32 @@ describe("commands/overview", () => {
     );
     const cappedPayload = JSON.parse(capped.out.trim());
     expect(cappedPayload.notes).toMatchObject({ total: 2, count: 1, truncated: true });
+  });
+
+  it("locks relativePath to bucket-relative (not vault-relative) for nested files", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
+    const nestedDir = path.join(notesDir, "feature");
+    await mkdir(nestedDir, { recursive: true });
+    const notePath = path.join(nestedDir, "foo.md");
+    await writeFile(notePath, "x", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runOverviewWithOptions({ cwd: env.repo, homeDir: env.home, json: true }),
+    );
+
+    expect(code).toBe(0);
+    const payload = JSON.parse(out.trim());
+    expect(payload.notes.items[0]).toEqual({
+      path: notePath,
+      relativePath: "feature/foo.md",
+      fileUri: pathToFileURL(notePath).href,
+    });
   });
 
   it("returns usage error for invalid --limit", async () => {
@@ -281,7 +306,7 @@ describe("commands/overview", () => {
     const result = runCli(["overview", "--limit", "1"], withGroundedHome(env.home), env.repo);
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Most recent 1 note (there may be more):\n\n1. newer  \n");
+    expect(result.stdout).toContain("Most recent 1 of 2 notes:\n\n1. newer  \n");
     expect(result.stdout).toContain("Handoffs\nNo handoffs.\n");
     expect(result.stdout).toContain("Plans\nNo plans.\n");
   });
