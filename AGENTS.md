@@ -44,6 +44,7 @@ vault/                # vault on disk
 commands/             # mirrors CLI structure
   require-linked.ts   # CLI stderr wrapper around resolveLinkedProject
   search.ts           # grounder search (linked project vault root)
+  overview.ts         # grounder overview (counts + recent titles across notes/handoffs/plans)
   setup.ts            # grounder setup (agent-blind; uses agents registry)
   link.ts             # grounder link (creates notes/ + logs/ + plans/)
   note.ts             # grounder note

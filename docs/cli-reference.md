@@ -145,7 +145,7 @@ separately.
 | ------------- | ------------------------------------------------------------------------------- |
 | `--limit <n>` | Max recent titles to print per bucket (default: 3)                              |
 | `--markdown`  | Agent relay: `[bucketRelativePath](fileUri)` title lines                       |
-| `--json`      | Structured output: `{ count, truncated, items }` per bucket (notes/handoffs/plans) |
+| `--json`      | Structured output: `{ total, count, truncated, items }` per bucket (notes/handoffs/plans) — `total` is the full on-disk count, `count`/`items` are capped at `--limit`, `truncated` is `total > count` |
 
 `--markdown` and `--json` are mutually exclusive. Kept separate from `status` (wiring
 health) and `handoff peek` (hydrate teaser) — three distinct jobs.
