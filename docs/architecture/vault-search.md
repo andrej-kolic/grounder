@@ -20,7 +20,7 @@ That is slow, model-dependent, and mixes two different trees (source vs vault). 
 | Layer | Job | Must not |
 | --- | --- | --- |
 | `vault/search.ts` + `commands/search.ts` | Scan `*.md` under the **linked project vault root**, score, print | Guess user intent, paraphrase queries, synthesize prose |
-| `/grounder-search` templates | Classify lookup / request / topic leftover, turn that into `query` + `--terms` (hybrid) or `--markdown` (lookup), run CLI, full-read top hits when hybrid, write the hybrid answer | Re-rank, grep the vault, explore `packages/…` |
+| `/grounder-search` templates | Classify lookup / request / topic leftover, turn that into `query` (+ `--terms` for request/topic leftover), always `--json`, full-read top hits when hybrid, write the answer (or zero-hit disclosure) | Re-rank, grep the vault, explore `packages/…` |
 
 **`--terms` is the only model-dependent input that changes ranking.** Protocol (two rounds, `--json`, numbered `file://` links) is compatible across models. File order is not, unless terms match.
 
@@ -101,8 +101,8 @@ Then, as tiebreakers only: **non-archive before archive**, newer `mtime`, folder
 | Flag | Who | Shape |
 | --- | --- | --- |
 | (plain) | Humans | Summary line + optional truncation header; numbered stem + absolute path + one-line snippets |
-| `--markdown` | Lookup-mode skill | `file://` links (spaces percent-encoded via `pathToFileURL`) + fenced snippets |
-| `--json` | Default skill | See below — **parse privately, never paste** |
+| `--markdown` | Manual/script use | `file://` links (spaces percent-encoded via `pathToFileURL`) + fenced snippets — no skill invokes this for `search` anymore |
+| `--json` | Skill (both lookup and hybrid) | See below — **parse privately, never paste** |
 
 `--markdown` and `--json` are mutually exclusive.
 
@@ -114,6 +114,7 @@ Then, as tiebreakers only: **non-archive before archive**, newer `mtime`, folder
 | `termHitCounts` | `{ "<term>": n }` — keys match `terms` spelling; every term pre-init to `0`; zero-hit terms stay explicit for broaden decisions |
 | `summary` | Human-readable count line (same as plain header) |
 | `truncated`, `totalMatchCount`, `totalFileCount` | Truncation signal + scan totals |
+| `vaultRoot`, `vaultRootUri` | Absolute path / `file://` link for the vault folder actually scanned (same `rootDir` used for `relativePath`) — the skill links this on a zero-hit result so the user can tell which vault was actually searched |
 | `hits[]` | Ranked file list |
 
 Each `hits[]` entry:
@@ -135,8 +136,9 @@ After **any** template edit, run `grounder migrate` (hash-safe if the on-disk fi
 
 ### Modes
 
-- **Hybrid (default):** one `search … --json` with `--terms`, full-read CLI hits **1–4** in one parallel batch, synthesize.
-- **Lookup:** explicit lookup wording (`exact phrase`, `this line`, `the wording`) **or** leftover is a bare `"quoted span"` → relay `--markdown` as-is (one search, no `--terms`, no full reads).
+- **Hybrid (default, topic/request):** one `search … --json` with `--terms`, full-read CLI hits **1–4** in one parallel batch, synthesize.
+- **Lookup:** explicit lookup wording (`exact phrase`, `this line`, `the wording`) **or** leftover is a bare `"quoted span"` → one `search … --json` (no `--terms`, no full reads); format hits directly from JSON (Path links + `matches[]` snippets), CLI order, no synthesis.
+- **Zero-hit disclosure (both modes):** if `totalFileCount` is 0 (after broaden, for hybrid), answer `No matches in [<vaultRoot>](<vaultRootUri>) for this topic.` instead of the normal output.
 
 ### Query and terms (the ranking contract)
 
@@ -144,7 +146,7 @@ The CLI does not guess intent. The skill **classifies** after stripping retrieva
 
 | Class | Signal | `query` |
 | --- | --- | --- |
-| **Lookup** | Explicit lookup wording (`exact phrase`, `this line`, `the wording`), **or** leftover is a bare `"quoted span"` | Quoted text (bare `"…"`) or leftover after wrappers, unmodified. Relay `--markdown`; no `--terms`, no reads. |
+| **Lookup** | Explicit lookup wording (`exact phrase`, `this line`, `the wording`), **or** leftover is a bare `"quoted span"` | Quoted text (bare `"…"`) or leftover after wrappers, unmodified. `--json`; no `--terms`, no reads; format hits directly or zero-hit disclosure. |
 | **Request** | Leftover still has request syntax: `that mention` / `that discuss` / `that talk about`; starts with `plans that` / `notes that` / `docs that` / `documents that`; trailing `both in` / `either in` / `in CLI and` | One primary noun or named command from the topic (tight phrase; do not prefix a product name). Extra nouns go in `--terms`. Never the leftover sentence. |
 | **Topic leftover** | Otherwise — leftover is already a topic noun-phrase | Leftover, same words, same order. Do **not** paraphrase. |
 

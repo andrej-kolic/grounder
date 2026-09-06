@@ -35,7 +35,7 @@ describe("templates/grounder-search", () => {
       expect(body).not.toContain("**Exact**");
       expect(body).not.toContain("Quoted spans are **not** lookup");
       expect(body).toContain('leftover is a bare `"quoted span"`');
-      expect(body).toContain('{{GROUNDER_CLI}} search "retry of expired jobs" --markdown');
+      expect(body).toContain('{{GROUNDER_CLI}} search "retry of expired jobs" --json');
       expect(body).toContain("no `--terms`, no full reads");
       expect(body).toContain("that mention");
       expect(body).toContain("never a lone generic verb");

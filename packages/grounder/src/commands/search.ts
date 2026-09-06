@@ -204,6 +204,8 @@ function writeJsonOutput(outcome: SearchOutcome, rootDir: string): void {
     truncated: outcome.truncated,
     totalMatchCount: outcome.totalMatchCount,
     totalFileCount: outcome.totalFileCount,
+    vaultRoot: rootDir,
+    vaultRootUri: toFileUri(rootDir),
     hits: outcome.files.map((file) => ({
       file: file.filePath,
       relativePath: vaultRelativePath(rootDir, file.filePath),

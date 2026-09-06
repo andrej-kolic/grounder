@@ -27,6 +27,12 @@ tests under `test/`.
 - Command palette: "Grounder: Search Vault" (backed by `grounder search --json`), results in a
   QuickPick; accept to open, or use the item's clipboard button to copy it as an `@mention`.
 
+## Multi-root workspaces
+
+In a multi-root workspace, an AI agent's `grounder` commands target whichever folder is its
+current working directory — normally the first workspace folder, but it can change mid-session.
+The tree view has no way to detect or show this.
+
 ## Build
 
 ```bash

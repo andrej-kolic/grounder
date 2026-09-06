@@ -44,6 +44,8 @@ describe("commands/search json output", () => {
 
     expect(code).toBe(0);
     const payload = JSON.parse(out.trim()) as {
+      vaultRoot: string;
+      vaultRootUri: string;
       hits: Array<{
         file: string;
         relativePath: string;
@@ -53,6 +55,8 @@ describe("commands/search json output", () => {
       }>;
     };
 
+    expect(payload.vaultRoot).toBe(projectRoot);
+    expect(payload.vaultRootUri).toBe(pathToFileURL(projectRoot).href);
     expect(payload.hits.length).toBeGreaterThan(0);
     const hit = payload.hits.find((entry) => entry.file === notePath);
     expect(hit).toBeDefined();
