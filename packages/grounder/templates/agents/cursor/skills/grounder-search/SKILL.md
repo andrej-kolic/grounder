@@ -41,7 +41,9 @@ Exactly **two** assistant turns with tools, then the answer. Allowed tools, noth
 - Number every listed file, continuing across sections (`1…` in **Read these**, then `5…` in **Also matched`).
 - Do not restart at 1 in **Also matched**. Do not use bullet-only lists without numbers.
 
-Structure:
+**Zero-hit disclosure (mandatory, both modes):** if `totalFileCount` is 0 (after the broaden attempt for topic/request), answer exactly `No matches in [<vaultRoot>](<vaultRootUri>) for this topic.` (`vaultRoot`/`vaultRootUri` from the JSON payload — the vault folder actually searched) instead of the Structure below.
+
+Structure (non-empty results):
 
 1. **Opening** — one sentence of what the vault says (not a search recap). Never start with “I have searched…”, “I found…”, or similar.
 2. **Read these** — hits 1–4 only; numbered linked paths + optional role + short bullets under each. You may list a design/archive authority first *among those four*.
@@ -61,7 +63,7 @@ Vault notes discuss …
 4. [plans/…](file:///…) — one phrase
 ```
 
-**Lookup mode:** explicit lookup wording (`exact phrase`, `this line`, `the wording`) **or** the entire input after stripping retrieval wrappers is a bare `"quoted span"` → relay CLI `--markdown` as-is (one search, no `--terms`, no full reads).
+**Lookup mode:** explicit lookup wording (`exact phrase`, `this line`, `the wording`) **or** the entire input after stripping retrieval wrappers is a bare `"quoted span"` → one search with `--json` (no `--terms`, no full reads). Non-empty: list each hit as `[relativePath](fileUri)` (Path links rules) followed by its `matches[]` lines (`L{line} ({term}): {snippet}`), CLI order, no synthesis. Empty: Zero-hit disclosure.
 
 ## Steps
 
@@ -69,7 +71,7 @@ Vault notes discuss …
 
    **Classify** after stripping retrieval wrappers (`find`, `search for`, `documents discussing`, `notes about`, `look up`). Then pick one:
 
-   - **Lookup** — explicit lookup wording (`exact phrase`, `this line`, `the wording`), **or** leftover is a bare `"quoted span"`. `query` = the quoted text, unmodified. Relay CLI `--markdown` as-is; no `--terms`, no full reads.
+   - **Lookup** — explicit lookup wording (`exact phrase`, `this line`, `the wording`), **or** leftover is a bare `"quoted span"`. `query` = the quoted text, unmodified — execution: see **Lookup mode** above.
    - **Request** — leftover still has request syntax (any of): `that mention` / `that discuss` / `that talk about`; leftover starts with `plans that` / `notes that` / `docs that` / `documents that`; trailing scope `both in` / `either in` / `in CLI and`. Do **not** pass that leftover as `query`. `query` = one primary noun or named command from the topic (tight phrase; do not prefix a product name). Extra nouns go in `--terms`.
    - **Topic leftover** — leftover is already a topic noun-phrase. `query` = leftover, same words, same order. Do not paraphrase, shorten, or coin a new phrase.
 
@@ -79,7 +81,7 @@ Vault notes discuss …
 
    Example — lookup. User: `find "retry of expired jobs"`
    - class: lookup
-   - argv: {{GROUNDER_CLI}} search "retry of expired jobs" --markdown
+   - argv: {{GROUNDER_CLI}} search "retry of expired jobs" --json
 
    Example — topic leftover. User: `find documents discussing retry of expired jobs`
    - class: topic leftover
