@@ -19,7 +19,11 @@ tests under `test/`.
   Populated by walking `status --json`'s directory paths directly, not by shelling out per item.
   Live-refreshes via a file watcher on each directory.
 - "Link this project" action when the open folder isn't linked yet; a setup hint (opens a
-  terminal with `grounder setup`) when the CLI itself isn't installed.
+  terminal with `grounder setup`) when the CLI itself isn't installed, or when it's installed but
+  this machine hasn't run `setup` for this project yet. Every other state `grounder status --json`
+  can report (broken home config, a missing/corrupt/unsupported install ledger, a pending
+  `grounder migrate`, an unsupported vault link schema) gets its own tree item and remedy too —
+  see `resolveFolderState` (`src/folderState.ts`) for the full ordered check list.
 - Click a doc to open it in the editor; drag it into a chat panel to attach it; right-click →
   "Copy as @mention" for chat surfaces that need typed text instead (Claude Code's own chat
   currently needs Shift-drag and only ever inserts `@mention` text anyway — see the plan's

@@ -10,6 +10,11 @@ import path from "node:path";
  */
 export const MIN_CLI_VERSION = "0.6.0";
 
+/** Honors `GROUNDER_HOME` like the CLI itself does, falling back to the real home dir. */
+export function grounderHomeDir(): string {
+  return process.env.GROUNDER_HOME || os.homedir();
+}
+
 /** `~/.grounder/runtime/dist/cli.js`, honoring `GROUNDER_HOME` like the CLI itself does. */
 export function runtimeCliPathFor(homeDir: string): string {
   return path.join(homeDir, ".grounder", "runtime", "dist", "cli.js");
@@ -17,7 +22,7 @@ export function runtimeCliPathFor(homeDir: string): string {
 
 /** Absolute path to the materialized CLI entry this extension shells out to. */
 export function runtimeCliPath(): string {
-  return runtimeCliPathFor(process.env.GROUNDER_HOME || os.homedir());
+  return runtimeCliPathFor(grounderHomeDir());
 }
 
 interface ParsedVersion {
