@@ -68,8 +68,8 @@ detected agent via a pluggable adapter registry (`src/agents/`).
 
 | Agent       | Detection          | Artifacts                                                      |
 | ----------- | ------------------ | -------------------------------------------------------------- |
-| Cursor      | `~/.cursor` exists | `~/.cursor/skills/grounder-{note,search,task,task-handoff,plan}/SKILL.md` |
-| Claude Code | `~/.claude` exists | `~/.claude/skills/grounder-{note,search,task,task-handoff,plan}/SKILL.md` |
+| Cursor      | `~/.cursor` exists | `~/.cursor/skills/grounder-{note,search,overview,task,task-handoff,plan}/SKILL.md` |
+| Claude Code | `~/.claude` exists | `~/.claude/skills/grounder-{note,search,overview,task,task-handoff,plan}/SKILL.md` |
 
 With no `--agent` flag, `setup` auto-detects installed agents. To install explicitly:
 

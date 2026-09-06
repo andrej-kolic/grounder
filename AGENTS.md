@@ -97,12 +97,14 @@ packages/grounder/templates/
       grounder-task-handoff/SKILL.md    # write session checkpoint
       grounder-plan/SKILL.md            # named living plan
       grounder-search/SKILL.md          # vault retrieval — CLI ranks, agent synthesizes
+      grounder-overview/SKILL.md        # vault inventory — counts + recent titles
     claude/skills/
       grounder-note/SKILL.md
       grounder-task/SKILL.md
       grounder-task-handoff/SKILL.md
       grounder-plan/SKILL.md
       grounder-search/SKILL.md
+      grounder-overview/SKILL.md
   vault/
     session-handoff.md            # lean section reference for skills
     plan.md                       # section reference for /grounder-plan

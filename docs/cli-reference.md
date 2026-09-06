@@ -147,6 +147,12 @@ separately.
 | `--markdown`  | Agent relay: `[bucketRelativePath](fileUri)` title lines                       |
 | `--json`      | Structured output: `{ total, count, truncated, items }` per bucket (notes/handoffs/plans) — `total` is the full on-disk count, `count`/`items` are capped at `--limit`, `truncated` is `total > count` |
 
+Each `items[]` entry is `{ path, relativePath, fileUri }`. Unlike `search --json`, where
+`relativePath` is project-vault-relative (e.g. `notes/foo.md`), overview's `relativePath`
+is **bucket**-relative (e.g. `foo.md`, no `notes/`/`logs/`/`plans/` prefix) — it's scoped
+per bucket key already, so the prefix would be redundant. Don't reuse `search`'s
+convention when consuming overview's JSON.
+
 `--markdown` and `--json` are mutually exclusive. Kept separate from `status` (wiring
 health) and `handoff peek` (hydrate teaser) — three distinct jobs.
 

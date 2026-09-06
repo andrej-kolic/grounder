@@ -84,6 +84,8 @@ export async function runOverview(argv: string[]): Promise<number> {
 interface Bucket {
   dir: string;
   noun: VaultItemListNoun;
+  /** Section heading for text/markdown mode ("Notes", "Handoffs", "Plans"). */
+  title: string;
   /** Every markdown file in this bucket, newest first (uncapped). */
   all: string[];
   /** `all` capped to the requested limit — what text/markdown mode prints. */
@@ -99,11 +101,12 @@ interface Bucket {
 async function gatherBucket(
   dir: string,
   noun: VaultItemListNoun,
+  title: string,
   limit: number,
   lister: (dir: string, options?: { limit?: number }) => Promise<string[]>,
 ): Promise<Bucket> {
   const all = await lister(dir);
-  return { dir, noun, all, shown: all.slice(0, limit) };
+  return { dir, noun, title, all, shown: all.slice(0, limit) };
 }
 
 function jsonBucket(bucket: Bucket) {
@@ -124,7 +127,7 @@ function writeTextOutput(buckets: readonly Bucket[], limit: number, markdown: bo
     if (index > 0) {
       process.stdout.write("\n");
     }
-    writeSection(bucket.noun.plural[0]?.toUpperCase() + bucket.noun.plural.slice(1));
+    writeSection(bucket.title);
     writeVaultItemList(bucket.shown, limit, bucket.noun, { markdown, titleRootDir: bucket.dir });
   });
 }
@@ -157,9 +160,15 @@ export async function runOverviewWithOptions(options: OverviewOptions = {}): Pro
     const plansDir = resolvePlansDir(linked.home, linked.repo);
 
     const buckets = await Promise.all([
-      gatherBucket(notesDir, { singular: "note", plural: "notes" }, limit, listNotes),
-      gatherBucket(logsDir, { singular: "handoff", plural: "handoffs" }, limit, listHandoffs),
-      gatherBucket(plansDir, { singular: "plan", plural: "plans" }, limit, listPlans),
+      gatherBucket(notesDir, { singular: "note", plural: "notes" }, "Notes", limit, listNotes),
+      gatherBucket(
+        logsDir,
+        { singular: "handoff", plural: "handoffs" },
+        "Handoffs",
+        limit,
+        listHandoffs,
+      ),
+      gatherBucket(plansDir, { singular: "plan", plural: "plans" }, "Plans", limit, listPlans),
     ]);
 
     if (options.json) {
