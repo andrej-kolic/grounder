@@ -140,9 +140,9 @@ default, full-reads the top four hits, and synthesizes a short answer — see
 ## Overview flags
 
 `grounder overview` composes `note list` / `handoff list` / `plan list` into one call: a
-per-bucket count plus capped recent titles across `notes/`, `logs/`, and `plans/` — the
-gap between `status` (wiring health only) and running those three list commands
-separately.
+per-bucket count plus capped recent titles (each with a last-updated date) across
+`notes/`, `logs/`, and `plans/` — the gap between `status` (wiring health only) and
+running those three list commands separately.
 
 | Flag          | Description                                                                    |
 | ------------- | ------------------------------------------------------------------------------- |
@@ -150,11 +150,17 @@ separately.
 | `--markdown`  | Agent relay: `[bucketRelativePath](fileUri)` title lines                       |
 | `--json`      | Structured output: `{ total, count, truncated, items }` per bucket (notes/handoffs/plans) — `total` is the full on-disk count, `count`/`items` are capped at `--limit`, `truncated` is `total > count` |
 
-Each `items[]` entry is `{ path, relativePath, fileUri }`. Unlike `search --json`, where
-`relativePath` is project-vault-relative (e.g. `notes/foo.md`), overview's `relativePath`
-is **bucket**-relative (e.g. `foo.md`, no `notes/`/`logs/`/`plans/` prefix) — it's scoped
-per bucket key already, so the prefix would be redundant. Don't reuse `search`'s
-convention when consuming overview's JSON.
+Each `items[]` entry is `{ path, relativePath, fileUri, mtimeMs }`. Unlike `search --json`,
+where `relativePath` is project-vault-relative (e.g. `notes/foo.md`), overview's
+`relativePath` is **bucket**-relative (e.g. `foo.md`, no `notes/`/`logs/`/`plans/` prefix)
+— it's scoped per bucket key already, so the prefix would be redundant. Don't reuse
+`search`'s convention when consuming overview's JSON.
+
+`mtimeMs` is the file's on-disk modified time (epoch milliseconds), not a frontmatter
+field — notes and handoffs carry no `updated` frontmatter at all, and a plan's `updated`
+frontmatter only changes on `plan --force`, not on a hand-edit made directly in the
+vault. Text and markdown mode print the same value as `— updated YYYY-MM-DD` on each
+title line.
 
 `--markdown` and `--json` are mutually exclusive. Kept separate from `status` (wiring
 health) and `handoff peek` (hydrate teaser) — three distinct jobs.

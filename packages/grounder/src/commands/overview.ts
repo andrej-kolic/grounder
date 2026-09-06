@@ -2,11 +2,16 @@ import { withHomeDir } from "../connector/home.js";
 import { resolveLogsDir, resolveNotesDir, resolvePlansDir } from "../connector/vault.js";
 import { helpExitCode } from "../help.js";
 import { flagBool, parseArgs } from "../util/parse-args.js";
-import { toFileUri, vaultRelativePath } from "../util/path.js";
-import { listHandoffs } from "../vault/list-handoffs.js";
-import { listNotes } from "../vault/list-notes.js";
-import { listPlans } from "../vault/list-plans.js";
-import { type VaultItemListNoun, writeSection, writeVaultItemListEntries } from "./output.js";
+import {
+  formatMarkdownFileLink,
+  toFileUri,
+  vaultItemPlainTitle,
+  vaultRelativePath,
+} from "../util/path.js";
+import { listHandoffsDetailed } from "../vault/list-handoffs.js";
+import { listNotesDetailed } from "../vault/list-notes.js";
+import { listPlansDetailed } from "../vault/list-plans.js";
+import { type VaultItemListNoun, writeSection } from "./output.js";
 import { requireLinkedProject } from "./require-linked.js";
 
 const DEFAULT_LIMIT = 3;
@@ -19,7 +24,8 @@ export interface OverviewOptions {
   limit?: number;
   /**
    * Agent relay: `[bucketRelativePath](fileUri)` on each title line (default:
-   * plain bucket-relative stem path).
+   * plain bucket-relative stem path). Either way the title line also carries
+   * "— updated YYYY-MM-DD".
    */
   markdown?: boolean;
   /** Structured JSON payload instead of formatted text. Mutually exclusive with `markdown`. */
@@ -81,15 +87,21 @@ export async function runOverview(argv: string[]): Promise<number> {
   return runOverviewWithOptions({ limit, markdown, json });
 }
 
+/** A listed file plus the mtime already fetched to rank it. */
+interface Entry {
+  path: string;
+  mtimeMs: number;
+}
+
 interface Bucket {
   dir: string;
   noun: VaultItemListNoun;
   /** Section heading for text/markdown mode ("Notes", "Handoffs", "Plans"). */
   title: string;
   /** Every markdown file in this bucket, newest first (uncapped). */
-  all: string[];
+  all: Entry[];
   /** `all` capped to the requested limit — what text/markdown mode prints. */
-  shown: string[];
+  shown: Entry[];
 }
 
 /**
@@ -103,10 +115,15 @@ async function gatherBucket(
   noun: VaultItemListNoun,
   title: string,
   limit: number,
-  lister: (dir: string, options?: { limit?: number }) => Promise<string[]>,
+  lister: (dir: string, options?: { limit?: number }) => Promise<Entry[]>,
 ): Promise<Bucket> {
   const all = await lister(dir);
   return { dir, noun, title, all, shown: all.slice(0, limit) };
+}
+
+/** `YYYY-MM-DD` — deterministic and matches the ISO dates already used in plan frontmatter. */
+function formatEntryDate(mtimeMs: number): string {
+  return new Date(mtimeMs).toISOString().slice(0, 10);
 }
 
 function jsonBucket(bucket: Bucket) {
@@ -114,10 +131,11 @@ function jsonBucket(bucket: Bucket) {
     total: bucket.all.length,
     count: bucket.shown.length,
     truncated: bucket.all.length > bucket.shown.length,
-    items: bucket.shown.map((filePath) => ({
-      path: filePath,
-      relativePath: vaultRelativePath(bucket.dir, filePath),
-      fileUri: toFileUri(filePath),
+    items: bucket.shown.map((entry) => ({
+      path: entry.path,
+      relativePath: vaultRelativePath(bucket.dir, entry.path),
+      fileUri: toFileUri(entry.path),
+      mtimeMs: entry.mtimeMs,
     })),
   };
 }
@@ -143,6 +161,32 @@ function bucketHeader(bucket: Bucket): string {
   return `Most recent ${shown} of ${total} ${bucket.noun.plural}:\n\n`;
 }
 
+/**
+ * Numbered title + absolute-path blocks for one bucket, each title line
+ * suffixed with "— updated YYYY-MM-DD" and ending in two trailing spaces (a
+ * Markdown hard line break, matching the `note`/`handoff`/`plan list`
+ * convention) so agents can relay stdout into chat and keep title, date, and
+ * path on separate rendered lines.
+ *
+ * Deliberately not routed through the shared `writeVaultItemListEntries` in
+ * `output.ts` — that helper is also used by `note`/`handoff`/`plan list`,
+ * whose output format this change isn't meant to touch, so overview owns its
+ * own (nearly identical) entry line here instead of adding a date parameter
+ * to shared code three other commands don't want.
+ */
+function writeBucketEntries(bucket: Bucket, markdown: boolean): void {
+  bucket.shown.forEach((entry, index) => {
+    if (index > 0) {
+      process.stdout.write("\n");
+    }
+    const title = markdown
+      ? formatMarkdownFileLink(vaultRelativePath(bucket.dir, entry.path), entry.path)
+      : vaultItemPlainTitle(entry.path, bucket.dir);
+    const updated = formatEntryDate(entry.mtimeMs);
+    process.stdout.write(`${index + 1}. ${title} — updated ${updated}  \n  ${entry.path}\n`);
+  });
+}
+
 function writeTextOutput(buckets: readonly Bucket[], markdown: boolean): void {
   buckets.forEach((bucket, index) => {
     if (index > 0) {
@@ -150,7 +194,7 @@ function writeTextOutput(buckets: readonly Bucket[], markdown: boolean): void {
     }
     writeSection(bucket.title);
     process.stdout.write(bucketHeader(bucket));
-    writeVaultItemListEntries(bucket.shown, { markdown, titleRootDir: bucket.dir });
+    writeBucketEntries(bucket, markdown);
   });
 }
 
@@ -164,9 +208,11 @@ function writeJsonOutput(buckets: readonly Bucket[]): void {
 
 /**
  * Resolves the linked project, gathers a per-bucket count + capped recent
- * titles across `notes/`, `logs/` (handoffs), and `plans/` — the same
- * newest-first listings `note/handoff/plan list` use, in one call. No new
- * storage or list logic; this only composes the existing listers.
+ * titles (each with a last-updated date) across `notes/`, `logs/`
+ * (handoffs), and `plans/` — the same newest-first listings
+ * `note/handoff/plan list` use, in one call. No new storage; the mtime shown
+ * is the same one each lister already fetches to rank entries (see
+ * `listNotesDetailed` / `listHandoffsDetailed` / `listPlansDetailed`).
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runOverviewWithOptions(options: OverviewOptions = {}): Promise<number> {
@@ -182,15 +228,27 @@ export async function runOverviewWithOptions(options: OverviewOptions = {}): Pro
     const plansDir = resolvePlansDir(linked.home, linked.repo);
 
     const buckets = await Promise.all([
-      gatherBucket(notesDir, { singular: "note", plural: "notes" }, "Notes", limit, listNotes),
+      gatherBucket(
+        notesDir,
+        { singular: "note", plural: "notes" },
+        "Notes",
+        limit,
+        listNotesDetailed,
+      ),
       gatherBucket(
         logsDir,
         { singular: "handoff", plural: "handoffs" },
         "Handoffs",
         limit,
-        listHandoffs,
+        listHandoffsDetailed,
       ),
-      gatherBucket(plansDir, { singular: "plan", plural: "plans" }, "Plans", limit, listPlans),
+      gatherBucket(
+        plansDir,
+        { singular: "plan", plural: "plans" },
+        "Plans",
+        limit,
+        listPlansDetailed,
+      ),
     ]);
 
     if (options.json) {

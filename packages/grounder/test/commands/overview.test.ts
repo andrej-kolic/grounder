@@ -19,6 +19,10 @@ async function touch(filePath: string, when: Date): Promise<void> {
   await utimes(filePath, when, when);
 }
 
+/** Mid-day UTC so a truncated (second-resolution) mtime never crosses a day boundary. */
+const FIXED_MTIME = new Date("2026-06-26T15:00:00.000Z");
+const FIXED_DATE = "2026-06-26";
+
 describe("commands/overview", () => {
   let cleanup: (() => Promise<void>) | undefined;
 
@@ -70,6 +74,7 @@ describe("commands/overview", () => {
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
     const notePath = path.join(notesDir, "phase-1.md");
     await writeFile(notePath, "x", "utf8");
+    await touch(notePath, FIXED_MTIME);
 
     const { code, out } = await captureStdout(() =>
       runOverviewWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -77,7 +82,7 @@ describe("commands/overview", () => {
 
     expect(code).toBe(0);
     expect(out).toBe(
-      `Notes\nAll 1 note:\n\n1. phase-1  \n  ${notePath}\n\n` +
+      `Notes\nAll 1 note:\n\n1. phase-1 — updated ${FIXED_DATE}  \n  ${notePath}\n\n` +
         "Handoffs\nNo handoffs.\n\nPlans\nNo plans.\n",
     );
   });
@@ -102,7 +107,7 @@ describe("commands/overview", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain("Most recent 1 of 2 notes:\n\n1. newer  \n");
+    expect(out).toContain(`Most recent 1 of 2 notes:\n\n1. newer — updated ${FIXED_DATE}  \n`);
   });
 
   it("prints markdown link title lines with --markdown", async () => {
@@ -115,13 +120,16 @@ describe("commands/overview", () => {
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
     const notePath = path.join(notesDir, "phase-1.md");
     await writeFile(notePath, "x", "utf8");
+    await touch(notePath, FIXED_MTIME);
 
     const { code, out } = await captureStdout(() =>
       runOverviewWithOptions({ cwd: env.repo, homeDir: env.home, markdown: true }),
     );
 
     expect(code).toBe(0);
-    expect(out).toContain(`1. [phase-1.md](${pathToFileURL(notePath).href})  \n  ${notePath}\n`);
+    expect(out).toContain(
+      `1. [phase-1.md](${pathToFileURL(notePath).href}) — updated ${FIXED_DATE}  \n  ${notePath}\n`,
+    );
   });
 
   it("prints structured JSON with --json, covering all three buckets", async () => {
@@ -140,6 +148,9 @@ describe("commands/overview", () => {
     await writeFile(notePath, "x", "utf8");
     await writeFile(handoffPath, "y", "utf8");
     await writeFile(planPath, "z", "utf8");
+    await touch(notePath, FIXED_MTIME);
+    await touch(handoffPath, FIXED_MTIME);
+    await touch(planPath, FIXED_MTIME);
 
     const { code, out } = await captureStdout(() =>
       runOverviewWithOptions({ cwd: env.repo, homeDir: env.home, json: true }),
@@ -157,6 +168,7 @@ describe("commands/overview", () => {
             path: notePath,
             relativePath: "phase-1.md",
             fileUri: pathToFileURL(notePath).href,
+            mtimeMs: expect.any(Number),
           },
         ],
       },
@@ -169,6 +181,7 @@ describe("commands/overview", () => {
             path: handoffPath,
             relativePath: "2026-06-26-120000-session.md",
             fileUri: pathToFileURL(handoffPath).href,
+            mtimeMs: expect.any(Number),
           },
         ],
       },
@@ -181,10 +194,18 @@ describe("commands/overview", () => {
             path: planPath,
             relativePath: "auth-rewrite.md",
             fileUri: pathToFileURL(planPath).href,
+            mtimeMs: expect.any(Number),
           },
         ],
       },
     });
+
+    // mtimeMs is a real stat, not a placeholder: locks the value to the
+    // filesystem mtime this test actually set for every bucket.
+    for (const bucket of ["notes", "handoffs", "plans"] as const) {
+      const mtimeMs = payload[bucket].items[0].mtimeMs;
+      expect(new Date(mtimeMs).toISOString().slice(0, 10)).toBe(FIXED_DATE);
+    }
   });
 
   it("reports an honest total and only flags truncated past the limit", async () => {
@@ -247,6 +268,7 @@ describe("commands/overview", () => {
       path: notePath,
       relativePath: "feature/foo.md",
       fileUri: pathToFileURL(notePath).href,
+      mtimeMs: expect.any(Number),
     });
   });
 
@@ -276,6 +298,7 @@ describe("commands/overview", () => {
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
     const notePath = path.join(notesDir, "phase-1.md");
     await writeFile(notePath, "x", "utf8");
+    await touch(notePath, FIXED_MTIME);
 
     const nested = path.join(env.repo, "src", "nested");
     await mkdir(nested, { recursive: true });
@@ -285,7 +308,7 @@ describe("commands/overview", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain("All 1 note:\n\n1. phase-1  \n");
+    expect(out).toContain(`All 1 note:\n\n1. phase-1 — updated ${FIXED_DATE}  \n`);
   });
 
   it("cli prints per-bucket sections and honors --limit", async () => {
@@ -306,7 +329,9 @@ describe("commands/overview", () => {
     const result = runCli(["overview", "--limit", "1"], withGroundedHome(env.home), env.repo);
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Most recent 1 of 2 notes:\n\n1. newer  \n");
+    expect(result.stdout).toContain(
+      `Most recent 1 of 2 notes:\n\n1. newer — updated ${FIXED_DATE}  \n`,
+    );
     expect(result.stdout).toContain("Handoffs\nNo handoffs.\n");
     expect(result.stdout).toContain("Plans\nNo plans.\n");
   });
@@ -321,6 +346,7 @@ describe("commands/overview", () => {
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
     const notePath = path.join(notesDir, "phase-1.md");
     await writeFile(notePath, "x", "utf8");
+    await touch(notePath, FIXED_MTIME);
 
     const result = runCli(["overview", "--json"], withGroundedHome(env.home), env.repo);
 
@@ -331,9 +357,15 @@ describe("commands/overview", () => {
       count: 1,
       truncated: false,
       items: [
-        { path: notePath, relativePath: "phase-1.md", fileUri: pathToFileURL(notePath).href },
+        {
+          path: notePath,
+          relativePath: "phase-1.md",
+          fileUri: pathToFileURL(notePath).href,
+          mtimeMs: expect.any(Number),
+        },
       ],
     });
+    expect(new Date(payload.notes.items[0].mtimeMs).toISOString().slice(0, 10)).toBe(FIXED_DATE);
   });
 
   it("returns 1 when the project is not linked", async () => {

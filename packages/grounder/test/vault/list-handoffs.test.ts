@@ -1,8 +1,12 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { listHandoffs } from "../../src/vault/list-handoffs.js";
+import { listHandoffs, listHandoffsDetailed } from "../../src/vault/list-handoffs.js";
 import { createTempEnv } from "../helpers.js";
+
+async function touch(filePath: string, when: Date): Promise<void> {
+  await utimes(filePath, when, when);
+}
 
 describe("vault/list-handoffs", () => {
   let cleanup: (() => Promise<void>) | undefined;
@@ -45,6 +49,28 @@ describe("vault/list-handoffs", () => {
       path.join(logsDir, "2026-06-26-150000-later.md"),
       path.join(logsDir, "2026-06-26-143000.md"),
       path.join(logsDir, "2026-06-25-090000-old.md"),
+    ]);
+  });
+
+  it("listHandoffsDetailed returns the same filename ranking with each entry's real mtime attached", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const logsDir = path.join(env.vault, "logs");
+    await mkdir(logsDir, { recursive: true });
+    const later = path.join(logsDir, "2026-06-26-150000-later.md");
+    const earlier = path.join(logsDir, "2026-06-26-143000.md");
+    await writeFile(later, "a", "utf8");
+    await writeFile(earlier, "b", "utf8");
+    // mtime intentionally reversed from filename order — ranking must stay
+    // filename-based, only the mtime field itself should reflect this.
+    const laterMtime = new Date("2026-06-25T09:00:00.000Z");
+    const earlierMtime = new Date("2026-06-27T09:00:00.000Z");
+    await touch(later, laterMtime);
+    await touch(earlier, earlierMtime);
+
+    expect(await listHandoffsDetailed(logsDir)).toEqual([
+      { path: later, mtimeMs: laterMtime.getTime() },
+      { path: earlier, mtimeMs: earlierMtime.getTime() },
     ]);
   });
 
