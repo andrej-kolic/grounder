@@ -1,21 +1,37 @@
-# `grounder-vscode-extension` (drag-and-drop spike)
+# `grounder-vscode-extension`
 
-Not a real release — this tests one assumption before anything else gets built: can a VS Code
-`TreeDataProvider` drag a file into **Cursor's** chat panel or the **Claude Code** VS Code
-extension's chat panel? See the "Grounder VS Code Extension" plan (Step 1) in the vault for the
-full context.
+Not published yet — see the "Grounder VS Code Extension" plan in the vault for full context.
+Browses a linked project's Grounder vault (notes/handoffs/plans) in a tree view, and lets you
+drag a doc into **Cursor**'s or the **Claude Code** VS Code extension's chat panel to attach it
+as context (confirmed working for both — see the plan's Step 1 result). Requires the `grounder`
+CLI; this package never imports its internals, only shells out to the materialized runtime at
+`~/.grounder/runtime/dist/cli.js`.
 
-It contributes one tree view, "Grounder (spike)", in the Explorer sidebar, with a single
-hardcoded item pointing at this package's own `README.md` (this file) — a real file to drag, no
-CLI invocation, no real vault reading yet.
+**Out of `pnpm check` for now** — own release cadence, own test runner
+(`@vscode/test-electron`, not wired up yet) for anything that needs the VS Code API. Pure logic
+(CLI resolution, version-floor comparison, `status --json` parsing) has normal `vitest` unit
+tests under `test/`.
 
-**Out of `pnpm check` for now** — own release cadence, no test runner wired up yet (same
-rationale as `packages/e2e`).
+## What's here
+
+- Tree view ("Grounder" in the Explorer sidebar): `Notes` / `Handoffs` / `Plans` per linked
+  workspace folder (grouped by folder in a multi-root workspace, flat in a single-root one).
+  Populated by walking `status --json`'s directory paths directly, not by shelling out per item.
+  Live-refreshes via a file watcher on each directory.
+- "Link this project" action when the open folder isn't linked yet; a setup hint (opens a
+  terminal with `grounder setup`) when the CLI itself isn't installed.
+- Click a doc to open it in the editor; drag it into a chat panel to attach it; right-click →
+  "Copy as @mention" for chat surfaces that need typed text instead (Claude Code's own chat
+  currently needs Shift-drag and only ever inserts `@mention` text anyway — see the plan's
+  Decisions).
+- Command palette: "Grounder: Search Vault" (backed by `grounder search --json`), results in a
+  QuickPick; accept to open, or use the item's clipboard button to copy it as an `@mention`.
 
 ## Build
 
 ```bash
 pnpm --filter grounder-vscode-extension build   # from repo root
+pnpm --filter grounder-vscode-extension test:unit
 ```
 
 ## Manual testing
@@ -26,7 +42,7 @@ monorepo root — so `.vscode/launch.json` here applies.
 ### If developing inside Cursor itself
 
 Press `F5` ("Run Extension"). This launches a **Cursor** Extension Development Host directly —
-drag the "README.md" tree item from the "Grounder (spike)" view into Cursor's chat panel there.
+open a linked project there and drag/drop-test against Cursor's real chat panel.
 
 ### If developing in plain VS Code
 
@@ -39,7 +55,7 @@ pnpm --filter grounder-vscode-extension package   # runs `npx @vscode/vsce packa
 ```
 
 Then in Cursor: Extensions view → `...` menu → "Install from VSIX..." → pick the generated
-`.vsix`. Reload, open the "Grounder (spike)" view, and drag-test against the real chat panel.
+`.vsix`. Reload, open a linked project, and drag-test against the real chat panel.
 
 (`@vscode/vsce` is invoked via `npx`, not a workspace devDependency — its optional native deps
 `keytar`/`@vscode/vsce-sign` trip pnpm's build-script approval gate and break `pnpm run` for the
@@ -49,10 +65,4 @@ whole monorepo, not just this package.)
 
 Same caveat as Cursor: a plain VS Code Extension Development Host won't have it installed by
 default. Make sure the Claude Code extension is present and enabled in whichever dev host you
-use (install it into that dev host, or sideload this extension's `.vsix` into a real VS Code /
-Cursor install where Claude Code is already enabled) before drag-testing.
-
-## Outcome
-
-If the drop lands in either chat panel, the tree view + drag-and-drop plan proceeds as scoped.
-If not, "copy path as `@mention`" becomes the real v1 mechanism instead of a fallback.
+use before drag-testing.
