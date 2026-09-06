@@ -76,3 +76,35 @@ whole monorepo, not just this package.)
 Same caveat as Cursor: a plain VS Code Extension Development Host won't have it installed by
 default. Make sure the Claude Code extension is present and enabled in whichever dev host you
 use before drag-testing.
+
+### Scripted `FolderState` dogfooding (MCP)
+
+`grounder._debugState` (`src/commands.ts`) is a dev-host-only command — registered only when
+`context.extensionMode === vscode.ExtensionMode.Development`, never in the Command Palette or a
+packaged install — that returns the resolved `FolderState` per workspace folder, re-running the
+same `fetchStatus`/`hasGrounderMarkerUpward` logic the tree view itself uses. It exists so an
+external driver can assert the tree's error-state matrix (see `resolveFolderState`,
+`src/folderState.ts`) end-to-end without a way to read an extension's TreeView contents directly.
+
+The intended driver is [`acomagu.vscode-as-mcp-server`](https://marketplace.visualstudio.com/items?itemName=acomagu.vscode-as-mcp-server),
+installed and active *inside* the dev host window (its single running server targets whichever
+VS Code window is currently "active," switched by clicking its own status bar item in that
+window — there's no command to script that switch). From an MCP-connected session: mutate
+on-disk state, call `execute_vscode_command("grounder._debugState")`, and diff the result against
+the expected `FolderState` for that row.
+
+Use the **"Run Extension (fixtures/dev, isolated home)"** launch config for this (`.vscode/launch.json`)
+— it sets `GROUNDER_HOME` to a scratch `fixtures/dev-home/` (gitignored), so mutating
+config/ledger files for the matrix never touches a real `~/.grounder` install. Seed it once via
+the repo's own built CLI:
+
+```bash
+pnpm grounder setup fixtures/dev-vault --yes --agent claude   # any scratch vault path works
+cd fixtures/dev && node ../../packages/grounder/dist/cli.js link --yes
+```
+
+(The plain **"Run Extension (fixtures/dev)"** config is unchanged and still uses your real home,
+per `fixture-setup.mjs`'s documented workflow — don't add `GROUNDER_HOME` to it.)
+
+See `plans/vscode-extension-mcp-dogfood-automation.md` in the vault for the full 15-row matrix and
+results from the last scripted pass.
