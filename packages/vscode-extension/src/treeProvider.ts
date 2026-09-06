@@ -1,5 +1,8 @@
 import path from "node:path";
 import * as vscode from "vscode";
+import { grounderHomeDir } from "./cli.js";
+import { type LinkedProject, resolveFolderState } from "./folderState.js";
+import { hasGrounderMarkerUpward } from "./grounderMarker.js";
 import { fetchStatus } from "./status.js";
 import {
   buildVaultTree,
@@ -283,52 +286,150 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
   }
 
   private async childrenForFolder(folder: vscode.WorkspaceFolder): Promise<GrounderNode[]> {
+    // Machine-level state (`config.json`, `state.json`, the materialized
+    // runtime) lives outside any watched vault dir — without this, running
+    // `grounder setup`/`migrate`/`doctor` from the hint terminals never
+    // clears a stale error/drift row until the user hits refresh by hand.
+    this.watchDir(path.join(grounderHomeDir(), ".grounder"), "**/*");
+
     const status = await fetchStatus(folder.uri.fsPath);
+    const hasMarker =
+      status.kind === "no-runtime" ? hasGrounderMarkerUpward(folder.uri.fsPath) : false;
+    const state = resolveFolderState(status, hasMarker);
 
-    if (status.kind === "no-runtime") {
-      return [
-        {
-          kind: "action",
-          label: "Grounder CLI not installed",
-          description: "run `grounder setup`",
-          commandId: "grounder.showSetupHint",
-          commandArgs: [folder],
-        },
-      ];
+    switch (state.kind) {
+      case "no-runtime-unlinked":
+        return [
+          {
+            kind: "action",
+            label: "Grounder CLI not installed",
+            description: "run `grounder setup`",
+            commandId: "grounder.showSetupHint",
+            commandArgs: [folder],
+          },
+        ];
+
+      case "no-runtime-linked":
+        return [
+          {
+            kind: "action",
+            label: "Grounder not set up on this machine",
+            description: "this project is linked — run `grounder setup`",
+            commandId: "grounder.showSetupHint",
+            commandArgs: [folder],
+          },
+        ];
+
+      case "cli-error":
+        return [{ kind: "message", label: "Grounder error", description: state.message }];
+
+      case "newer-schema":
+        return [
+          {
+            kind: "message",
+            label: "Grounder CLI is newer than this extension expects",
+            description: "some info may be unavailable — consider updating the extension",
+          },
+        ];
+
+      case "machine-config-broken":
+        return [
+          {
+            kind: "action",
+            label: "Grounder home config broken",
+            description: `${state.configState} — run \`grounder setup <path>\``,
+            commandId: "grounder.showSetupHint",
+            commandArgs: [folder],
+          },
+        ];
+
+      case "ledger-missing":
+        return [
+          {
+            kind: "action",
+            label: "Grounder install ledger missing",
+            description: "run `grounder migrate --force`",
+            commandId: "grounder.showMigrateForceHint",
+            commandArgs: [folder],
+          },
+        ];
+
+      case "ledger-broken":
+        return state.status === "unsupported"
+          ? [
+              {
+                kind: "message",
+                label: "Grounder install ledger broken",
+                description: "unsupported — upgrade grounder",
+              },
+            ]
+          : [
+              {
+                kind: "action",
+                label: "Grounder install ledger broken",
+                description: "invalid — run `grounder migrate --force`",
+                commandId: "grounder.showMigrateForceHint",
+                commandArgs: [folder],
+              },
+            ];
+
+      case "unlinked":
+        return [
+          {
+            kind: "action",
+            label: "Link this project",
+            commandId: "grounder.linkProject",
+            commandArgs: [folder],
+          },
+        ];
+
+      case "project-schema-unsupported":
+        return [
+          {
+            kind: "message",
+            label: "Vault link unsupported",
+            description: "upgrade grounder",
+          },
+        ];
+
+      case "project-config-broken":
+        return [
+          {
+            kind: "action",
+            label: "Vault not fully configured",
+            description: `${state.configState} — run \`grounder doctor\``,
+            commandId: "grounder.showDoctorHint",
+            commandArgs: [folder],
+          },
+        ];
+
+      case "dirs-missing":
+        return [
+          {
+            kind: "action",
+            label: "Vault not fully configured",
+            description: "run `grounder doctor`",
+            commandId: "grounder.showDoctorHint",
+            commandArgs: [folder],
+          },
+        ];
+
+      case "healthy":
+        return this.healthyChildren(
+          folder,
+          state.project,
+          state.installDrift,
+          state.packageVersionNotice,
+        );
     }
+  }
 
-    if (status.kind === "error") {
-      return [{ kind: "message", label: "Grounder error", description: status.message }];
-    }
-
-    const { project } = status.payload;
-
-    if (!project.linked) {
-      return [
-        {
-          kind: "action",
-          label: "Link this project",
-          commandId: "grounder.linkProject",
-          commandArgs: [folder],
-        },
-      ];
-    }
-
-    if (
-      project.configState !== "ok" ||
-      !project.notesDir ||
-      !project.logsDir ||
-      !project.plansDir
-    ) {
-      return [
-        {
-          kind: "message",
-          label: "Vault not fully configured",
-          description: `${project.configState} — run \`grounder doctor\``,
-        },
-      ];
-    }
-
+  private async healthyChildren(
+    folder: vscode.WorkspaceFolder,
+    project: LinkedProject,
+    installDrift: boolean,
+    packageVersionNotice: string | null,
+  ): Promise<GrounderNode[]> {
     this.watchDir(project.notesDir);
     this.watchDir(project.logsDir);
     this.watchDir(project.plansDir);
@@ -383,7 +484,32 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
       this.categoryNodes.set(category.dir, category);
     }
 
-    const nodes: GrounderNode[] = [...categories];
+    const nodes: GrounderNode[] = [];
+    if (installDrift) {
+      // Non-blocking notice: the vault itself is fully usable while a
+      // migrate is pending, so this sits above the real tree rather than
+      // replacing it (unlike every other check in resolveFolderState).
+      nodes.push({
+        kind: "action",
+        label: "Grounder install out of date",
+        description: "run `grounder migrate`",
+        commandId: "grounder.showMigrateHint",
+        commandArgs: [folder],
+      });
+    }
+    if (packageVersionNotice) {
+      // Same non-blocking placement as installDrift above. The CLI's fix
+      // (`grounder migrate` vs. upgrading the extension's Grounder) depends
+      // on which side is ahead — `status --json` only exposes the plain-
+      // language message, not the distinction, so this stays a message
+      // rather than guessing a remedy command.
+      nodes.push({
+        kind: "message",
+        label: "Grounder version notice",
+        description: packageVersionNotice,
+      });
+    }
+    nodes.push(...categories);
 
     if (this.showAllVaultItems && project.vaultRoot) {
       this.watchDir(project.vaultRoot, "*.md");

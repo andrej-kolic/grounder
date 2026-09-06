@@ -87,6 +87,24 @@ function showSetupHint(): void {
   terminal.sendText("grounder setup");
 }
 
+function showMigrateHint(): void {
+  const terminal = vscode.window.createTerminal("Grounder Migrate");
+  terminal.show();
+  terminal.sendText("grounder migrate");
+}
+
+function showMigrateForceHint(): void {
+  const terminal = vscode.window.createTerminal("Grounder Migrate");
+  terminal.show();
+  terminal.sendText("grounder migrate --force");
+}
+
+function showDoctorHint(): void {
+  const terminal = vscode.window.createTerminal("Grounder Doctor");
+  terminal.show();
+  terminal.sendText("grounder doctor");
+}
+
 /**
  * Each toggle is registered under two command ids (see `registerCommands`),
  * one per state, shown/hidden by complementary `when` clauses on the config
@@ -337,6 +355,9 @@ export function registerCommands(
       },
     ),
     vscode.commands.registerCommand("grounder.showSetupHint", () => showSetupHint()),
+    vscode.commands.registerCommand("grounder.showMigrateHint", () => showMigrateHint()),
+    vscode.commands.registerCommand("grounder.showMigrateForceHint", () => showMigrateForceHint()),
+    vscode.commands.registerCommand("grounder.showDoctorHint", () => showDoctorHint()),
     vscode.commands.registerCommand("grounder.toggleDimDatesOn", () => void toggleDimDates()),
     vscode.commands.registerCommand("grounder.toggleDimDatesOff", () => void toggleDimDates()),
     vscode.commands.registerCommand(
