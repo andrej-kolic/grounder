@@ -14,3 +14,6 @@ fixtures/dev/.grounder.json
 
 # Claude Code machine-local permissions (nvm paths, etc.)
 .claude/settings.local.json
+
+# Contain local settings
+*.code-workspace
