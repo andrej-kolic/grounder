@@ -44,6 +44,22 @@ describe("commands/overview", () => {
     expect(out).toBe("Notes\nNo notes.\n\nHandoffs\nNo handoffs.\n\nPlans\nNo plans.\n");
   });
 
+  it("prints total: 0 and empty items for every bucket with --json on an empty vault", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const { code, out } = await captureStdout(() =>
+      runOverviewWithOptions({ cwd: env.repo, homeDir: env.home, json: true }),
+    );
+
+    expect(code).toBe(0);
+    const empty = { total: 0, count: 0, truncated: false, items: [] };
+    expect(JSON.parse(out.trim())).toEqual({ notes: empty, handoffs: empty, plans: empty });
+  });
+
   it("prints per-bucket counts and newest-first titles under the default limit", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;
@@ -268,6 +284,31 @@ describe("commands/overview", () => {
     expect(result.stdout).toContain("Most recent 1 note (there may be more):\n\n1. newer  \n");
     expect(result.stdout).toContain("Handoffs\nNo handoffs.\n");
     expect(result.stdout).toContain("Plans\nNo plans.\n");
+  });
+
+  it("cli prints structured JSON with --json", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
+    const notePath = path.join(notesDir, "phase-1.md");
+    await writeFile(notePath, "x", "utf8");
+
+    const result = runCli(["overview", "--json"], withGroundedHome(env.home), env.repo);
+
+    expect(result.status).toBe(0);
+    const payload = JSON.parse(result.stdout.trim());
+    expect(payload.notes).toEqual({
+      total: 1,
+      count: 1,
+      truncated: false,
+      items: [
+        { path: notePath, relativePath: "phase-1.md", fileUri: pathToFileURL(notePath).href },
+      ],
+    });
   });
 
   it("returns 1 when the project is not linked", async () => {

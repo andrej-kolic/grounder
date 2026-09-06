@@ -172,6 +172,7 @@ grounder note "Investigate auth middleware"               # always a new note
 grounder handoff $'# Handoff: ...\n\n## Next\n1. ...'     # saved session summary
 grounder search "token refresh"                           # find earlier documents on token refresh
 grounder plan list                                        # also: note list, handoff list
+grounder overview                                         # counts + recent titles, all three buckets
 grounder status                                           # am I wired up?
 grounder doctor                                           # why isn't this working?
 ```
