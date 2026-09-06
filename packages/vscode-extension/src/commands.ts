@@ -323,6 +323,9 @@ export function registerCommands(
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("grounder.refresh", () => provider.refresh()),
+    vscode.commands.registerCommand("grounder.collapseAll", () =>
+      vscode.commands.executeCommand("workbench.actions.treeView.grounderVault.collapseAll"),
+    ),
     vscode.commands.registerCommand(
       "grounder.linkProject",
       (node?: GrounderNode | vscode.WorkspaceFolder) => {

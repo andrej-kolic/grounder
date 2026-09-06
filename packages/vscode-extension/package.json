@@ -21,7 +21,8 @@
       "explorer": [
         {
           "id": "grounderVault",
-          "name": "Grounder"
+          "name": "Grounder",
+          "showCollapseAll": true
         }
       ]
     },
@@ -89,6 +90,12 @@
         "icon": "$(search)"
       },
       {
+        "command": "grounder.collapseAll",
+        "title": "Collapse All",
+        "category": "Grounder",
+        "icon": "$(collapse-all)"
+      },
+      {
         "command": "grounder.linkProject",
         "title": "Link this Project",
         "category": "Grounder"
@@ -139,12 +146,17 @@
         {
           "command": "grounder.refresh",
           "when": "view == grounderVault",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
           "command": "grounder.search",
           "when": "view == grounderVault",
-          "group": "navigation"
+          "group": "navigation@2"
+        },
+        {
+          "command": "grounder.collapseAll",
+          "when": "view == grounderVault",
+          "group": "navigation@3"
         },
         {
           "command": "grounder.toggleDimDatesOn",
