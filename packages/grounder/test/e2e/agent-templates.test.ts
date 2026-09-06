@@ -155,6 +155,7 @@ describe("e2e/agent-templates", () => {
         "plan",
         "plan list",
         "search",
+        "overview",
       ]),
     );
 
