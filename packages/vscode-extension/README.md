@@ -106,5 +106,12 @@ cd fixtures/dev && node ../../packages/grounder/dist/cli.js link --yes
 (The plain **"Run Extension (fixtures/dev)"** config is unchanged and still uses your real home,
 per `fixture-setup.mjs`'s documented workflow — don't add `GROUNDER_HOME` to it.)
 
+Two rows of the matrix ("never installed/linked anywhere," "not linked, runtime present") need a
+workspace folder with no `.grounder.json` anywhere in its ancestry — `fixtures/dev` doesn't
+qualify, since it's nested inside this repo, which is itself grounder-linked at its root. Use the
+**"Run Extension (grounder-test, isolated home)"** config for those two (targets
+`~/dev/playground/grounder-test` via `--folder-uri`, reusing the same `fixtures/dev-home`) —
+temporarily rename that folder's own `.grounder.json` aside to simulate "unlinked."
+
 See `plans/vscode-extension-mcp-dogfood-automation.md` in the vault for the full 15-row matrix and
 results from the last scripted pass.
