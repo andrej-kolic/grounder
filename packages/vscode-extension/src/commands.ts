@@ -105,8 +105,12 @@ async function linkProject(
 // misleading "would rewrite" preview (comparing against Electron's own path
 // instead of a terminal's). See docs/architecture/runtime-invocation.md's
 // "Drift checks must not use the checking process's own interpreter path".
-function showTerminalHint(terminalName: string, command: string): void {
-  const terminal = vscode.window.createTerminal(terminalName);
+function showTerminalHint(
+  terminalName: string,
+  command: string,
+  folder?: vscode.WorkspaceFolder,
+): void {
+  const terminal = vscode.window.createTerminal({ name: terminalName, cwd: folder?.uri });
   terminal.show();
   terminal.sendText(command);
 }
@@ -439,17 +443,19 @@ export function registerCommands(
         }
       },
     ),
-    vscode.commands.registerCommand("grounder.showSetupHint", () =>
-      showTerminalHint("Grounder Setup", "grounder setup"),
+    vscode.commands.registerCommand("grounder.showSetupHint", (folder?: vscode.WorkspaceFolder) =>
+      showTerminalHint("Grounder Setup", "grounder setup", folder),
     ),
-    vscode.commands.registerCommand("grounder.showMigrateHint", () =>
-      showTerminalHint("Grounder Migrate", "grounder migrate"),
+    vscode.commands.registerCommand("grounder.showMigrateHint", (folder?: vscode.WorkspaceFolder) =>
+      showTerminalHint("Grounder Migrate", "grounder migrate", folder),
     ),
-    vscode.commands.registerCommand("grounder.showMigrateForceHint", () =>
-      showTerminalHint("Grounder Migrate", "grounder migrate --force"),
+    vscode.commands.registerCommand(
+      "grounder.showMigrateForceHint",
+      (folder?: vscode.WorkspaceFolder) =>
+        showTerminalHint("Grounder Migrate", "grounder migrate --force", folder),
     ),
-    vscode.commands.registerCommand("grounder.showDoctorHint", () =>
-      showTerminalHint("Grounder Doctor", "grounder doctor"),
+    vscode.commands.registerCommand("grounder.showDoctorHint", (folder?: vscode.WorkspaceFolder) =>
+      showTerminalHint("Grounder Doctor", "grounder doctor", folder),
     ),
     vscode.commands.registerCommand(
       "grounder.toggleDimDatesOn",
