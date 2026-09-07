@@ -1,4 +1,6 @@
 import { invokeCli } from "./cli.js";
+import { type FolderState, resolveFolderState } from "./folderState.js";
+import { hasGrounderMarkerUpward } from "./grounderMarker.js";
 
 export type ConfigState = "ok" | "missing" | "invalid" | "unsupported";
 export type MachineConfigState = "ok" | "missing" | "invalid";
@@ -121,6 +123,12 @@ function parseMachineLenient(raw: unknown): { machine: StatusMachine; complete: 
   let state: StatusLedger | null = null;
   if (m.state && typeof m.state === "object") {
     const s = m.state as Record<string, unknown>;
+    if (s.installCurrent !== null && typeof s.installCurrent !== "boolean") {
+      incomplete.value = true;
+    }
+    if (!isNullableString(s.packageVersionNotice)) {
+      incomplete.value = true;
+    }
     state = {
       status: stateStatus(s.status),
       installCurrent: typeof s.installCurrent === "boolean" ? s.installCurrent : null,
@@ -205,4 +213,15 @@ export async function fetchStatus(cwd: string): Promise<StatusResult> {
     return { kind: "error", message: "Could not parse `grounder status --json` output." };
   }
   return parsed;
+}
+
+/**
+ * `fetchStatus` + the marker fallback check + `resolveFolderState`, in the
+ * one order both `treeProvider.ts` and the `_debugState` dev command need —
+ * shared so the two don't drift on this sequence independently.
+ */
+export async function resolveFolderStateFromDisk(folderPath: string): Promise<FolderState> {
+  const status = await fetchStatus(folderPath);
+  const hasMarker = status.kind === "no-runtime" ? hasGrounderMarkerUpward(folderPath) : false;
+  return resolveFolderState(status, hasMarker);
 }

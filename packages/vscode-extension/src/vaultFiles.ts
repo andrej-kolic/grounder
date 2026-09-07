@@ -18,20 +18,47 @@ export interface VaultDoc {
   label: string;
 }
 
+/** `readdir(dir, { withFileTypes: true })`, treating a missing dir as empty rather than an error. */
+async function readdirSafe(dir: string): Promise<Dirent[]> {
+  try {
+    return await readdir(dir, { withFileTypes: true });
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+}
+
+/** Stats and sorts `entries` newest-mtime-first (ties broken by `relativePath` descending), the "generic" sort shared by {@link listVaultDocs} and {@link listVaultRootFiles}. */
+async function sortByMtimeDesc(
+  entries: readonly { filePath: string; relativePath: string }[],
+): Promise<VaultDoc[]> {
+  const withMtime = await Promise.all(
+    entries.map(async (entry) => {
+      const { mtimeMs } = await stat(entry.filePath);
+      return { ...entry, mtimeMs };
+    }),
+  );
+  withMtime.sort((a, b) => {
+    if (a.mtimeMs !== b.mtimeMs) {
+      return b.mtimeMs - a.mtimeMs;
+    }
+    return a.relativePath < b.relativePath ? 1 : a.relativePath > b.relativePath ? -1 : 0;
+  });
+  return withMtime.map((entry) => ({
+    filePath: entry.filePath,
+    relativePath: entry.relativePath,
+    label: path.basename(entry.filePath, ".md"),
+  }));
+}
+
 /** Recursively lists `*.md` files under `dir` (absolute paths). Missing dirs yield `[]`. */
 async function listMarkdownFiles(dir: string): Promise<string[]> {
   const results: string[] = [];
 
   async function walk(current: string): Promise<void> {
-    let entries: Dirent[];
-    try {
-      entries = await readdir(current, { withFileTypes: true });
-    } catch (error: unknown) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return;
-      }
-      throw error;
-    }
+    const entries = await readdirSafe(current);
     for (const entry of entries) {
       const full = path.join(current, entry.name);
       if (entry.isDirectory()) {
@@ -74,23 +101,9 @@ export async function listVaultDocs(dir: string, sortKind: SortKind): Promise<Va
     }));
   }
 
-  const withMtime = await Promise.all(
-    files.map(async (filePath) => {
-      const { mtimeMs } = await stat(filePath);
-      return { filePath, relativePath: path.relative(dir, filePath), mtimeMs };
-    }),
+  return sortByMtimeDesc(
+    files.map((filePath) => ({ filePath, relativePath: path.relative(dir, filePath) })),
   );
-  withMtime.sort((a, b) => {
-    if (a.mtimeMs !== b.mtimeMs) {
-      return b.mtimeMs - a.mtimeMs;
-    }
-    return a.relativePath < b.relativePath ? 1 : a.relativePath > b.relativePath ? -1 : 0;
-  });
-  return withMtime.map((entry) => ({
-    filePath: entry.filePath,
-    relativePath: entry.relativePath,
-    label: path.basename(entry.filePath, ".md"),
-  }));
 }
 
 /**
@@ -104,15 +117,7 @@ export async function listExtraVaultFolders(
   vaultRoot: string,
   knownDirs: readonly string[],
 ): Promise<string[]> {
-  let entries: Dirent[];
-  try {
-    entries = await readdir(vaultRoot, { withFileTypes: true });
-  } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return [];
-    }
-    throw error;
-  }
+  const entries = await readdirSafe(vaultRoot);
   const known = new Set(knownDirs);
   return entries
     .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
@@ -131,36 +136,14 @@ export async function listExtraVaultFolders(
  * `listVaultDocs`'s "generic" sort.
  */
 export async function listVaultRootFiles(vaultRoot: string): Promise<VaultDoc[]> {
-  let entries: Dirent[];
-  try {
-    entries = await readdir(vaultRoot, { withFileTypes: true });
-  } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return [];
-    }
-    throw error;
-  }
+  const entries = await readdirSafe(vaultRoot);
   const files = entries
     .filter((entry) => entry.isFile() && entry.name.endsWith(".md") && !entry.name.startsWith("."))
     .map((entry) => path.join(vaultRoot, entry.name));
 
-  const withMtime = await Promise.all(
-    files.map(async (filePath) => {
-      const { mtimeMs } = await stat(filePath);
-      return { filePath, relativePath: path.basename(filePath), mtimeMs };
-    }),
+  return sortByMtimeDesc(
+    files.map((filePath) => ({ filePath, relativePath: path.basename(filePath) })),
   );
-  withMtime.sort((a, b) => {
-    if (a.mtimeMs !== b.mtimeMs) {
-      return b.mtimeMs - a.mtimeMs;
-    }
-    return a.relativePath < b.relativePath ? 1 : a.relativePath > b.relativePath ? -1 : 0;
-  });
-  return withMtime.map((entry) => ({
-    filePath: entry.filePath,
-    relativePath: entry.relativePath,
-    label: path.basename(entry.filePath, ".md"),
-  }));
 }
 
 export type VaultTreeNode =

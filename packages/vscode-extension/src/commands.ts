@@ -1,9 +1,7 @@
 import path from "node:path";
 import * as vscode from "vscode";
 import { type CliResult, invokeCli } from "./cli.js";
-import { resolveFolderState } from "./folderState.js";
-import { hasGrounderMarkerUpward } from "./grounderMarker.js";
-import { fetchStatus, type StatusProject } from "./status.js";
+import { fetchStatus, resolveFolderStateFromDisk, type StatusProject } from "./status.js";
 import type { GrounderNode, GrounderTreeDataProvider } from "./treeProvider.js";
 
 interface SearchHit {
@@ -14,16 +12,26 @@ interface SearchHit {
 
 interface SearchPayload {
   totalMatchCount: number;
+  /** True when `hits` was cut short by the CLI's own `--limit`/`--max-hits` defaults. */
+  truncated: boolean;
   hits: SearchHit[];
 }
 
 function parseSearchJson(raw: string): SearchPayload | null {
   try {
     const parsed = JSON.parse(raw) as Partial<SearchPayload>;
-    if (typeof parsed.totalMatchCount !== "number" || !Array.isArray(parsed.hits)) {
+    if (
+      typeof parsed.totalMatchCount !== "number" ||
+      typeof parsed.truncated !== "boolean" ||
+      !Array.isArray(parsed.hits)
+    ) {
       return null;
     }
-    return { totalMatchCount: parsed.totalMatchCount, hits: parsed.hits as SearchHit[] };
+    return {
+      totalMatchCount: parsed.totalMatchCount,
+      truncated: parsed.truncated,
+      hits: parsed.hits as SearchHit[],
+    };
   } catch {
     return null;
   }
@@ -97,28 +105,10 @@ async function linkProject(
 // misleading "would rewrite" preview (comparing against Electron's own path
 // instead of a terminal's). See docs/architecture/runtime-invocation.md's
 // "Drift checks must not use the checking process's own interpreter path".
-function showSetupHint(): void {
-  const terminal = vscode.window.createTerminal("Grounder Setup");
+function showTerminalHint(terminalName: string, command: string): void {
+  const terminal = vscode.window.createTerminal(terminalName);
   terminal.show();
-  terminal.sendText("grounder setup");
-}
-
-function showMigrateHint(): void {
-  const terminal = vscode.window.createTerminal("Grounder Migrate");
-  terminal.show();
-  terminal.sendText("grounder migrate");
-}
-
-function showMigrateForceHint(): void {
-  const terminal = vscode.window.createTerminal("Grounder Migrate");
-  terminal.show();
-  terminal.sendText("grounder migrate --force");
-}
-
-function showDoctorHint(): void {
-  const terminal = vscode.window.createTerminal("Grounder Doctor");
-  terminal.show();
-  terminal.sendText("grounder doctor");
+  terminal.sendText(command);
 }
 
 /**
@@ -128,22 +118,10 @@ function showDoctorHint(): void {
  * a `view/title` entry, since this Cursor build renders no checkmark at all
  * for the native `toggled` menu-item property.
  */
-async function toggleDimDates(): Promise<void> {
+async function toggleBoolean(key: string): Promise<void> {
   const config = vscode.workspace.getConfiguration("grounder");
-  const current = config.get<boolean>("dimDates", true);
-  await config.update("dimDates", !current, vscode.ConfigurationTarget.Global);
-}
-
-async function toggleShowAllVaultItems(): Promise<void> {
-  const config = vscode.workspace.getConfiguration("grounder");
-  const current = config.get<boolean>("showAllVaultItems", true);
-  await config.update("showAllVaultItems", !current, vscode.ConfigurationTarget.Global);
-}
-
-async function toggleRevealOnOpen(): Promise<void> {
-  const config = vscode.workspace.getConfiguration("grounder");
-  const current = config.get<boolean>("revealOnOpen", true);
-  await config.update("revealOnOpen", !current, vscode.ConfigurationTarget.Global);
+  const current = config.get<boolean>(key, true);
+  await config.update(key, !current, vscode.ConfigurationTarget.Global);
 }
 
 /**
@@ -287,7 +265,7 @@ async function fetchSearchPayload(
   folder: vscode.WorkspaceFolder,
   query: string,
 ): Promise<SearchPayload | undefined> {
-  const result = await invokeCli(["search", query, "--json"], { cwd: folder.uri.fsPath });
+  const result = await invokeCli(["search", "--json", "--", query], { cwd: folder.uri.fsPath });
   if (result.kind !== "ok") {
     reportCliFailure(result);
     return undefined;
@@ -333,7 +311,7 @@ function showSearchResults(
     quickPick.title = `No matches for "${query}" — type a new query and press Enter`;
     quickPick.items = [];
   } else {
-    quickPick.title = `${payload.hits.length} result(s) for "${query}"`;
+    quickPick.title = `${payload.hits.length} result(s) for "${query}"${payload.truncated ? " (more not shown)" : ""}`;
     quickPick.items = payload.hits.map((hit) => ({
       label: hit.alsoMatchedHint,
       detail: hit.relativePath,
@@ -387,16 +365,17 @@ async function runSearch(
     prompt: `Search the "${folder.name}" vault`,
     placeHolder: "query",
   });
-  if (!query) {
+  const trimmedQuery = query?.trim();
+  if (!trimmedQuery) {
     return;
   }
 
-  const payload = await fetchSearchPayload(folder, query);
+  const payload = await fetchSearchPayload(folder, trimmedQuery);
   if (!payload) {
     return;
   }
 
-  showSearchResults(view, folder, query, payload);
+  showSearchResults(view, folder, trimmedQuery, payload);
 }
 
 /**
@@ -418,10 +397,7 @@ async function debugState(folderNameOrPath?: string): Promise<Record<string, unk
     : folders;
   const results: Record<string, unknown> = {};
   for (const folder of targets) {
-    const status = await fetchStatus(folder.uri.fsPath);
-    const hasMarker =
-      status.kind === "no-runtime" ? hasGrounderMarkerUpward(folder.uri.fsPath) : false;
-    results[folder.name] = resolveFolderState(status, hasMarker);
+    results[folder.name] = await resolveFolderStateFromDisk(folder.uri.fsPath);
   }
   return results;
 }
@@ -454,35 +430,50 @@ export function registerCommands(
     ),
     vscode.commands.registerCommand(
       "grounder.linkProject",
-      (node?: GrounderNode | vscode.WorkspaceFolder) => {
+      async (node?: GrounderNode | vscode.WorkspaceFolder) => {
         const folder =
-          node && "folder" in node ? node.folder : (node as vscode.WorkspaceFolder | undefined);
+          (node && "folder" in node ? node.folder : (node as vscode.WorkspaceFolder | undefined)) ??
+          (await pickWorkspaceFolder());
         if (folder) {
           void linkProject(folder, provider);
         }
       },
     ),
-    vscode.commands.registerCommand("grounder.showSetupHint", () => showSetupHint()),
-    vscode.commands.registerCommand("grounder.showMigrateHint", () => showMigrateHint()),
-    vscode.commands.registerCommand("grounder.showMigrateForceHint", () => showMigrateForceHint()),
-    vscode.commands.registerCommand("grounder.showDoctorHint", () => showDoctorHint()),
-    vscode.commands.registerCommand("grounder.toggleDimDatesOn", () => void toggleDimDates()),
-    vscode.commands.registerCommand("grounder.toggleDimDatesOff", () => void toggleDimDates()),
+    vscode.commands.registerCommand("grounder.showSetupHint", () =>
+      showTerminalHint("Grounder Setup", "grounder setup"),
+    ),
+    vscode.commands.registerCommand("grounder.showMigrateHint", () =>
+      showTerminalHint("Grounder Migrate", "grounder migrate"),
+    ),
+    vscode.commands.registerCommand("grounder.showMigrateForceHint", () =>
+      showTerminalHint("Grounder Migrate", "grounder migrate --force"),
+    ),
+    vscode.commands.registerCommand("grounder.showDoctorHint", () =>
+      showTerminalHint("Grounder Doctor", "grounder doctor"),
+    ),
+    vscode.commands.registerCommand(
+      "grounder.toggleDimDatesOn",
+      () => void toggleBoolean("dimDates"),
+    ),
+    vscode.commands.registerCommand(
+      "grounder.toggleDimDatesOff",
+      () => void toggleBoolean("dimDates"),
+    ),
     vscode.commands.registerCommand(
       "grounder.toggleShowAllVaultItemsOn",
-      () => void toggleShowAllVaultItems(),
+      () => void toggleBoolean("showAllVaultItems"),
     ),
     vscode.commands.registerCommand(
       "grounder.toggleShowAllVaultItemsOff",
-      () => void toggleShowAllVaultItems(),
+      () => void toggleBoolean("showAllVaultItems"),
     ),
     vscode.commands.registerCommand(
       "grounder.toggleRevealOnOpenOn",
-      () => void toggleRevealOnOpen(),
+      () => void toggleBoolean("revealOnOpen"),
     ),
     vscode.commands.registerCommand(
       "grounder.toggleRevealOnOpenOff",
-      () => void toggleRevealOnOpen(),
+      () => void toggleBoolean("revealOnOpen"),
     ),
     vscode.commands.registerCommand(
       "grounder.copyMention",

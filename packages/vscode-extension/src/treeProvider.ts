@@ -1,9 +1,8 @@
 import path from "node:path";
 import * as vscode from "vscode";
 import { grounderHomeDir } from "./cli.js";
-import { type LinkedProject, resolveFolderState } from "./folderState.js";
-import { hasGrounderMarkerUpward } from "./grounderMarker.js";
-import { fetchStatus } from "./status.js";
+import type { LinkedProject } from "./folderState.js";
+import { resolveFolderStateFromDisk } from "./status.js";
 import {
   buildVaultTree,
   listExtraVaultFolders,
@@ -40,23 +39,25 @@ export type GrounderNode =
       description?: string;
       commandId: string;
       commandArgs: unknown[];
+      folder?: vscode.WorkspaceFolder;
     }
-  | { kind: "message"; label: string; description?: string };
+  | { kind: "message"; label: string; description?: string; folder?: vscode.WorkspaceFolder };
 
+/** `folder`-scoped where available so identical action/message rows across workspace folders (e.g. two unlinked folders both showing "Link this project") don't collide on VS Code's tree-wide-unique `TreeItem.id`. */
 function nodeId(node: GrounderNode): string {
   switch (node.kind) {
     case "folder":
       return `folder:${node.folder.uri.toString()}`;
     case "category":
-      return `category:${node.dir}`;
+      return `category:${node.folder.uri.toString()}:${node.dir}`;
     case "vaultFolder":
-      return `vaultFolder:${node.dir}:${node.relativePath}`;
+      return `vaultFolder:${node.folder.uri.toString()}:${node.dir}:${node.relativePath}`;
     case "doc":
-      return `doc:${node.doc.filePath}`;
+      return `doc:${node.folder.uri.toString()}:${node.doc.filePath}`;
     case "action":
-      return `action:${node.commandId}:${node.label}`;
+      return `action:${node.folder ? `${node.folder.uri.toString()}:` : ""}${node.commandId}:${node.label}`;
     case "message":
-      return `message:${node.label}`;
+      return `message:${node.folder ? `${node.folder.uri.toString()}:` : ""}${node.label}`;
   }
 }
 
@@ -132,7 +133,29 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
     this.onDidChangeTreeDataEmitter.fire(undefined);
   }
 
+  private refreshDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * Debounced refresh for file-watcher events: `grounder setup`/`migrate` can
+   * touch several files under `~/.grounder` in quick succession (each
+   * watched via a broad `**\/*` pattern), which would otherwise fire a full
+   * `refresh()` — and the `status --json` re-fetch it triggers — once per
+   * file instead of once for the whole burst.
+   */
+  private scheduleRefresh(): void {
+    if (this.refreshDebounceTimer) {
+      clearTimeout(this.refreshDebounceTimer);
+    }
+    this.refreshDebounceTimer = setTimeout(() => {
+      this.refreshDebounceTimer = undefined;
+      this.refresh();
+    }, 300);
+  }
+
   dispose(): void {
+    if (this.refreshDebounceTimer) {
+      clearTimeout(this.refreshDebounceTimer);
+    }
     for (const watcher of this.watchers.values()) {
       watcher.dispose();
     }
@@ -146,20 +169,36 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
    * placeholder (e.g. an empty `children`) is enough for VS Code to match it
    * against the real node once it expands that level via `getChildren`.
    */
+  /** Key `categoryNodes` by folder + dir, not dir alone — two open folders can share the same vault (dir alone would collide). */
+  private categoryNodeKey(folder: vscode.WorkspaceFolder, dir: string): string {
+    return `${folder.uri.toString()}:${dir}`;
+  }
+
+  /**
+   * Shared by the doc/vaultFolder `getParent` branches below: the category
+   * node for `dir` in `folder`, or — when that category hasn't rendered yet
+   * this session — the folder-root fallback in a multi-root workspace
+   * (nothing to fall back to in a single-root one, since there's no folder
+   * node to reveal).
+   */
+  private topLevelParent(dir: string, folder: vscode.WorkspaceFolder): GrounderNode | undefined {
+    const category = this.categoryNodes.get(this.categoryNodeKey(folder, dir));
+    if (category) {
+      return category;
+    }
+    const isMultiRoot = (vscode.workspace.workspaceFolders?.length ?? 0) > 1;
+    return isMultiRoot ? { kind: "folder", folder } : undefined;
+  }
+
   getParent(element: GrounderNode): GrounderNode | undefined {
     switch (element.kind) {
       case "doc": {
         const parentRelative = path.dirname(element.doc.relativePath);
         if (parentRelative === ".") {
-          const category = this.categoryNodes.get(element.dir);
-          if (category) {
-            return category;
-          }
           // A loose doc directly in the vault root (see `listVaultRootFiles`)
           // has no category node of its own — it sits at the same level as
           // one, so its parent is whatever a category's parent would be.
-          const isMultiRoot = (vscode.workspace.workspaceFolders?.length ?? 0) > 1;
-          return isMultiRoot ? { kind: "folder", folder: element.folder } : undefined;
+          return this.topLevelParent(element.dir, element.folder);
         }
         return {
           kind: "vaultFolder",
@@ -173,7 +212,7 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
       case "vaultFolder": {
         const parentRelative = path.dirname(element.relativePath);
         if (parentRelative === ".") {
-          return this.categoryNodes.get(element.dir);
+          return this.topLevelParent(element.dir, element.folder);
         }
         return {
           kind: "vaultFolder",
@@ -273,7 +312,13 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
     if (element.kind === "category") {
       const docs = await listVaultDocs(element.dir, element.sortKind);
       if (docs.length === 0) {
-        return [{ kind: "message", label: `No ${element.label.toLowerCase()} yet` }];
+        return [
+          {
+            kind: "message",
+            label: `No ${element.label.toLowerCase()} yet`,
+            folder: element.folder,
+          },
+        ];
       }
       return toGrounderNodes(buildVaultTree(docs), element.dir, element.folder);
     }
@@ -292,10 +337,7 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
     // clears a stale error/drift row until the user hits refresh by hand.
     this.watchDir(path.join(grounderHomeDir(), ".grounder"), "**/*");
 
-    const status = await fetchStatus(folder.uri.fsPath);
-    const hasMarker =
-      status.kind === "no-runtime" ? hasGrounderMarkerUpward(folder.uri.fsPath) : false;
-    const state = resolveFolderState(status, hasMarker);
+    const state = await resolveFolderStateFromDisk(folder.uri.fsPath);
 
     switch (state.kind) {
       case "no-runtime-unlinked":
@@ -306,6 +348,7 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
             description: "run `grounder setup`",
             commandId: "grounder.showSetupHint",
             commandArgs: [folder],
+            folder,
           },
         ];
 
@@ -317,11 +360,12 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
             description: "this project is linked — run `grounder setup`",
             commandId: "grounder.showSetupHint",
             commandArgs: [folder],
+            folder,
           },
         ];
 
       case "cli-error":
-        return [{ kind: "message", label: "Grounder error", description: state.message }];
+        return [{ kind: "message", label: "Grounder error", description: state.message, folder }];
 
       case "newer-schema":
         return [
@@ -329,6 +373,7 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
             kind: "message",
             label: "Grounder CLI is newer than this extension expects",
             description: "some info may be unavailable — consider updating the extension",
+            folder,
           },
         ];
 
@@ -340,6 +385,7 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
             description: `${state.configState} — run \`grounder setup <path>\``,
             commandId: "grounder.showSetupHint",
             commandArgs: [folder],
+            folder,
           },
         ];
 
@@ -351,6 +397,7 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
             description: "run `grounder migrate --force`",
             commandId: "grounder.showMigrateForceHint",
             commandArgs: [folder],
+            folder,
           },
         ];
 
@@ -361,6 +408,7 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
                 kind: "message",
                 label: "Grounder install ledger broken",
                 description: "unsupported — upgrade grounder",
+                folder,
               },
             ]
           : [
@@ -370,6 +418,7 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
                 description: "invalid — run `grounder migrate --force`",
                 commandId: "grounder.showMigrateForceHint",
                 commandArgs: [folder],
+                folder,
               },
             ];
 
@@ -380,6 +429,7 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
             label: "Link this project",
             commandId: "grounder.linkProject",
             commandArgs: [folder],
+            folder,
           },
         ];
 
@@ -389,6 +439,7 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
             kind: "message",
             label: "Vault link unsupported",
             description: "upgrade grounder",
+            folder,
           },
         ];
 
@@ -400,6 +451,7 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
             description: `${state.configState} — run \`grounder doctor\``,
             commandId: "grounder.showDoctorHint",
             commandArgs: [folder],
+            folder,
           },
         ];
 
@@ -411,6 +463,7 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
             description: "run `grounder doctor`",
             commandId: "grounder.showDoctorHint",
             commandArgs: [folder],
+            folder,
           },
         ];
 
@@ -481,7 +534,7 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
     }
 
     for (const category of categories) {
-      this.categoryNodes.set(category.dir, category);
+      this.categoryNodes.set(this.categoryNodeKey(category.folder, category.dir), category);
     }
 
     const nodes: GrounderNode[] = [];
@@ -495,6 +548,7 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
         description: "run `grounder migrate`",
         commandId: "grounder.showMigrateHint",
         commandArgs: [folder],
+        folder,
       });
     }
     if (packageVersionNotice) {
@@ -507,12 +561,18 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
         kind: "message",
         label: "Grounder version notice",
         description: packageVersionNotice,
+        folder,
       });
     }
     nodes.push(...categories);
 
     if (this.showAllVaultItems && project.vaultRoot) {
-      this.watchDir(project.vaultRoot, "*.md");
+      // "*" not "*.md": a non-recursive single-level pattern, so this also
+      // catches an extra vault folder (see listExtraVaultFolders) being
+      // created or removed directly under vaultRoot, not just loose .md
+      // files — without matching deep inside .obsidian/'s frequent internal
+      // churn, since that requires a recursive pattern to reach.
+      this.watchDir(project.vaultRoot, "*");
       const rootFiles = await listVaultRootFiles(project.vaultRoot);
       for (const doc of rootFiles) {
         nodes.push({ kind: "doc", doc, dir: project.vaultRoot, folder });
@@ -529,9 +589,9 @@ export class GrounderTreeDataProvider implements vscode.TreeDataProvider<Grounde
     const watcher = vscode.workspace.createFileSystemWatcher(
       new vscode.RelativePattern(vscode.Uri.file(dir), pattern),
     );
-    watcher.onDidCreate(() => this.refresh());
-    watcher.onDidChange(() => this.refresh());
-    watcher.onDidDelete(() => this.refresh());
+    watcher.onDidCreate(() => this.scheduleRefresh());
+    watcher.onDidChange(() => this.scheduleRefresh());
+    watcher.onDidDelete(() => this.scheduleRefresh());
     this.watchers.set(dir, watcher);
   }
 }
