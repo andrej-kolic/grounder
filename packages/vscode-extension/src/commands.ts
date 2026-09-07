@@ -280,6 +280,100 @@ async function copyRelativePath(node?: GrounderNode): Promise<void> {
   await vscode.env.clipboard.writeText(node.doc.relativePath);
 }
 
+type SearchQuickPickItem = vscode.QuickPickItem & { hit?: SearchHit };
+
+/** Runs `grounder search --json`, reporting CLI/parse failures itself and returning `undefined` for them. */
+async function fetchSearchPayload(
+  folder: vscode.WorkspaceFolder,
+  query: string,
+): Promise<SearchPayload | undefined> {
+  const result = await invokeCli(["search", query, "--json"], { cwd: folder.uri.fsPath });
+  if (result.kind !== "ok") {
+    reportCliFailure(result);
+    return undefined;
+  }
+  const payload = parseSearchJson(result.stdout);
+  if (!payload) {
+    vscode.window.showErrorMessage("Could not parse `grounder search --json` output.");
+    return undefined;
+  }
+  return payload;
+}
+
+/**
+ * Shows one search-results QuickPick and wires its accept/retry behavior.
+ * `title` (not `placeholder`) carries the status message: `placeholder` only
+ * renders while the input box is empty, but `value` is prefilled with `query`
+ * so the box stays editable for a retry — `title` stays visible regardless.
+ *
+ * On a retry (accepting with no result item selected), the current QuickPick
+ * is disposed and a brand-new one shown for the next query, rather than
+ * mutating this instance in place — VS Code only auto-selects a QuickPick's
+ * prefilled value the first time it's shown, so reusing one instance across
+ * retries left the second-and-later query unselected no matter how `value`
+ * was reassigned.
+ */
+function showSearchResults(
+  view: vscode.TreeView<GrounderNode>,
+  folder: vscode.WorkspaceFolder,
+  query: string,
+  payload: SearchPayload,
+): void {
+  const copyButton: vscode.QuickInputButton = {
+    iconPath: new vscode.ThemeIcon("clippy"),
+    tooltip: "Copy as @mention",
+  };
+
+  const quickPick = vscode.window.createQuickPick<SearchQuickPickItem>();
+  quickPick.value = query;
+  if (payload.totalMatchCount === 0) {
+    // The QuickPick's own input box stays live (unlike a transient
+    // showInformationMessage toast) so retyping and pressing Enter re-runs
+    // the search instead of the box just sitting there doing nothing.
+    quickPick.title = `No matches for "${query}" — type a new query and press Enter`;
+    quickPick.items = [];
+  } else {
+    quickPick.title = `${payload.hits.length} result(s) for "${query}"`;
+    quickPick.items = payload.hits.map((hit) => ({
+      label: hit.alsoMatchedHint,
+      detail: hit.relativePath,
+      buttons: [copyButton],
+      hit,
+    }));
+  }
+
+  quickPick.onDidTriggerItemButton(async (event) => {
+    if (event.item.hit) {
+      await copyMentionForUri(vscode.Uri.file(event.item.hit.file));
+    }
+  });
+  quickPick.onDidAccept(async () => {
+    const [selected] = quickPick.selectedItems;
+    if (selected?.hit) {
+      await vscode.window.showTextDocument(vscode.Uri.file(selected.hit.file));
+      void revealInTree(view, folder, selected.hit.file);
+      quickPick.hide();
+      return;
+    }
+    // Nothing selected — the zero-hit state, or the typed text no longer
+    // matches any rendered item — re-run the CLI search against whatever's
+    // currently typed instead of silently doing nothing.
+    const nextQuery = quickPick.value.trim();
+    if (!nextQuery) {
+      return;
+    }
+    quickPick.busy = true;
+    const nextPayload = await fetchSearchPayload(folder, nextQuery);
+    quickPick.busy = false;
+    quickPick.hide();
+    if (nextPayload) {
+      showSearchResults(view, folder, nextQuery, nextPayload);
+    }
+  });
+  quickPick.onDidHide(() => quickPick.dispose());
+  quickPick.show();
+}
+
 async function runSearch(
   view: vscode.TreeView<GrounderNode>,
   folderArg?: vscode.WorkspaceFolder,
@@ -297,57 +391,12 @@ async function runSearch(
     return;
   }
 
-  const result = await invokeCli(["search", query, "--json"], { cwd: folder.uri.fsPath });
-  if (result.kind !== "ok") {
-    reportCliFailure(result);
-    return;
-  }
-
-  const payload = parseSearchJson(result.stdout);
+  const payload = await fetchSearchPayload(folder, query);
   if (!payload) {
-    vscode.window.showErrorMessage("Could not parse `grounder search --json` output.");
-    return;
-  }
-  if (payload.totalMatchCount === 0) {
-    // A transient showInformationMessage toast auto-dismisses and is easy to
-    // miss, reading as "search did nothing" for an empty-result query — an
-    // empty QuickPick with the message as its placeholder stays up until the
-    // user dismisses it, same as VS Code's own Quick Open empty state.
-    const quickPick = vscode.window.createQuickPick();
-    quickPick.placeholder = `No matches for "${query}"`;
-    quickPick.items = [];
-    quickPick.onDidHide(() => quickPick.dispose());
-    quickPick.show();
     return;
   }
 
-  const copyButton: vscode.QuickInputButton = {
-    iconPath: new vscode.ThemeIcon("clippy"),
-    tooltip: "Copy as @mention",
-  };
-
-  const quickPick = vscode.window.createQuickPick<vscode.QuickPickItem & { hit: SearchHit }>();
-  quickPick.placeholder = `${payload.hits.length} result(s) for "${query}"`;
-  quickPick.items = payload.hits.map((hit) => ({
-    label: hit.alsoMatchedHint,
-    detail: hit.relativePath,
-    buttons: [copyButton],
-    hit,
-  }));
-
-  quickPick.onDidTriggerItemButton(async (event) => {
-    await copyMentionForUri(vscode.Uri.file(event.item.hit.file));
-  });
-  quickPick.onDidAccept(async () => {
-    const [selected] = quickPick.selectedItems;
-    if (selected) {
-      await vscode.window.showTextDocument(vscode.Uri.file(selected.hit.file));
-      void revealInTree(view, folder, selected.hit.file);
-    }
-    quickPick.hide();
-  });
-  quickPick.onDidHide(() => quickPick.dispose());
-  quickPick.show();
+  showSearchResults(view, folder, query, payload);
 }
 
 /**

@@ -32,7 +32,18 @@
       "request": "launch",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}",
-        "--folder-uri=file:///Users/andrejkolic/dev/playground/grounder-test"
+        "--folder-uri=file:///Users/andrejkolic/dev/rey/grounder"
+      ],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "preLaunchTask": "${defaultBuildTask}"
+    },
+    {
+      "name": "Run Extension (worktree: grounder itself)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--folder-uri=file:///Users/andrejkolic/dev/rey/grounder-vscode-plugin"
       ],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "preLaunchTask": "${defaultBuildTask}"
