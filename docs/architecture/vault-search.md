@@ -60,7 +60,12 @@ Whole-file `phraseMatch` / `partialPhraseMatch` still apply on top of line scans
 - Multi-word terms: case-insensitive substring (so `slash commands` and `grounder migrate` work).
 - On a line, the **longest** matching term wins as `matchedTerm` (label only; all matching terms still count toward distinct-term score).
 - Frontmatter `topics:` exact-match against terms → `topicsMatch` (ranking boost). Body and frontmatter lines both produce line hits.
-- Filename/path segments also count as term matches (`filenameTermCount`).
+- Filename/path segments (dir names + stem) count toward `filenameTermCount`, a ranking-only signal — a query for a common folder name (`plans`, `notes`, `archive`) must not return every file in that folder, so path segments never gate inclusion, only rank.
+- Since 2026-09-07, a **stem-only match** (term appears in the file's own name, not parent directories, and never in a body line) is enough on its own to include the file in results — e.g. `pluggable.md`, whose body never repeats the word "pluggable". Its per-file line-hit array is empty (`SearchFileHit.hits` — *not* the top-level JSON `hits[]` file list below; same name, different shape).
+- `distinctTermCount` stays content-only (`matchedTerms.size`) even for a stem-included file — 0 for a pure stem match — so a title match can't outrank a file that actually discusses the topic just for being included. It still earns the flat `filenameTermCount` bonus, just not full per-term (`×1000`) credit.
+- A term that only ever appears in a stem still increments `termHitCounts`'s document-frequency count (a folder-name-only term does not), so the skill's zero-hit "bad term" broaden check (below) doesn't misfire on a real title match. That same counter also feeds `idfDensity` (§3) — a term hitting several title-only files slightly dilutes density for content files sharing it; coupling, not a likely reorder, since `distinctTermCount`'s `×1000` weight dominates `idfDensity`'s capped `×10`.
+- Terminology collision, not a bug: the scan-internal `matchedTerms` (content-only, feeds `distinctTermCount`) and the public `SearchFileHit.matchedTerms` (union of content **and** stem terms — not itself in the JSON payload, but the source for `alsoMatchedHint` below) are two different sets sharing one name.
+- **Known limitation, untested:** a stem-only file's score is entirely `filenameTermCount * 200` (no content, so `distinctTermCount` is 0) — usually well below a single content match (1000+), but not always: a `--terms` list hitting 5+ path segments of one file (`filenameTermCount >= 5`) could tie or exceed it. The `filenameTermCount` formula itself predates this fix (see "`filenameTermCount` as a rank-only boost" in the history table below); what's new is that stem-only files are now candidates for it at all — before 2026-09-07 they were dropped before scoring ever ran. Requires exactly the high-df folder-name terms the "Never as terms" rule (below) already discourages passing.
 
 The scan **always finishes the tree**. Early `--max-hits` stop-scan was removed: it made ranking depend on directory walk order. `--max-hits` now only caps **stored snippets per file** (`min(50, maxHits)`, default 50); ranking still uses full per-file hit counts.
 
@@ -71,6 +76,8 @@ Optional. Parsed in `commands/search.ts` (`parseSinceDate`): calendar date (`202
 ### 3. Score (higher wins)
 
 Hit density uses **IDF-lite** per term: during the walk, accumulate `termHitCounts` (files containing each term). Each file’s `idfDensity` is the sum of `perTermHits / log(1 + df)` across its matched terms. Common tokens (high document frequency) contribute less; rare identifiers contribute more.
+
+`termHitCounts`/`termDocFreq` is one shared counter for two purposes: the skill's zero-hit "bad term" broaden check (below), and this `idfDensity` weighting. A stem-only match (2026-09-07) bumps the same counter as a content match, so a term that hits several title-only files slightly dilutes `idfDensity` for content files that share it — coupling, not a likely reorder, since `distinctTermCount`'s `×1000` weight dominates `idfDensity`'s `×10` (capped at 100).
 
 ```text
 distinctTermCount * 1000
@@ -126,7 +133,7 @@ Each `hits[]` entry:
 | `fileUri` | Pre-encoded `file://` href for markdown links |
 | `alsoMatchedHint` | Stem + up to two distinct file terms (`stem — term1, term2`), from all matches not just the shown snippet |
 | `mtimeMs`, `topicsMatch` | Metadata |
-| `matches[]` | `{ line, term, snippet }` per hit line |
+| `matches[]` | `{ line, term, snippet }` per hit line — empty for a filename/stem-only match with no body line hit (2026-09-07) |
 
 ## Skill protocol
 
@@ -212,6 +219,11 @@ You may list a design/archive authority first **among the four full-reads**. Do 
 | Raw hit-count density | Common tokens (`grounder`) swamped rare identifiers | **Keep** IDF-lite (`idfDensity`) |
 | Verbatim-only phrase match | NL queries rarely appear verbatim in vault | **Keep** partial n-gram match (+100; trigrams for 4+ words) |
 | Semantic / BM25 / embeddings | Needs an index, deps, and a rebuild story | **Rejected for v1** — vaults are small; scan is sub-second |
+| `filenameTermCount` as a rank-only boost | A file named after a concept it never repeats verbatim in body (e.g. `pluggable.md` never says "pluggable") had zero content matches and was dropped from results entirely, however relevant the title | **Fixed (2026-09-07)** — a **stem**-only match now also gates inclusion; also feeds `termDocFreq`/`termHitCounts` so the broaden check doesn't treat a title-only term as "bad" |
+| First cut: gated inclusion on the **full path**, not just the stem | A query matching a common folder name (`plans`, `notes`, `archive`) returned every file in that folder — 85 of ~114 vault files for query `plans`, regardless of content | **Fixed same day** — inclusion now keys off the file's own stem only; full-path matching stays a rank-only `filenameTermCount` bonus, using the same `termMatchesHaystack` matcher as before for a plain path segment (a common folder name still only ever boosts rank, never gates inclusion). `distinctTermCount` was never changed by this — it stays content-only (`matchedTerms.size`), never the stem/path union, so a title-only file can't out-earn its `×1000` term-coverage weight just for being included |
+| Path-level `filenameTermCount` also went through the dot-boundary fix below (shared matcher) | Not a regression, but not literally "unchanged" either: a content-matching `<id>.plan.md` file used to get `filenameTermCount`'s `+200` for the path segment "plan" too (plain `\bterm\b` treats `.` as an ordinary boundary); after the dot-boundary fix it no longer does, since `pathMatchedTerms` and `stemMatchedTerms` share `termMatchesHaystack` | **Known, accepted** — arguably more correct (the dotted suffix wasn't a real word before either), but callers should not assume path-level scoring is byte-for-byte identical to pre-2026-09-07 behavior for dotted stems specifically |
+| Stem match used `\b` word boundaries as-is | `.` isn't a `\w` character, so a dotted pseudo-extension convention (`<id>.plan.md`, two real files in this vault) let `\bplan\b` match the `.plan` segment as if it were a standalone word, with no body hit — same shape as the folder flood, one level down | **Fixed same day** — a term may no longer *start* right after a `.` (custom lookbehind), so `plan` no longer matches `<id>.plan.md`'s suffix |
+| First cut of that fix excluded `.` from **both** sides of the match | Blocking `.` on the trailing side too meant the actual id (`schema_versioning`) could no longer match its own file either — the term couldn't *end* right before the dot, defeating the point of stem inclusion for exactly these files | **Fixed same day** — `.` is excluded from the leading lookbehind only, not the trailing lookahead; a term may still end right before a dot. Other boundaries are unchanged from before this fix: `search` still matches `search-feature.md` (hyphen splits), `search_feature.md` still does not (`_` is `\w`, same as `\b`'s prior behavior) |
 
 ### Skill (prompt)
 
@@ -278,6 +290,7 @@ Evaluate **one change at a time** (CLI xor template). Migrating templates mid-ex
 - **`--terms` quality** remains the ranking incompatibility. The recipe + never-list + `termHitCounts` zero-hit broaden is the v1 mitigation. Request vs leftover classification is the v1 mitigation for request-shaped utterances.
 - **Read order in synthesis** — some models substitute hits 1–4 despite template rules; template tests cannot catch live agent behavior.
 - Template tests are string-contains on the markdown, not live agents. They catch priming regressions and broaden protocol text; they cannot catch Gemini narration or Composer read-order swaps.
+- **Stem-only hits can occupy the skill's full-read window (2026-09-07, untested).** Stem-only files usually score below any content match (see the score formula above and its "Known limitation" caveat for the untested exception), but they still outrank files with *no* match at all — so a query with few real content hits plus several hyphen-titled files that happen to contain the query as a kebab-case word (`search` → `search-feature.md`) can land a title-only file inside the skill's fixed "read hits 1–4" window in hybrid mode. That's tolerable there — the skill full-reads the file, judges it "thin/off-topic," and gives it a blunt line or moves it to Also matched rather than fabricating a claim (see the Output contract's "Claims only from files you full-read"). **Lookup mode has no such safety net** (it formats directly from JSON, no full read, no synthesis) — its `matches[]`-per-hit format assumed every hit had at least one line to quote, which a stem-only hit doesn't. Fixed 2026-09-07: lookup mode now prints `(matched by filename — no line to quote)` for an empty-`matches[]` hit instead of silently rendering a link with nothing under it. Broaden itself was deliberately left untouched — a stem-only hit is an accepted, in-scope result for both modes, not a signal to re-search.
 
 ## Key code map
 

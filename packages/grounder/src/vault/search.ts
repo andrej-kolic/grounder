@@ -138,6 +138,11 @@ function searchMetaPenalty(rootDir: string, filePath: string, query: string): nu
   return 0;
 }
 
+// Deliberately separate from termMatchesHaystack's dot-aware boundary below —
+// body content has no dotted-pseudo-extension convention to guard against, so
+// plain `\b` is correct here. Do not "unify" the two matchers: a shared regex
+// would either reintroduce `plan` matching `<id>.plan.md` in filenames, or
+// stop `.plan` matching `plan` in body text, silently changing one side.
 function termMatchesLine(line: string, term: string): boolean {
   if (term.includes(" ")) {
     return line.toLowerCase().includes(term.toLowerCase());
@@ -198,34 +203,78 @@ interface RawFileHits {
   /** IDF-weighted density — computed after the full walk using global termDocFreq. */
   idfDensity: number;
   filenameTermCount: number;
+  /**
+   * Lowercased terms matched via this file's own filename stem (not parent
+   * directories) — regardless of whether the term also matches in content.
+   * Narrow enough to justify including a file that has no content match.
+   */
+  stemMatchedTerms: Set<string>;
   phraseMatch: boolean;
   partialPhraseMatch: boolean;
   /** Per-term line-hit counts for this file; used to compute idfDensity. */
   perTermHits: Map<string, number>;
 }
 
-function countFilenameTermMatches(
+/**
+ * `.` only counts as a word character on the *leading* side of a match
+ * (unlike `\b`'s default), so a term can't start right after a dot — this
+ * stops a dotted filename convention like `<id>.plan.md` from letting a
+ * generic term match its dotted suffix as a standalone word (query "plan"
+ * must not match every `*.plan.md` file), while still letting the id itself
+ * match (`schema_versioning` must match `schema_versioning.plan.md`) since a
+ * term is still allowed to *end* right before a dot. `\w`-based boundaries
+ * are otherwise unchanged from before this fix: a hyphen still splits words
+ * (`search` matches `search-feature.md`), but `_` does not (`search` does
+ * *not* match `search_feature.md` — same as `\b`'s existing behavior).
+ */
+function termMatchesHaystack(haystack: string, lower: string): boolean {
+  if (lower.includes(" ")) {
+    return haystack.includes(lower);
+  }
+  const escaped = escapeRegex(lower);
+  return new RegExp(`(?<![\\w.])${escaped}(?!\\w)`, "i").test(haystack);
+}
+
+/**
+ * Lowercased `terms` that appear in `filePath`'s vault-relative path,
+ * including parent directory names (e.g. `plans/p1.md` matches both `plans`
+ * and `p1`). Ranking signal only (`filenameTermCount`) — never a matching
+ * gate, since a query for a common folder name (`plans`, `notes`, `archive`)
+ * would otherwise return every file in that folder regardless of content.
+ */
+function pathMatchedTerms(
   rootDir: string,
   filePath: string,
   terms: readonly string[],
-): number {
+): Set<string> {
   const rel = path.relative(rootDir, filePath);
   const haystack = rel.replace(/[/\\]/g, " ").replace(/\.md$/i, "").toLowerCase();
-  let count = 0;
+  const matched = new Set<string>();
   for (const term of terms) {
     const lower = term.toLowerCase();
-    if (lower.includes(" ")) {
-      if (haystack.includes(lower)) {
-        count++;
-      }
-      continue;
-    }
-    const re = new RegExp(`\\b${escapeRegex(lower)}\\b`, "i");
-    if (re.test(haystack)) {
-      count++;
+    if (termMatchesHaystack(haystack, lower)) {
+      matched.add(lower);
     }
   }
-  return count;
+  return matched;
+}
+
+/**
+ * Lowercased `terms` that appear in `filePath`'s own filename stem only (no
+ * parent directories, no extension) — e.g. `plans/pluggable.md` matches
+ * `pluggable` but not `plans`. Narrow enough to gate inclusion for a file
+ * with no content match, unlike {@link pathMatchedTerms}.
+ */
+function stemMatchedTerms(filePath: string, terms: readonly string[]): Set<string> {
+  const stem = path.basename(filePath, path.extname(filePath)).toLowerCase();
+  const matched = new Set<string>();
+  for (const term of terms) {
+    const lower = term.toLowerCase();
+    if (termMatchesHaystack(stem, lower)) {
+      matched.add(lower);
+    }
+  }
+  return matched;
 }
 
 function contentHasPhrase(content: string, query: string): boolean {
@@ -362,7 +411,38 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
       }
     }
 
-    if (matchedTerms.size > 0) {
+    // Path terms (dir segments + stem) stay a ranking-only signal — they must
+    // never gate inclusion, or a query for a common folder name (`plans`,
+    // `notes`, `archive`) would return every file in that folder regardless
+    // of content. The *matcher* underneath did change (shares
+    // termMatchesHaystack's dot-boundary fix with stem matching below), so a
+    // content-matching `<id>.plan.md` no longer earns filenameTermCount for
+    // its dotted suffix — only the gating behavior is unchanged, not the
+    // matcher itself.
+    const pathTerms = pathMatchedTerms(options.rootDir, filePath, terms);
+    // Stem terms are narrow enough (the file's own name, not its folder) to
+    // justify surfacing a file that has no content match at all — e.g.
+    // `pluggable.md`, whose body never repeats the word "pluggable".
+    const stemTerms = stemMatchedTerms(filePath, terms);
+
+    if (matchedTerms.size === 0 && stemTerms.size > 0) {
+      // Every other zero-hit check in the CLI and its consumers (summary
+      // text, JSON, the extension's QuickPick) keys off `totalMatchCount`,
+      // not file count — count the title match itself so a filename-only
+      // result doesn't get reported as "no matches" while still returning a hit.
+      totalMatchCount++;
+    }
+    if (matchedTerms.size > 0 || stemTerms.size > 0) {
+      for (const t of stemTerms) {
+        // Only stem terms feed doc-freq (not the wider path terms): a term
+        // that only ever appears in a title should still show a nonzero
+        // `termHitCounts`, so the skill's zero-hit "bad term" broaden check
+        // doesn't misfire on it — but a common folder name shouldn't inflate
+        // every other term's IDF weighting.
+        if (!matchedTerms.has(t)) {
+          termDocFreq[t] = (termDocFreq[t] ?? 0) + 1;
+        }
+      }
       for (const t of matchedTerms) {
         termDocFreq[t] = (termDocFreq[t] ?? 0) + 1;
       }
@@ -371,10 +451,15 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
         mtimeMs,
         topicsMatch,
         hits: fileHits,
+        // Content-only: a filename/stem match justifies inclusion (above)
+        // and still earns the flat `filenameTermCount` rank bonus below, but
+        // doesn't inflate distinct-term coverage — a file that only matches
+        // by title shouldn't outrank one that actually discusses the topic.
         distinctTermCount: matchedTerms.size,
         totalHitCount,
         idfDensity: 0,
-        filenameTermCount: countFilenameTermMatches(options.rootDir, filePath, terms),
+        filenameTermCount: pathTerms.size,
+        stemMatchedTerms: stemTerms,
         phraseMatch: contentHasPhrase(content, options.query),
         partialPhraseMatch: contentHasPartialPhrase(content, options.query),
         perTermHits,
@@ -423,7 +508,10 @@ export async function searchVault(options: SearchOptions): Promise<SearchOutcome
     topicsMatch: file.topicsMatch,
     hits: pickBestHits(file.hits, maxHitsPerFile),
     matchedTerms: terms
-      .filter((term) => file.perTermHits.has(term.toLowerCase()))
+      .filter(
+        (term) =>
+          file.perTermHits.has(term.toLowerCase()) || file.stemMatchedTerms.has(term.toLowerCase()),
+      )
       .sort((a, b) => b.length - a.length),
   }));
 

@@ -47,7 +47,7 @@ Structure (non-empty results):
 
 1. **Opening** — one sentence of what the vault says (not a search recap). Never start with “I have searched…”, “I found…”, or similar.
 2. **Read these** — hits 1–4 only; numbered linked paths + optional role + short bullets under each. You may list a design/archive authority first *among those four*.
-3. **Also matched** — leftover top-10 **in CLI order** (do not reshuffle); numbered linked paths + one short phrase each (`hits[].alsoMatchedHint` or `matches[].term`). Every line must end with ` — phrase`; bare links are invalid. Omit if empty.
+3. **Also matched** — leftover top-10 **in CLI order** (do not reshuffle); numbered linked paths + one short phrase each. Use `hits[].alsoMatchedHint` — it is always present, even for a filename-only match with no `matches[]` line. `matches[].term` is a same-length alternative only when `matches[]` is non-empty. Every line must end with ` — phrase`; bare links are invalid. Omit if empty.
 
 Example shape (`##` headings required — not bold-only, not `###`):
 
@@ -63,11 +63,11 @@ Vault notes discuss …
 4. [plans/…](file:///…) — one phrase
 ```
 
-**Lookup mode:** explicit lookup wording (`exact phrase`, `this line`, `the wording`) **or** the entire input after stripping retrieval wrappers is a bare `"quoted span"` → one search with `--json` (no `--terms`, no full reads). Non-empty: list each hit as `[relativePath](fileUri)` (Path links rules) followed by its `matches[]` lines (`L{line} ({term}): {snippet}`), CLI order, no synthesis. Empty: Zero-hit disclosure.
+**Lookup mode:** explicit lookup wording (`exact phrase`, `this line`, `the wording`) **or** the entire input after stripping retrieval wrappers is a bare `"quoted span"` → one search with `--json` (no `--terms`, no full reads). Non-empty: list each hit as `[relativePath](fileUri)` (Path links rules) followed by its `matches[]` lines (`L{line} ({term}): {snippet}`), CLI order, no synthesis. A hit with an empty `matches[]` matched only by filename, not content — print `(matched by filename — no line to quote)` instead of inventing a snippet line. Empty (`totalFileCount` 0): Zero-hit disclosure.
 
 ## Steps
 
-1. **Query and terms (private)** — classify, then build argv. Classification is silent (no chat text). The CLI always line-scans `query` plus `--terms`. Multi-word queries only match lines that contain that phrase verbatim. Rank is dominated by how many distinct terms hit the **same** file — complementary vault words beat extra English synonyms and source module names.
+1. **Query and terms (private)** — classify, then build argv. Classification is silent (no chat text). The CLI line-scans `query` plus `--terms`; a file whose name (not just body) matches a term can also surface with no line hit at all (`matches[]` empty) — see **Also matched** and **Lookup mode** for how to gloss those. Multi-word queries only match lines that contain that phrase verbatim. Rank is dominated by how many distinct terms hit the **same** file — complementary vault words beat extra English synonyms and source module names.
 
    **Classify** after stripping retrieval wrappers (`find`, `search for`, `documents discussing`, `notes about`, `look up`). Then pick one:
 
@@ -121,7 +121,7 @@ Vault notes discuss …
 
 **Always quote `--terms`.** Unquoted CSV with spaces corrupts argv.
 
-Parse JSON privately. Take hits in CLI order (`hits[0]` …). For links use `relativePath` + `fileUri`; for Also matched gloss use `alsoMatchedHint` or `matches[].term` — do not quote snippets.
+Parse JSON privately. Take hits in CLI order (`hits[0]` …). For links use `relativePath` + `fileUri`; for Also matched gloss use `alsoMatchedHint` (always present) — do not quote snippets.
 
 **Broaden once (silent)** only if: `totalFileCount` is 0; or ≤2 and every hit is meta (`discussions/search/`, or snippet only quotes the query); or any term in `termHitCounts` has a count of 0 (that term produced no files — it was a bad guess and must be replaced). Otherwise do not re-search.
 
@@ -142,7 +142,7 @@ Parse JSON privately. Take hits in CLI order (`hits[0]` …). For links use `rel
 4. **Answer** — synthesize immediately after reads:
    - Claims only from files you full-read. Unread hits must not grow new facts.
    - **Read these:** useful full-reads (those 1–4 only). Thin/off-topic reads get one blunt numbered line there or move to **Also matched**.
-   - **Also matched:** remaining top-10 you did not deep-summarize, **in CLI leftover order**. Copy `alsoMatchedHint` or phrase from `matches[].term`; every line ends with ` — phrase`.
+   - **Also matched:** remaining top-10 you did not deep-summarize, **in CLI leftover order**. Copy `alsoMatchedHint` (always present, even for a filename-only match); every line ends with ` — phrase`.
    - Every file line: `[relativePath](fileUri)` from JSON; continue numbering across sections.
    - Prefer design/archive docs when they are the authority among the files you read.
 

@@ -150,6 +150,12 @@ function writePlainOutput(outcome: SearchOutcome): void {
     const label = fileStem(file.filePath);
     const topicTag = file.topicsMatch ? " [topics]" : "";
     process.stdout.write(`${index + 1}. ${label}${topicTag}  \n  ${file.filePath}\n`);
+    if (file.hits.length === 0) {
+      // Filename-only match (2026-09-07): no body line to quote — say so
+      // instead of printing a bare file with no evidence of why it matched.
+      process.stdout.write(`  (matched by filename: ${file.matchedTerms.join(", ")})\n`);
+      return;
+    }
     for (const hit of file.hits) {
       const snippet = hit.snippet.replace(/\s+/g, " ").trim();
       process.stdout.write(`  L${hit.line} (${hit.matchedTerm}): ${snippet}\n`);
@@ -182,6 +188,11 @@ function writeMarkdownOutput(outcome: SearchOutcome): void {
   for (const file of outcome.files) {
     const label = fileStem(file.filePath);
     process.stdout.write(`### ${formatMarkdownFileLink(label, file.filePath)}\n\n`);
+    if (file.hits.length === 0) {
+      // Filename-only match (2026-09-07): no body line to quote.
+      process.stdout.write(`(matched by filename: ${file.matchedTerms.join(", ")})\n\n`);
+      continue;
+    }
     for (const hit of file.hits) {
       process.stdout.write(`L${hit.line} (${hit.matchedTerm}):\n\n`);
       process.stdout.write(formatSnippetBlock(hit.snippet));

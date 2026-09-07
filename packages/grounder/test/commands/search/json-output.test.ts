@@ -168,4 +168,39 @@ describe("commands/search json output", () => {
     expect(payload.termHitCounts["session hooks"]).toBeGreaterThan(0);
     expect(payload.termHitCounts["nonexistent-vault-token"]).toBe(0);
   });
+
+  it("reports a stem-only match with empty matches[] and a nonzero totalMatchCount", async () => {
+    const env = await createTempEnv({ packageName: "my-app", initGit: false });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await writeHomeConfig({ vaultRoot: env.vault });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
+    await mkdir(plansDir, { recursive: true });
+    const p1Path = path.join(plansDir, "p1.md");
+    await writeFile(p1Path, "o1\n", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runSearchWithOptions({
+        homeDir: env.home,
+        cwd: env.repo,
+        query: "p1",
+        json: true,
+      }),
+    );
+
+    expect(code).toBe(0);
+    const payload = JSON.parse(out.trim()) as {
+      totalMatchCount: number;
+      hits: Array<{ file: string; alsoMatchedHint: string; matches: Array<{ term: string }> }>;
+    };
+
+    expect(payload.totalMatchCount).toBe(1);
+    const hit = payload.hits.find((entry) => entry.file === p1Path);
+    expect(hit).toBeDefined();
+    expect(hit?.matches).toEqual([]);
+    expect(hit?.alsoMatchedHint).toContain("p1");
+  });
 });

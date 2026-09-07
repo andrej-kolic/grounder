@@ -40,7 +40,10 @@ describe("templates/grounder-search", () => {
       expect(body).toContain("that mention");
       expect(body).toContain("never a lone generic verb");
       expect(body).toContain("source module / file stems");
-      expect(body).toContain("The CLI always line-scans `query` plus `--terms`");
+      expect(body).toContain("The CLI line-scans `query` plus `--terms`");
+      expect(body).toContain("matches[]` empty");
+      expect(body).toContain("matched by filename — no line to quote");
+      expect(body).toContain("it is always present, even for a filename-only match");
       expect(body).toContain("retry queue,dead letter,jobs.json,RetryPolicy,ttl");
       expect(body).toContain("wrong query: `expired job retries`");
       expect(body).toContain("wrong class: request");

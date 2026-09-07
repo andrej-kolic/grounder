@@ -109,7 +109,10 @@ by `--title` (use `--force` to overwrite), or update an existing file in place w
 ## Search flags
 
 Scoped to the **linked project vault** only (`<vault>/10-Projects/{projectId}/`).
-Searches `*.md` under that folder — not the git repo, not sibling projects.
+Searches `*.md` under that folder — not the git repo, not sibling projects. Matches a term
+in a file's body **or** its own filename (e.g. `pluggable.md` matches `pluggable` even if the
+word never appears in the body) — see [vault search architecture](architecture/vault-search.md)
+for the stem-vs-path distinction.
 
 ```bash
 grounder search "handling migrations of slash commands" \
