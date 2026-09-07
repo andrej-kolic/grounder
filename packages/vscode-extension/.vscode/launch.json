@@ -38,20 +38,6 @@
       "preLaunchTask": "${defaultBuildTask}"
     },
     {
-      "name": "Run Extension (grounder-test, isolated home)",
-      "type": "extensionHost",
-      "request": "launch",
-      "env": {
-        "GROUNDER_HOME": "${workspaceFolder}/../../fixtures/dev-home"
-      },
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}",
-        "--folder-uri=file:///Users/andrejkolic/dev/playground/grounder-test"
-      ],
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
-      "preLaunchTask": "${defaultBuildTask}"
-    },
-    {
       "name": "Run Extension (blank)",
       "type": "extensionHost",
       "request": "launch",

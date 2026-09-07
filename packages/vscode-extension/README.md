@@ -108,10 +108,11 @@ per `fixture-setup.mjs`'s documented workflow — don't add `GROUNDER_HOME` to i
 
 Two rows of the matrix ("never installed/linked anywhere," "not linked, runtime present") need a
 workspace folder with no `.grounder.json` anywhere in its ancestry — `fixtures/dev` doesn't
-qualify, since it's nested inside this repo, which is itself grounder-linked at its root. Use the
-**"Run Extension (grounder-test, isolated home)"** config for those two (targets
-`~/dev/playground/grounder-test` via `--folder-uri`, reusing the same `fixtures/dev-home`) —
-temporarily rename that folder's own `.grounder.json` aside to simulate "unlinked."
+qualify, since it's nested inside this repo, which is itself grounder-linked at its root. There's
+no checked-in launch config for this (the folder is necessarily personal/machine-specific): add a
+temporary one pointing `--folder-uri` at any such folder on your machine, with the same
+`GROUNDER_HOME` env override as the "isolated home" config above, then temporarily rename that
+folder's own `.grounder.json` aside to simulate "unlinked."
 
 See `plans/vscode-extension-mcp-dogfood-automation.md` in the vault for the full 15-row matrix and
 results from the last scripted pass.
