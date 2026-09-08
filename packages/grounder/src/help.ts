@@ -161,17 +161,14 @@ Subcommands:
   {
     id: "overview",
     group: "Retrieve",
-    summary:
-      "Bird's-eye view: counts + recent titles (with last-updated) across notes/handoffs/plans",
+    summary: "Bird's-eye view: counts + recent titles across notes/handoffs/plans",
     listUsage: "overview",
     usage: "grounder overview [--limit <n>] [--markdown] [--json]",
     flags: `Flags:
   --limit <n>  Max recent titles to print per bucket (default: 3)
   --markdown   Agent relay: [bucketRelativePath](fileUri) title lines
   --json       Structured output (total, count, truncated, items per bucket;
-               each item includes mtimeMs)
-
-Each title line, text or markdown, is suffixed "— updated YYYY-MM-DD".`,
+               each item includes mtimeMs)`,
   },
   {
     id: "path notes",

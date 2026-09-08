@@ -74,7 +74,6 @@ describe("commands/overview", () => {
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
     const notePath = path.join(notesDir, "phase-1.md");
     await writeFile(notePath, "x", "utf8");
-    await touch(notePath, FIXED_MTIME);
 
     const { code, out } = await captureStdout(() =>
       runOverviewWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -82,7 +81,7 @@ describe("commands/overview", () => {
 
     expect(code).toBe(0);
     expect(out).toBe(
-      `Notes\nAll 1 note:\n\n1. phase-1 — updated ${FIXED_DATE}  \n  ${notePath}\n\n` +
+      `Notes\nAll 1 note:\n\n1. phase-1  \n  ${notePath}\n\n` +
         "Handoffs\nNo handoffs.\n\nPlans\nNo plans.\n",
     );
   });
@@ -107,7 +106,7 @@ describe("commands/overview", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain(`Most recent 1 of 2 notes:\n\n1. newer — updated ${FIXED_DATE}  \n`);
+    expect(out).toContain("Most recent 1 of 2 notes:\n\n1. newer  \n");
   });
 
   it("prints markdown link title lines with --markdown", async () => {
@@ -120,16 +119,13 @@ describe("commands/overview", () => {
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
     const notePath = path.join(notesDir, "phase-1.md");
     await writeFile(notePath, "x", "utf8");
-    await touch(notePath, FIXED_MTIME);
 
     const { code, out } = await captureStdout(() =>
       runOverviewWithOptions({ cwd: env.repo, homeDir: env.home, markdown: true }),
     );
 
     expect(code).toBe(0);
-    expect(out).toContain(
-      `1. [phase-1.md](${pathToFileURL(notePath).href}) — updated ${FIXED_DATE}  \n  ${notePath}\n`,
-    );
+    expect(out).toContain(`1. [phase-1.md](${pathToFileURL(notePath).href})  \n  ${notePath}\n`);
   });
 
   it("prints structured JSON with --json, covering all three buckets", async () => {
@@ -298,7 +294,6 @@ describe("commands/overview", () => {
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
     const notePath = path.join(notesDir, "phase-1.md");
     await writeFile(notePath, "x", "utf8");
-    await touch(notePath, FIXED_MTIME);
 
     const nested = path.join(env.repo, "src", "nested");
     await mkdir(nested, { recursive: true });
@@ -308,7 +303,7 @@ describe("commands/overview", () => {
     );
 
     expect(code).toBe(0);
-    expect(out).toContain(`All 1 note:\n\n1. phase-1 — updated ${FIXED_DATE}  \n`);
+    expect(out).toContain("All 1 note:\n\n1. phase-1  \n");
   });
 
   it("cli prints per-bucket sections and honors --limit", async () => {
@@ -329,9 +324,7 @@ describe("commands/overview", () => {
     const result = runCli(["overview", "--limit", "1"], withGroundedHome(env.home), env.repo);
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain(
-      `Most recent 1 of 2 notes:\n\n1. newer — updated ${FIXED_DATE}  \n`,
-    );
+    expect(result.stdout).toContain("Most recent 1 of 2 notes:\n\n1. newer  \n");
     expect(result.stdout).toContain("Handoffs\nNo handoffs.\n");
     expect(result.stdout).toContain("Plans\nNo plans.\n");
   });

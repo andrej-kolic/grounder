@@ -2,16 +2,11 @@ import { withHomeDir } from "../connector/home.js";
 import { resolveLogsDir, resolveNotesDir, resolvePlansDir } from "../connector/vault.js";
 import { helpExitCode } from "../help.js";
 import { flagBool, parseArgs } from "../util/parse-args.js";
-import {
-  formatMarkdownFileLink,
-  toFileUri,
-  vaultItemPlainTitle,
-  vaultRelativePath,
-} from "../util/path.js";
+import { toFileUri, vaultRelativePath } from "../util/path.js";
 import { listHandoffsDetailed } from "../vault/list-handoffs.js";
 import { listNotesDetailed } from "../vault/list-notes.js";
 import { listPlansDetailed } from "../vault/list-plans.js";
-import { type VaultItemListNoun, writeSection } from "./output.js";
+import { type VaultItemListNoun, writeSection, writeVaultItemListEntries } from "./output.js";
 import { requireLinkedProject } from "./require-linked.js";
 
 const DEFAULT_LIMIT = 3;
@@ -24,8 +19,7 @@ export interface OverviewOptions {
   limit?: number;
   /**
    * Agent relay: `[bucketRelativePath](fileUri)` on each title line (default:
-   * plain bucket-relative stem path). Either way the title line also carries
-   * "— updated YYYY-MM-DD".
+   * plain bucket-relative stem path).
    */
   markdown?: boolean;
   /** Structured JSON payload instead of formatted text. Mutually exclusive with `markdown`. */
@@ -121,11 +115,6 @@ async function gatherBucket(
   return { dir, noun, title, all, shown: all.slice(0, limit) };
 }
 
-/** `YYYY-MM-DD` — deterministic and matches the ISO dates already used in plan frontmatter. */
-function formatEntryDate(mtimeMs: number): string {
-  return new Date(mtimeMs).toISOString().slice(0, 10);
-}
-
 function jsonBucket(bucket: Bucket) {
   return {
     total: bucket.all.length,
@@ -161,32 +150,6 @@ function bucketHeader(bucket: Bucket): string {
   return `Most recent ${shown} of ${total} ${bucket.noun.plural}:\n\n`;
 }
 
-/**
- * Numbered title + absolute-path blocks for one bucket, each title line
- * suffixed with "— updated YYYY-MM-DD" and ending in two trailing spaces (a
- * Markdown hard line break, matching the `note`/`handoff`/`plan list`
- * convention) so agents can relay stdout into chat and keep title, date, and
- * path on separate rendered lines.
- *
- * Deliberately not routed through the shared `writeVaultItemListEntries` in
- * `output.ts` — that helper is also used by `note`/`handoff`/`plan list`,
- * whose output format this change isn't meant to touch, so overview owns its
- * own (nearly identical) entry line here instead of adding a date parameter
- * to shared code three other commands don't want.
- */
-function writeBucketEntries(bucket: Bucket, markdown: boolean): void {
-  bucket.shown.forEach((entry, index) => {
-    if (index > 0) {
-      process.stdout.write("\n");
-    }
-    const title = markdown
-      ? formatMarkdownFileLink(vaultRelativePath(bucket.dir, entry.path), entry.path)
-      : vaultItemPlainTitle(entry.path, bucket.dir);
-    const updated = formatEntryDate(entry.mtimeMs);
-    process.stdout.write(`${index + 1}. ${title} — updated ${updated}  \n  ${entry.path}\n`);
-  });
-}
-
 function writeTextOutput(buckets: readonly Bucket[], markdown: boolean): void {
   buckets.forEach((bucket, index) => {
     if (index > 0) {
@@ -194,7 +157,10 @@ function writeTextOutput(buckets: readonly Bucket[], markdown: boolean): void {
     }
     writeSection(bucket.title);
     process.stdout.write(bucketHeader(bucket));
-    writeBucketEntries(bucket, markdown);
+    writeVaultItemListEntries(
+      bucket.shown.map((entry) => entry.path),
+      { markdown, titleRootDir: bucket.dir },
+    );
   });
 }
 
@@ -208,11 +174,11 @@ function writeJsonOutput(buckets: readonly Bucket[]): void {
 
 /**
  * Resolves the linked project, gathers a per-bucket count + capped recent
- * titles (each with a last-updated date) across `notes/`, `logs/`
- * (handoffs), and `plans/` — the same newest-first listings
- * `note/handoff/plan list` use, in one call. No new storage; the mtime shown
- * is the same one each lister already fetches to rank entries (see
- * `listNotesDetailed` / `listHandoffsDetailed` / `listPlansDetailed`).
+ * titles across `notes/`, `logs/` (handoffs), and `plans/` — the same
+ * newest-first listings `note/handoff/plan list` use, in one call. `--json`
+ * items also include `mtimeMs` (the same on-disk mtime each lister already
+ * fetches to rank entries; see `listNotesDetailed` / `listHandoffsDetailed` /
+ * `listPlansDetailed`). Text and markdown stay title + path only.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runOverviewWithOptions(options: OverviewOptions = {}): Promise<number> {

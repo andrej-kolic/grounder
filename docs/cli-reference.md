@@ -140,9 +140,9 @@ default, full-reads the top four hits, and synthesizes a short answer — see
 ## Overview flags
 
 `grounder overview` composes `note list` / `handoff list` / `plan list` into one call: a
-per-bucket count plus capped recent titles (each with a last-updated date) across
-`notes/`, `logs/`, and `plans/` — the gap between `status` (wiring health only) and
-running those three list commands separately.
+per-bucket count plus capped recent titles across `notes/`, `logs/`, and `plans/` — the
+gap between `status` (wiring health only) and running those three list commands
+separately.
 
 | Flag          | Description                                                                    |
 | ------------- | ------------------------------------------------------------------------------- |
@@ -159,8 +159,7 @@ where `relativePath` is project-vault-relative (e.g. `notes/foo.md`), overview's
 `mtimeMs` is the file's on-disk modified time (epoch milliseconds), not a frontmatter
 field — notes and handoffs carry no `updated` frontmatter at all, and a plan's `updated`
 frontmatter only changes on `plan --force`, not on a hand-edit made directly in the
-vault. Text and markdown mode print the same value as `— updated YYYY-MM-DD` on each
-title line.
+vault. Text and markdown mode omit it.
 
 `--markdown` and `--json` are mutually exclusive. Kept separate from `status` (wiring
 health) and `handoff peek` (hydrate teaser) — three distinct jobs.
