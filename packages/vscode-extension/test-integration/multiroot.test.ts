@@ -85,6 +85,7 @@ suite("multi-root", () => {
         "expected every hit to come from fixture-two's project vault",
       );
     } finally {
+      intercept.getQuickPick()?.dispose();
       restoreQuickPick();
       restoreInput();
       intercept.restore();

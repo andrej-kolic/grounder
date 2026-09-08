@@ -1,5 +1,4 @@
 import * as assert from "node:assert/strict";
-import path from "node:path";
 import * as vscode from "vscode";
 import { interceptQuickPick, stubShowInputBox, waitFor } from "./quickPickHarness.js";
 
@@ -21,8 +20,10 @@ async function getApi(): Promise<GrounderExtensionApi> {
 }
 
 // grounder search's relativePath is relative to the project vault root, not
-// the category dir (unlike vaultFiles.ts's own doc.relativePath).
-const DEEP_DIVE_RELATIVE_PATH = path.join("notes", "topics", "deep-dive.md");
+// the category dir (unlike vaultFiles.ts's own doc.relativePath) — and, per
+// util/path.ts's vaultRelativePath, always forward-slash regardless of OS.
+// A path.join(...) comparison would break on Windows.
+const DEEP_DIVE_RELATIVE_PATH = "notes/topics/deep-dive.md";
 
 /**
  * Dogfooding matrix cases 20-23 (search QuickPick) plus case 9
@@ -44,6 +45,11 @@ suite("search", () => {
 
   teardown(async () => {
     await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+    // The accept test below flips this on explicitly; reset regardless of
+    // which test ran so later suites always see the documented default.
+    await vscode.workspace
+      .getConfiguration("grounder")
+      .update("revealOnOpen", true, vscode.ConfigurationTarget.Global);
   });
 
   test("basic search: results shown with match-hint label and relative-path detail", async () => {
@@ -61,6 +67,7 @@ suite("search", () => {
         `expected a hit for ${DEEP_DIVE_RELATIVE_PATH}, got: ${JSON.stringify(quickPick.items.map((i: Node) => ({ label: i.label, detail: i.detail })))}`,
       );
     } finally {
+      intercept.getQuickPick()?.dispose();
       restoreInput();
       intercept.restore();
     }
@@ -77,6 +84,7 @@ suite("search", () => {
       assert.ok(quickPick.title.includes("No matches for"), `unexpected title: ${quickPick.title}`);
       assert.equal(quickPick.items.length, 0);
     } finally {
+      intercept.getQuickPick()?.dispose();
       restoreInput();
       intercept.restore();
     }
@@ -95,6 +103,7 @@ suite("search", () => {
       await intercept.getOnButton()({ item: hit });
       assert.equal(await vscode.env.clipboard.readText(), `@${hit.hit.file}`);
     } finally {
+      intercept.getQuickPick()?.dispose();
       restoreInput();
       intercept.restore();
     }
@@ -122,6 +131,7 @@ suite("search", () => {
       await waitFor(() => view.selection.length > 0);
       assert.ok(view.selection.some((n: Node) => n.kind === "doc" && n.doc.label === "deep-dive"));
     } finally {
+      intercept.getQuickPick()?.dispose();
       restoreInput();
       intercept.restore();
     }

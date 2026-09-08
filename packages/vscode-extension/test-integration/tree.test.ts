@@ -84,17 +84,23 @@ suite("tree structure", () => {
   test("plans sort: newest-mtime-first", async () => {
     const plans = findCategory(provider, root, "Plans");
     const children: Node[] = await provider.getChildren(plans);
+    // alpha-plan.md is given the newer mtime despite sorting after beta-plan
+    // alphabetically — proves this order comes from mtime, not from
+    // sortByMtimeDesc's name-descending tie-break (which would put beta
+    // first regardless of mtime).
     assert.deepEqual(
       children.map((n) => n.doc.label),
-      ["beta-plan", "alpha-plan"],
+      ["alpha-plan", "beta-plan"],
     );
   });
 
   test("vault-root loose files: shown at top level, not nested under a category", () => {
     const rootDocs = root.filter((n) => n.kind === "doc");
+    // root-doc-1.md is given the newer mtime despite sorting after
+    // root-doc-2.md alphabetically — same mtime-vs-tie-break proof as plans.
     assert.deepEqual(
       rootDocs.map((n) => n.doc.label),
-      ["root-doc-2", "root-doc-1"],
+      ["root-doc-1", "root-doc-2"],
     );
   });
 
@@ -285,12 +291,16 @@ suite("live refresh and controls", () => {
   test("file watcher: adding a file refreshes the tree without a manual refresh", async () => {
     const root: Node[] = await provider.getChildren();
     const notes = findCategory(provider, root, "Notes");
-    const changed = onceTreeDataChanged(provider);
-    // scheduleRefresh debounces file-watcher events by 300ms.
+    // scheduleRefresh debounces file-watcher events by 300ms. Poll the
+    // actual visible effect rather than a single onDidChangeTreeData fire —
+    // the live provider also watches ~/.grounder and the settings suite's
+    // config updates fire the same event, so "the first fire after this
+    // write" isn't reliably *this* write's fire.
     await writeFile(path.join(notes.dir, "live-refresh-note.md"), "# Live refresh\n");
-    await changed;
-    const children: Node[] = await provider.getChildren(notes);
-    assert.ok(children.some((n) => n.kind === "doc" && n.doc.label === "live-refresh-note"));
+    await waitFor(async () => {
+      const children: Node[] = await provider.getChildren(notes);
+      return children.some((n) => n.kind === "doc" && n.doc.label === "live-refresh-note");
+    });
   });
 
   test("refresh command triggers a tree data change", async () => {

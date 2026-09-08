@@ -6,6 +6,16 @@
  * it registers directly — real production code, just triggered by a captured
  * reference instead of a real UI round-trip. Everything else on the real
  * QuickPick (items, title, value, selectedItems, busy) stays genuine.
+ *
+ * `interceptQuickPick` works by reassigning `onDidAccept`/
+ * `onDidTriggerItemButton` on the object VS Code's real `createQuickPick()`
+ * returns, which only works because those are today plain writable instance
+ * properties, not getter-only bindings — there's no other public seam for
+ * this, since VS Code exposes no way to fire an `Event` from outside or to
+ * script a real keypress/click into a QuickPick. If a future VS Code build
+ * makes them non-writable accessors, this reassignment throws and every test
+ * using it fails loudly (not silently) — that's an acceptable trade for the
+ * only coverage `commands.ts`'s search flow has at all.
  */
 
 // biome-ignore lint/suspicious/noExplicitAny: intercepting the untyped-for-us `vscode` module object at runtime.
@@ -88,9 +98,12 @@ export function stubShowQuickPick<T>(
   };
 }
 
-export async function waitFor(predicate: () => boolean, timeoutMs = 5000): Promise<void> {
+export async function waitFor(
+  predicate: () => boolean | Promise<boolean>,
+  timeoutMs = 5000,
+): Promise<void> {
   const start = Date.now();
-  while (!predicate()) {
+  while (!(await predicate())) {
     if (Date.now() - start > timeoutMs) {
       throw new Error("Timed out waiting for condition");
     }

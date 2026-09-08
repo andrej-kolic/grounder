@@ -68,10 +68,15 @@ temporarily-skipped TODOs:
   pinned version) without Cursor and without those chat extensions installed, so this is
   permanently dogfood-only — see the plan's Step 10 for the full cases-to-buckets mapping.
 
-Everything else `@vscode/test-electron` *can* reach — tree structure, settings, open/preview,
-copy, live refresh, multi-root grouping, and the search QuickPick flow (via
+Most of what `@vscode/test-electron` *can* reach — tree structure, settings, open/preview, copy,
+live refresh, multi-root grouping, and the search QuickPick flow (via
 `test-integration/quickPickHarness.ts`'s callback-capture technique) — has real coverage under
-`test-integration/`.
+`test-integration/`. Not yet covered, despite being reachable: `grounder.linkProject`; the toggle commands themselves
+(only their config side effects are asserted); retrying a search from the zero-hit QuickPick
+state; `revealOnOpen: false`; and the tree's rendered content for every non-`"healthy"`
+`FolderState` row (the `activation` config's fixture is unlinked, but nothing asserts the tree
+actually shows a "Link this project" action for it, let alone the other rows — see
+`src/folderState.ts`).
 
 ### If developing inside Cursor itself
 

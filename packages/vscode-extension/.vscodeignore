@@ -1,6 +1,10 @@
 .vscode/**
 src/**
 test/**
+test-integration/**
+out/**
+.vscode-test/**
+.vscode-test.mjs
 tsconfig.json
 vitest.config.ts
 **/*.map
