@@ -1,0 +1,13 @@
+<!-- playbook:security v1 (2026-09-08) -->
+
+# Security-Sensitive Code
+
+Governs code that touches untrusted input, secrets, or a dangerous sink — not a general security audit checklist. Claude Code already carries generic OWASP-top-10 awareness; this rule adds the concrete, actionable specifics that generic awareness doesn't spell out, and fills the same gap for tools without it.
+
+Defer to this project's own established security tooling/process where it exists — a SAST config, a threat model, a security review doc. Use the rules below only where no such convention exists.
+
+1. **Trust boundaries** — Treat all external input (user input, API responses, file contents, anything crossing from a system you don't control) as untrusted. Validate it at the boundary, and again immediately before it reaches a dangerous sink (a query, a shell command, a template, a file path). Don't validate indiscriminately everywhere else — that's noise, not safety.
+2. **Never hardcode secrets** — API keys, tokens, connection strings, credentials. Env vars or a secrets manager only; never commit, log, or echo them, and never send them to an unrelated service.
+3. **Parameterized queries and safe APIs, not string concatenation** — Never build a SQL query, shell command, HTML/template, or file path by concatenating untrusted input. Use the language/framework's safe-by-construction API (parameterized queries, `execFile` over shell interpolation, template auto-escaping).
+4. **Least privilege by default** — Grant only the permission, scope, or credential actually needed for the task at hand. Default deny, not default allow.
+5. **Fix on sight** — If you notice insecure code — yours or pre-existing — while working nearby, fix it immediately rather than shipping it and noting it for later.

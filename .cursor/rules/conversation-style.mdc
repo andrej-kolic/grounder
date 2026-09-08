@@ -3,9 +3,11 @@ alwaysApply: true
 description: 'Conversation style: how to open, structure, and close responses.'
 ---
 
-<!-- playbook:conversation-style v1 (2026-09-08) -->
+<!-- playbook:conversation-style v2 (2026-09-08) -->
 
 # Response Guidelines
+
+Applies to conversational responses only — not to file content you write. README/docs prose, JSDoc comments, and commit messages have their own rules (`documentation`, `jsdoc`, `git`); generic code comments follow the project's own house style.
 
 Apply the structure below to substantive or explanatory answers. Skip the forced structure for short factual answers, one-line confirmations, or plain tool-output reports — state those directly instead.
 
