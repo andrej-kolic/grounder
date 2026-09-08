@@ -11,6 +11,7 @@ import { runLink } from "./commands/link.js";
 import { runMigrate } from "./commands/migrate.js";
 import { runNoteList } from "./commands/note/list.js";
 import { runNote } from "./commands/note.js";
+import { runOverview } from "./commands/overview.js";
 import { runPathLogs } from "./commands/path/logs.js";
 import { runPathNotes } from "./commands/path/notes.js";
 import { runPathPlans } from "./commands/path/plans.js";
@@ -115,6 +116,10 @@ async function main(): Promise<void> {
 
   if (command === "search") {
     process.exit(await runSearch(rest));
+  }
+
+  if (command === "overview") {
+    process.exit(await runOverview(rest));
   }
 
   if (command === "path") {

@@ -7,19 +7,27 @@ export interface ListNotesOptions {
   limit?: number;
 }
 
+/** One note with the mtime already used to rank it (see {@link listNotesDetailed}). */
+export interface NoteEntry {
+  path: string;
+  mtimeMs: number;
+}
+
 /**
- * Lists note markdown files under `notesDir` recursively, newest mtime first.
- * Returns absolute paths. Missing or empty dirs yield `[]`.
- * Ties break by vault-relative path descending for stable output.
+ * Lists note markdown files under `notesDir` recursively, newest mtime first,
+ * with each entry's mtime attached — the same stat this module already does
+ * internally to rank notes, just not thrown away after sorting. Missing or
+ * empty dirs yield `[]`. Ties break by vault-relative path descending for
+ * stable output.
  *
  * Matches {@link listPlans} sorting for consistency across list commands
  * (filename-descending alone is viable for timestamp-prefixed notes, like
  * {@link listHandoffs}).
  */
-export async function listNotes(
+export async function listNotesDetailed(
   notesDir: string,
   options: ListNotesOptions = {},
-): Promise<string[]> {
+): Promise<NoteEntry[]> {
   const mdPaths = await listMarkdownFiles(notesDir);
   const withMtime = await Promise.all(
     mdPaths.map(async (filePath) => {
@@ -35,13 +43,21 @@ export async function listNotes(
     return a.rel < b.rel ? 1 : a.rel > b.rel ? -1 : 0;
   });
 
-  const paths = withMtime.map((entry) => entry.filePath);
+  const entries = withMtime.map((entry) => ({ path: entry.filePath, mtimeMs: entry.mtimeMs }));
 
   if (options.limit === undefined) {
-    return paths;
+    return entries;
   }
   if (options.limit <= 0) {
     return [];
   }
-  return paths.slice(0, options.limit);
+  return entries.slice(0, options.limit);
+}
+
+/** Same ranking as {@link listNotesDetailed}, paths only. */
+export async function listNotes(
+  notesDir: string,
+  options: ListNotesOptions = {},
+): Promise<string[]> {
+  return (await listNotesDetailed(notesDir, options)).map((entry) => entry.path);
 }

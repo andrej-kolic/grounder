@@ -1,7 +1,7 @@
 import { mkdir, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { listNotes } from "../../src/vault/list-notes.js";
+import { listNotes, listNotesDetailed } from "../../src/vault/list-notes.js";
 import { createTempEnv } from "../helpers.js";
 
 async function touch(filePath: string, when: Date): Promise<void> {
@@ -54,6 +54,27 @@ describe("vault/list-notes", () => {
     await touch(newer, new Date("2026-06-26T15:00:00.000Z"));
 
     expect(await listNotes(notesDir)).toEqual([newer, mid, older]);
+  });
+
+  it("listNotesDetailed returns the same ranking with each entry's real mtime attached", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const notesDir = path.join(env.vault, "notes");
+    await mkdir(notesDir, { recursive: true });
+
+    const older = path.join(notesDir, "older.md");
+    const newer = path.join(notesDir, "newer.md");
+    await writeFile(older, "a", "utf8");
+    await writeFile(newer, "b", "utf8");
+    const olderMtime = new Date("2026-06-25T09:00:00.000Z");
+    const newerMtime = new Date("2026-06-26T15:00:00.000Z");
+    await touch(older, olderMtime);
+    await touch(newer, newerMtime);
+
+    expect(await listNotesDetailed(notesDir)).toEqual([
+      { path: newer, mtimeMs: newerMtime.getTime() },
+      { path: older, mtimeMs: olderMtime.getTime() },
+    ]);
   });
 
   it("breaks mtime ties by vault-relative path descending", async () => {

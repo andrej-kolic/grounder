@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import path from "node:path";
 import { vaultRelativePath } from "../util/path.js";
 import { listMarkdownFiles } from "./list-markdown.js";
@@ -7,17 +8,13 @@ export interface ListHandoffsOptions {
   limit?: number;
 }
 
-/**
- * Lists handoff markdown files under `logsDir` recursively, newest basename
- * first (timestamp-prefixed names sort correctly). Same basename in different
- * subfolders ties break by vault-relative path descending.
- * Returns absolute paths. Missing or empty dirs yield `[]`.
- */
-export async function listHandoffs(
-  logsDir: string,
-  options: ListHandoffsOptions = {},
-): Promise<string[]> {
-  const mdPaths = await listMarkdownFiles(logsDir);
+/** One handoff with its mtime (see {@link listHandoffsDetailed}). */
+export interface HandoffEntry {
+  path: string;
+  mtimeMs: number;
+}
+
+function rankHandoffPaths(mdPaths: readonly string[], logsDir: string): string[] {
   const ranked = mdPaths.map((filePath) => ({
     filePath,
     name: path.basename(filePath),
@@ -31,13 +28,44 @@ export async function listHandoffs(
     return a.rel < b.rel ? 1 : a.rel > b.rel ? -1 : 0;
   });
 
-  const paths = ranked.map((entry) => entry.filePath);
+  return ranked.map((entry) => entry.filePath);
+}
 
-  if (options.limit === undefined) {
-    return paths;
+function applyLimit(paths: readonly string[], limit: number | undefined): string[] {
+  if (limit === undefined) {
+    return [...paths];
   }
-  if (options.limit <= 0) {
+  if (limit <= 0) {
     return [];
   }
-  return paths.slice(0, options.limit);
+  return paths.slice(0, limit);
+}
+
+/**
+ * Lists handoff markdown files under `logsDir` recursively, newest basename
+ * first (timestamp-prefixed names sort correctly), with each entry's mtime
+ * attached. Same basename in different subfolders ties break by
+ * vault-relative path descending. Missing or empty dirs yield `[]`.
+ *
+ * Ranking never reads mtime (filenames already sort correctly), so this
+ * stats only the paths a `limit` actually keeps, not the whole bucket.
+ */
+export async function listHandoffsDetailed(
+  logsDir: string,
+  options: ListHandoffsOptions = {},
+): Promise<HandoffEntry[]> {
+  const mdPaths = await listMarkdownFiles(logsDir);
+  const paths = applyLimit(rankHandoffPaths(mdPaths, logsDir), options.limit);
+  return Promise.all(
+    paths.map(async (filePath) => ({ path: filePath, mtimeMs: (await stat(filePath)).mtimeMs })),
+  );
+}
+
+/** Same ranking as {@link listHandoffsDetailed}, paths only (no stat calls). */
+export async function listHandoffs(
+  logsDir: string,
+  options: ListHandoffsOptions = {},
+): Promise<string[]> {
+  const mdPaths = await listMarkdownFiles(logsDir);
+  return applyLimit(rankHandoffPaths(mdPaths, logsDir), options.limit);
 }
