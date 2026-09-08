@@ -2,6 +2,7 @@ import * as assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import * as vscode from "vscode";
+import { waitFor } from "./quickPickHarness.js";
 
 const EXTENSION_ID = "grounder-dev.grounder-vscode-extension";
 
@@ -150,22 +151,12 @@ suite("settings", () => {
   });
 });
 
-/**
- * `grounder.open`/`openToSide`/`openPreview*`'s registered handlers discard
- * their own promise (`void openDoc(node)`, see `commands.ts`) so VS Code
- * doesn't treat a slow open as a "slow command" — `executeCommand` for these
- * resolves before the editor/webview actually opens. Poll for the effect
- * instead of trusting the command's own resolution.
- */
-async function waitFor(predicate: () => boolean, timeoutMs = 5000): Promise<void> {
-  const start = Date.now();
-  while (!predicate()) {
-    if (Date.now() - start > timeoutMs) {
-      throw new Error("Timed out waiting for condition");
-    }
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-}
+// `grounder.open`/`openToSide`/`openPreview*`'s registered handlers discard
+// their own promise (`void openDoc(node)`, see `commands.ts`) so VS Code
+// doesn't treat a slow open as a "slow command" — `executeCommand` for these
+// resolves before the editor/webview actually opens. `waitFor` (from
+// quickPickHarness.js) polls for the effect instead of trusting the
+// command's own resolution.
 
 suite("open commands", () => {
   let generalNoteNode: Node;

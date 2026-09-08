@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { invokeCli, MIN_CLI_VERSION, meetsMinVersion } from "./cli.js";
 import { registerCommands, registerDebugCommands } from "./commands.js";
 import { GrounderDragAndDropController } from "./dragAndDrop.js";
+import type { GrounderNode } from "./treeProvider.js";
 import { GrounderTreeDataProvider } from "./treeProvider.js";
 
 /**
@@ -37,6 +38,8 @@ async function checkCliVersionFloor(): Promise<void> {
 export interface GrounderExtensionApi {
   provider: GrounderTreeDataProvider;
   GrounderTreeDataProvider: typeof GrounderTreeDataProvider;
+  /** For asserting `revealOnOpen`'s effect (`TreeView.selection`) after a search accept. */
+  view: vscode.TreeView<GrounderNode>;
 }
 
 export function activate(context: vscode.ExtensionContext): GrounderExtensionApi {
@@ -59,7 +62,7 @@ export function activate(context: vscode.ExtensionContext): GrounderExtensionApi
 
   void checkCliVersionFloor();
 
-  return { provider, GrounderTreeDataProvider };
+  return { provider, GrounderTreeDataProvider, view };
 }
 
 export function deactivate(): void {}

@@ -135,7 +135,19 @@ const multiRootWorkspaceFile = path.join(
 tempDirs.push(path.dirname(multiRootWorkspaceFile));
 writeFileSync(
   multiRootWorkspaceFile,
-  JSON.stringify({ folders: [{ path: linked.repoDir }, { path: second.repoDir }] }, null, 2),
+  // Explicit names: both repos are named "repo" on disk (each under its own
+  // temp fixture dir), which would otherwise give both workspace folders the
+  // same default (basename) name.
+  JSON.stringify(
+    {
+      folders: [
+        { name: "fixture-one", path: linked.repoDir },
+        { name: "fixture-two", path: second.repoDir },
+      ],
+    },
+    null,
+    2,
+  ),
 );
 
 /**
@@ -168,7 +180,7 @@ export default defineConfig({
     },
     {
       label: "tree",
-      files: "out/test-integration/tree.test.js",
+      files: ["out/test-integration/tree.test.js", "out/test-integration/search.test.js"],
       workspaceFolder: linked.repoDir,
       env: { GROUNDER_HOME: linked.homeDir, HOME: linked.homeDir },
       launchArgs: commonLaunchArgs(freshUserDataDir()),
