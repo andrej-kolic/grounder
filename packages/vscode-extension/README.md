@@ -8,9 +8,10 @@ CLI; this package never imports its internals, only shells out to the materializ
 `~/.grounder/runtime/dist/cli.js`.
 
 **Out of `pnpm check` for now** — own release cadence, own test runner
-(`@vscode/test-electron`, not wired up yet) for anything that needs the VS Code API. Pure logic
-(CLI resolution, version-floor comparison, `status --json` parsing) has normal `vitest` unit
-tests under `test/`.
+(`@vscode/test-electron` via `@vscode/test-cli`, `pnpm test:integration`) for anything that
+needs the VS Code API, under `test-integration/`. Pure logic (CLI resolution, version-floor
+comparison, `status --json` parsing) has normal `vitest` unit tests under `test/`
+(`pnpm test:unit`).
 
 ## What's here
 

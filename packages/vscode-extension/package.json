@@ -296,11 +296,16 @@
     "build": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "test:unit": "vitest run",
+    "pretest:integration": "pnpm run build && tsc -p ./test-integration/tsconfig.json",
+    "test:integration": "vscode-test",
     "package": "npx --yes @vscode/vsce package --no-dependencies"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/vscode": "^1.90.0",
     "@types/node": "^26.0.1",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.1.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"
   }
