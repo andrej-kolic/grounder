@@ -15,6 +15,10 @@ import { captureStdout, createTempEnv, withGroundedHome } from "../../helpers.js
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const cli = path.join(pkgRoot, "dist", "cli.js");
 
+function expectedTeaser(title: string, date: string): string {
+  return `[grounder] Latest handoff: "${title}" (${date}). Run /grounder-recall to load it, or ignore if unrelated.`;
+}
+
 function runCli(
   args: string[],
   env: NodeJS.ProcessEnv,
@@ -120,9 +124,7 @@ title: "auth"
     );
 
     expect(code).toBe(0);
-    expect(out).toBe(
-      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n',
-    );
+    expect(out).toBe(`${expectedTeaser("auth", "2026-06-26")}\n`);
   });
 
   it("falls back to filename label when frontmatter is corrupted", async () => {
@@ -144,9 +146,7 @@ title: "auth"
     );
 
     expect(code).toBe(0);
-    expect(out).toBe(
-      '[grounder] Latest handoff: "fix auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n',
-    );
+    expect(out).toBe(`${expectedTeaser("fix auth", "2026-06-26")}\n`);
   });
 
   it("falls back to an older handoff when the newest file is empty", async () => {
@@ -178,9 +178,7 @@ old
     );
 
     expect(code).toBe(0);
-    expect(out).toBe(
-      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n',
-    );
+    expect(out).toBe(`${expectedTeaser("auth", "2026-06-26")}\n`);
   });
 
   it("reads unquoted legacy frontmatter and minute-precision filenames", async () => {
@@ -209,9 +207,7 @@ title: phase-2-dogfood
     );
 
     expect(code).toBe(0);
-    expect(out).toBe(
-      '[grounder] Latest handoff: "phase-2-dogfood" (2026-07-22). Run /grounder-recall to load it, or ignore if unrelated.\n',
-    );
+    expect(out).toBe(`${expectedTeaser("phase-2-dogfood", "2026-07-22")}\n`);
   });
 
   it("cli peeks silently when unlinked", () => {
@@ -244,9 +240,7 @@ body
 
     const result = runCli(["handoff", "peek"], withGroundedHome(env.home), env.repo);
     expect(result.status).toBe(0);
-    expect(result.stdout).toBe(
-      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n',
-    );
+    expect(result.stdout).toBe(`${expectedTeaser("auth", "2026-06-26")}\n`);
   });
 
   it("cli finds linked repo via Cursor hook stdin workspace_roots", async () => {
@@ -279,9 +273,7 @@ body
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toBe(
-      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n',
-    );
+    expect(result.stdout).toBe(`${expectedTeaser("auth", "2026-06-26")}\n`);
   });
 
   it("cli finds linked repo via CURSOR_PROJECT_DIR when stdin has no workspace", async () => {
@@ -315,9 +307,7 @@ body
     );
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toBe(
-      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n',
-    );
+    expect(result.stdout).toBe(`${expectedTeaser("auth", "2026-06-26")}\n`);
   });
 
   it("--json prints additional_context when a teaser is present", async () => {
@@ -348,8 +338,7 @@ title: "auth"
     expect(code).toBe(0);
     expect(out.endsWith("\n")).toBe(true);
     expect(JSON.parse(out)).toEqual({
-      additional_context:
-        '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.',
+      additional_context: expectedTeaser("auth", "2026-06-26"),
     });
   });
 
@@ -404,8 +393,7 @@ body
     const result = runCli(["handoff", "peek", "--json"], withGroundedHome(env.home), env.repo);
     expect(result.status).toBe(0);
     expect(JSON.parse(result.stdout)).toEqual({
-      additional_context:
-        '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.',
+      additional_context: expectedTeaser("auth", "2026-06-26"),
     });
   });
 
@@ -451,7 +439,7 @@ body
 
     expect(code).toBe(0);
     expect(out).toBe(
-      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n[grounder] Install outdated — run: grounder migrate.\n',
+      `${expectedTeaser("auth", "2026-06-26")}\n[grounder] Install outdated — run: grounder migrate.\n`,
     );
   });
 
@@ -544,9 +532,7 @@ body
     );
 
     expect(code).toBe(0);
-    expect(out).toBe(
-      '[grounder] Latest handoff: "auth fix for login" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n',
-    );
+    expect(out).toBe(`${expectedTeaser("auth fix for login", "2026-06-26")}\n`);
   });
 
   it("truncates an unusually long title with an ellipsis", async () => {
@@ -577,8 +563,6 @@ body
 
     expect(code).toBe(0);
     const expectedLabel = `${"x".repeat(79)}…`;
-    expect(out).toBe(
-      `[grounder] Latest handoff: "${expectedLabel}" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n`,
-    );
+    expect(out).toBe(`${expectedTeaser(expectedLabel, "2026-06-26")}\n`);
   });
 });
