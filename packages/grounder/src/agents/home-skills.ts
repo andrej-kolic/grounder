@@ -29,8 +29,8 @@ const SKILL_NAMES = [
   "grounder-search",
   "grounder-overview",
   "grounder-plan",
-  "grounder-task-handoff",
-  "grounder-task",
+  "grounder-handoff",
+  "grounder-recall",
 ] as const;
 
 export type SkillName = (typeof SKILL_NAMES)[number];

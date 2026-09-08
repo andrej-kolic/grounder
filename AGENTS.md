@@ -93,15 +93,15 @@ packages/grounder/templates/
   agents/
     cursor/skills/
       grounder-note/SKILL.md
-      grounder-task/SKILL.md            # recall — read-only hydrate
-      grounder-task-handoff/SKILL.md    # write session checkpoint
+      grounder-recall/SKILL.md          # read-only hydrate from latest handoff
+      grounder-handoff/SKILL.md         # write session checkpoint
       grounder-plan/SKILL.md            # named living plan
       grounder-search/SKILL.md          # vault retrieval — CLI ranks, agent synthesizes
       grounder-overview/SKILL.md        # vault inventory — counts + recent titles
     claude/skills/
       grounder-note/SKILL.md
-      grounder-task/SKILL.md
-      grounder-task-handoff/SKILL.md
+      grounder-recall/SKILL.md
+      grounder-handoff/SKILL.md
       grounder-plan/SKILL.md
       grounder-search/SKILL.md
       grounder-overview/SKILL.md

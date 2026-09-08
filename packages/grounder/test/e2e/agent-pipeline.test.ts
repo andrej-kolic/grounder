@@ -6,11 +6,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { claude, claudeSettingsJsonPath } from "../../src/agents/claude.js";
 import {
   cursor,
-  grounderTaskHandoffCommandPath as cursorHandoffCommandPath,
+  grounderHandoffCommandPath as cursorHandoffCommandPath,
   cursorHooksJsonPath,
   grounderNoteCommandPath as cursorNoteCommandPath,
   grounderPlanCommandPath as cursorPlanCommandPath,
-  grounderTaskCommandPath as cursorTaskCommandPath,
+  grounderRecallCommandPath as cursorRecallCommandPath,
 } from "../../src/agents/cursor.js";
 import { hookFileGrounderPeekCommands, runtimeInvocation } from "../../src/agents/hook-runtime.js";
 import { createTempEnv, type TempEnv, withGroundedHome } from "../helpers.js";
@@ -168,9 +168,9 @@ describe("e2e/agent-pipeline", () => {
     assertOk(handoff, "handoff");
     expect(handoff.stdout).toMatch(/^Wrote .*e2e-smoke-handoff\.md\n$/);
 
-    const taskContent = await readFile(cursorTaskCommandPath(env.home), "utf8");
+    const recallContent = await readFile(cursorRecallCommandPath(env.home), "utf8");
     const handoffHead = runShell(
-      renderedInvocation(taskContent, env.home, "handoff list --head"),
+      renderedInvocation(recallContent, env.home, "handoff list --head"),
       grounded,
       env.repo,
     );
@@ -178,7 +178,7 @@ describe("e2e/agent-pipeline", () => {
     expect(handoffHead.stdout.trim()).toMatch(/e2e-smoke-handoff\.md$/);
 
     const handoffList = runShell(
-      renderedInvocation(taskContent, env.home, "handoff list --limit 5 --markdown"),
+      renderedInvocation(recallContent, env.home, "handoff list --limit 5 --markdown"),
       grounded,
       env.repo,
     );

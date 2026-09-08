@@ -3,10 +3,10 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   claude,
+  grounderHandoffCommandPath,
   grounderNoteCommandPath,
   grounderPlanCommandPath,
-  grounderTaskCommandPath,
-  grounderTaskHandoffCommandPath,
+  grounderRecallCommandPath,
 } from "../../src/agents/claude.js";
 import { runtimeInvocation } from "../../src/agents/hook-runtime.js";
 import { withHomeDir } from "../../src/connector/home.js";
@@ -21,11 +21,11 @@ describe("agents/claude", () => {
       expect(grounderPlanCommandPath("/home/user")).toBe(
         "/home/user/.claude/skills/grounder-plan/SKILL.md",
       );
-      expect(grounderTaskHandoffCommandPath("/home/user")).toBe(
-        "/home/user/.claude/skills/grounder-task-handoff/SKILL.md",
+      expect(grounderHandoffCommandPath("/home/user")).toBe(
+        "/home/user/.claude/skills/grounder-handoff/SKILL.md",
       );
-      expect(grounderTaskCommandPath("/home/user")).toBe(
-        "/home/user/.claude/skills/grounder-task/SKILL.md",
+      expect(grounderRecallCommandPath("/home/user")).toBe(
+        "/home/user/.claude/skills/grounder-recall/SKILL.md",
       );
     });
   });
@@ -37,8 +37,8 @@ describe("agents/claude", () => {
         "/home/user/.claude/skills/grounder-search/SKILL.md",
         "/home/user/.claude/skills/grounder-overview/SKILL.md",
         "/home/user/.claude/skills/grounder-plan/SKILL.md",
-        "/home/user/.claude/skills/grounder-task-handoff/SKILL.md",
-        "/home/user/.claude/skills/grounder-task/SKILL.md",
+        "/home/user/.claude/skills/grounder-handoff/SKILL.md",
+        "/home/user/.claude/skills/grounder-recall/SKILL.md",
       ]);
       const desired = await claude.desiredArtifacts("/home/user");
       expect(Object.keys(desired).sort()).toEqual(claude.expectedArtifacts("/home/user").sort());
@@ -51,13 +51,13 @@ describe("agents/claude", () => {
       const cli = runtimeInvocation("/home/user");
       const noteDest = grounderNoteCommandPath("/home/user");
       const planDest = grounderPlanCommandPath("/home/user");
-      const handoffDest = grounderTaskHandoffCommandPath("/home/user");
-      const taskDest = grounderTaskCommandPath("/home/user");
+      const handoffDest = grounderHandoffCommandPath("/home/user");
+      const recallDest = grounderRecallCommandPath("/home/user");
 
       expect(desired[noteDest]).toContain(`${cli} note`);
       expect(desired[planDest]).toContain(`${cli} plan`);
       expect(desired[handoffDest]).toContain(`${cli} handoff`);
-      expect(desired[taskDest]).toContain(`${cli} handoff list`);
+      expect(desired[recallDest]).toContain(`${cli} handoff list`);
       expect(desired[noteDest]).not.toContain("npx");
       expect(desired[noteDest]).not.toContain("{{GROUNDER_CLI}}");
     });

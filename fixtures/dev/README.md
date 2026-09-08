@@ -41,13 +41,13 @@ pnpm grounder handoff "$(cat <<'EOF'
 - Linked fixtures/dev and wrote a note
 
 ## Next
-1. Open a new chat and run /grounder-task
+1. Open a new chat and run /grounder-recall
 
 ## Blockers
 - None
 
 ## Decisions
-- Newest log file wins on resume
+- Newest log file wins on recall
 
 ## Files
 - fixtures/dev/README.md
@@ -83,9 +83,9 @@ In Cursor / Claude Code (from this folder or a linked project):
 
 ```text
 (new session)           → optional one-line teaser if a handoff exists (with --hooks)
-/grounder-task          → list --head + read newest usable handoff + AGENTS.md (read-only)
+/grounder-recall        → list --head + read newest usable handoff + AGENTS.md (read-only)
 … work …
-/grounder-task-handoff  → summarize → runtime handoff "<body>"
+/grounder-handoff       → summarize → runtime handoff "<body>"
 /grounder-plan          → write/update named plan → runtime plan "<body>" --title <name>
 ```
 
@@ -95,7 +95,7 @@ Verify the teaser without starting an agent session:
 pnpm grounder handoff peek          # linked + handoff → one line; else silent
 ```
 
-The teaser never auto-loads the full handoff and never blocks a session — run `/grounder-task` only when you want the body.
+The teaser never auto-loads the full handoff and never blocks a session — run `/grounder-recall` only when you want the body.
 
 All four skills run through the symlinked runtime described above, so they always exercise this checkout's build — `pnpm build` after editing `src/` is enough; no re-run of `setup` needed to pick up code changes. Re-run only after editing **templates** (`templates/agents/*/skills/*/SKILL.md`), since template content is copied at install time:
 

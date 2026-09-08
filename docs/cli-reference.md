@@ -32,7 +32,7 @@ Write
   grounder plan list            Recent plans, newest first
   grounder note list            Recent notes, newest first
   grounder handoff list         Recent handoffs, newest first
-  grounder handoff list --head  Newest usable handoff path (what /grounder-task reads)
+  grounder handoff list --head  Newest usable handoff path (what /grounder-recall reads)
 
 Retrieve
   grounder search <query>       Rank matching files in this project's vault
@@ -162,7 +162,7 @@ frontmatter only changes on `plan --force`, not on a hand-edit made directly in 
 vault. Text and markdown mode omit it.
 
 `--markdown` and `--json` are mutually exclusive. Kept separate from `status` (wiring
-health) and `handoff peek` (hydrate teaser) — three distinct jobs.
+health) and `handoff peek` (recall teaser) — three distinct jobs.
 
 ## Doctor flags
 

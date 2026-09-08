@@ -48,12 +48,12 @@ export function grounderPlanCommandPath(homeDir?: string): string {
   return layout.skillPath("grounder-plan", homeDir);
 }
 
-export function grounderTaskHandoffCommandPath(homeDir?: string): string {
-  return layout.skillPath("grounder-task-handoff", homeDir);
+export function grounderHandoffCommandPath(homeDir?: string): string {
+  return layout.skillPath("grounder-handoff", homeDir);
 }
 
-export function grounderTaskCommandPath(homeDir?: string): string {
-  return layout.skillPath("grounder-task", homeDir);
+export function grounderRecallCommandPath(homeDir?: string): string {
+  return layout.skillPath("grounder-recall", homeDir);
 }
 
 export function expectedArtifacts(homeDir?: string): string[] {
