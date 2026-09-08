@@ -45,13 +45,18 @@ function requestedLabels() {
 }
 
 const requested = requestedLabels();
-// Whether this run needs the (expensive: two real `grounder setup`/`link`
-// subprocess round-trips) linked fixtures at all — false only when someone
-// explicitly runs `vscode-test --label activation` alone, so that smoke test
-// stays genuinely independent (a CLI setup/link failure elsewhere shouldn't
-// block it, and it shouldn't pay for fixtures it never opens).
-const needsLinkedFixtures =
+// `--label` is `@vscode/test-cli`'s own CLI flag, not a documented stable
+// contract of this config file's shape — if a future version renames it,
+// requestedLabels() silently returns [], which reads as "no filter" below
+// and just over-builds both fixtures rather than leaving a requested config
+// pointed at an undefined workspaceFolder. Fails safe, not silent-broken.
+//
+// Two separate flags, not one: `tree` alone doesn't need the second
+// project/workspace file, only `multiroot` does — no point paying for an
+// extra `grounder link` round-trip a run isn't going to use.
+const needsPrimaryFixture =
   requested.length === 0 || requested.some((label) => label === "tree" || label === "multiroot");
+const needsSecondFixture = requested.length === 0 || requested.includes("multiroot");
 
 /**
  * A real linked project + vault, built once via the actual CLI (same
@@ -191,11 +196,11 @@ function buildMultiRootWorkspaceFile(linkedRepoDir, secondRepoDir) {
   return file;
 }
 
-const linked = needsLinkedFixtures ? buildLinkedFixture() : undefined;
-const second = needsLinkedFixtures
+const linked = needsPrimaryFixture ? buildLinkedFixture() : undefined;
+const second = needsSecondFixture
   ? buildSecondLinkedProject(linked.homeDir, linked.vaultDir)
   : undefined;
-const multiRootWorkspaceFile = needsLinkedFixtures
+const multiRootWorkspaceFile = needsSecondFixture
   ? buildMultiRootWorkspaceFile(linked.repoDir, second.repoDir)
   : undefined;
 
@@ -222,37 +227,48 @@ function commonLaunchArgs(userDataDir) {
 // its own declared minimum, not just whatever happens to be current today.
 const VSCODE_TEST_VERSION = "1.90.0";
 
-export default defineConfig({
-  tests: [
-    {
-      label: "activation",
-      files: "out/test-integration/extension.test.js",
-      // Deliberately unlinked (no .grounder.json) — proves the harness boots
-      // and the extension activates independent of any vault fixture. Real:
-      // running `vscode-test --label activation` alone builds no linked
-      // fixture at all (see needsLinkedFixtures above).
-      workspaceFolder: "test-integration/fixtures/empty-workspace",
-      version: VSCODE_TEST_VERSION,
-      launchArgs: commonLaunchArgs(freshUserDataDir()),
-      mocha: { timeout: 20_000 },
-    },
-    {
-      label: "tree",
-      files: ["out/test-integration/tree.test.js", "out/test-integration/search.test.js"],
-      workspaceFolder: linked?.repoDir,
-      env: { GROUNDER_HOME: linked?.homeDir },
-      version: VSCODE_TEST_VERSION,
-      launchArgs: commonLaunchArgs(freshUserDataDir()),
-      mocha: { timeout: 20_000 },
-    },
-    {
-      label: "multiroot",
-      files: "out/test-integration/multiroot.test.js",
-      workspaceFolder: multiRootWorkspaceFile,
-      env: { GROUNDER_HOME: linked?.homeDir },
-      version: VSCODE_TEST_VERSION,
-      launchArgs: commonLaunchArgs(freshUserDataDir()),
-      mocha: { timeout: 20_000 },
-    },
-  ],
-});
+// Built as a plain array, not a static object literal: an entry only exists
+// at all when its fixture was actually built, so no config ever ships a
+// `workspaceFolder: undefined` for `@vscode/test-cli` to (maybe, in some
+// future, stricter version) choke on — today it just skips unselected
+// entries, but that's its behavior to rely on, not this file's.
+const tests = [
+  {
+    label: "activation",
+    files: "out/test-integration/extension.test.js",
+    // Deliberately unlinked (no .grounder.json) — proves the harness boots
+    // and the extension activates independent of any vault fixture. Real:
+    // running `vscode-test --label activation` alone builds no linked
+    // fixture at all (see needsPrimaryFixture above).
+    workspaceFolder: "test-integration/fixtures/empty-workspace",
+    version: VSCODE_TEST_VERSION,
+    launchArgs: commonLaunchArgs(freshUserDataDir()),
+    mocha: { timeout: 20_000 },
+  },
+];
+
+if (linked) {
+  tests.push({
+    label: "tree",
+    files: ["out/test-integration/tree.test.js", "out/test-integration/search.test.js"],
+    workspaceFolder: linked.repoDir,
+    env: { GROUNDER_HOME: linked.homeDir },
+    version: VSCODE_TEST_VERSION,
+    launchArgs: commonLaunchArgs(freshUserDataDir()),
+    mocha: { timeout: 20_000 },
+  });
+}
+
+if (multiRootWorkspaceFile) {
+  tests.push({
+    label: "multiroot",
+    files: "out/test-integration/multiroot.test.js",
+    workspaceFolder: multiRootWorkspaceFile,
+    env: { GROUNDER_HOME: linked.homeDir },
+    version: VSCODE_TEST_VERSION,
+    launchArgs: commonLaunchArgs(freshUserDataDir()),
+    mocha: { timeout: 20_000 },
+  });
+}
+
+export default defineConfig({ tests });

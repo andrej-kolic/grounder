@@ -291,16 +291,19 @@ suite("live refresh and controls", () => {
   test("file watcher: adding a file refreshes the tree without a manual refresh", async () => {
     const root: Node[] = await provider.getChildren();
     const notes = findCategory(provider, root, "Notes");
-    // scheduleRefresh debounces file-watcher events by 300ms. Poll the
-    // actual visible effect rather than a single onDidChangeTreeData fire —
-    // the live provider also watches ~/.grounder and the settings suite's
-    // config updates fire the same event, so "the first fire after this
-    // write" isn't reliably *this* write's fire.
+    // getChildren re-reads the directory unconditionally on every call — it
+    // would find the new file even if the watcher were entirely broken, so
+    // this must wait for the actual onDidChangeTreeData fire, not just poll
+    // getChildren. The race with unrelated fires (the live provider also
+    // watches ~/.grounder; the settings suite's config updates fire the same
+    // event) is closed by *when* this subscribes: immediately before the
+    // write that should cause it, not at suite setup, long before.
+    const changed = onceTreeDataChanged(provider);
+    // scheduleRefresh debounces file-watcher events by 300ms.
     await writeFile(path.join(notes.dir, "live-refresh-note.md"), "# Live refresh\n");
-    await waitFor(async () => {
-      const children: Node[] = await provider.getChildren(notes);
-      return children.some((n) => n.kind === "doc" && n.doc.label === "live-refresh-note");
-    });
+    await changed;
+    const children: Node[] = await provider.getChildren(notes);
+    assert.ok(children.some((n) => n.kind === "doc" && n.doc.label === "live-refresh-note"));
   });
 
   test("refresh command triggers a tree data change", async () => {
