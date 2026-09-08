@@ -296,7 +296,7 @@
     "build": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "test:unit": "vitest run",
-    "pretest:integration": "pnpm run build && tsc -p ./test-integration/tsconfig.json",
+    "pretest:integration": "pnpm --filter grounder build && pnpm run build && tsc -p ./test-integration/tsconfig.json",
     "test:integration": "vscode-test",
     "package": "npx --yes @vscode/vsce package --no-dependencies"
   },

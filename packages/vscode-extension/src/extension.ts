@@ -25,7 +25,21 @@ async function checkCliVersionFloor(): Promise<void> {
   }
 }
 
-export function activate(context: vscode.ExtensionContext): void {
+/**
+ * Exposed for `test-integration/` — VS Code has no generic way to read
+ * another extension's rendered TreeView contents (see `commands.ts`'s
+ * `debugState` comment), so tests reach the live provider via
+ * `Extension.exports` instead. `GrounderTreeDataProvider` itself is also
+ * exposed so a settings test can construct a throwaway instance that reads
+ * `grounder.*` config fresh in its constructor, rather than racing the live
+ * provider's `onDidChangeConfiguration` listener after a config update.
+ */
+export interface GrounderExtensionApi {
+  provider: GrounderTreeDataProvider;
+  GrounderTreeDataProvider: typeof GrounderTreeDataProvider;
+}
+
+export function activate(context: vscode.ExtensionContext): GrounderExtensionApi {
   const provider = new GrounderTreeDataProvider();
   const view = vscode.window.createTreeView("grounderVault", {
     treeDataProvider: provider,
@@ -44,6 +58,8 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   void checkCliVersionFloor();
+
+  return { provider, GrounderTreeDataProvider };
 }
 
 export function deactivate(): void {}

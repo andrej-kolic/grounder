@@ -13,6 +13,12 @@ needs the VS Code API, under `test-integration/`. Pure logic (CLI resolution, ve
 comparison, `status --json` parsing) has normal `vitest` unit tests under `test/`
 (`pnpm test:unit`).
 
+On macOS, `pnpm test:integration` may pop a native **"Keychain Not Found"** dialog (Electron's
+`safeStorage` trying to create a "Code Key" item) — a known `@vscode/test-electron` quirk with
+the downloaded test build, unrelated to this extension. It doesn't block the run either way.
+Click **Cancel** — never "Reset to Defaults" (that wipes your real login keychain for an
+unrelated disposable test profile).
+
 ## What's here
 
 - Tree view ("Grounder" in the Explorer sidebar): `Notes` / `Handoffs` / `Plans` per linked
