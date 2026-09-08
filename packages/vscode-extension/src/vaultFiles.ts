@@ -34,12 +34,19 @@ async function readdirSafe(dir: string): Promise<Dirent[]> {
 async function sortByMtimeDesc(
   entries: readonly { filePath: string; relativePath: string }[],
 ): Promise<VaultDoc[]> {
-  const withMtime = await Promise.all(
+  const stated = await Promise.all(
     entries.map(async (entry) => {
-      const { mtimeMs } = await stat(entry.filePath);
-      return { ...entry, mtimeMs };
+      try {
+        const { mtimeMs } = await stat(entry.filePath);
+        return { ...entry, mtimeMs };
+      } catch {
+        // A file deleted between the walk and this stat — skip it rather
+        // than rejecting the whole list over one race.
+        return null;
+      }
     }),
   );
+  const withMtime = stated.filter((entry): entry is NonNullable<typeof entry> => entry !== null);
   withMtime.sort((a, b) => {
     if (a.mtimeMs !== b.mtimeMs) {
       return b.mtimeMs - a.mtimeMs;

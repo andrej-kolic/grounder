@@ -108,11 +108,13 @@ export function homeSkillsLayout(options: HomeSkillsLayoutOptions): HomeSkillsLa
     desiredArtifacts: async (homeDir, renderOptions) => {
       const cli = renderOptions?.invocation ?? runtimeInvocation(homeDir);
       const dir = skillsDir(homeDir);
+      const templates = await Promise.all(
+        SKILL_FILES.map((filename) => readFile(path.join(templateDir, filename), "utf8")),
+      );
       const desired: Record<string, string> = {};
-      for (const filename of SKILL_FILES) {
-        const template = await readFile(path.join(templateDir, filename), "utf8");
-        desired[path.join(dir, filename)] = template.replaceAll("{{GROUNDER_CLI}}", cli);
-      }
+      SKILL_FILES.forEach((filename, i) => {
+        desired[path.join(dir, filename)] = templates[i].replaceAll("{{GROUNDER_CLI}}", cli);
+      });
       return desired;
     },
 

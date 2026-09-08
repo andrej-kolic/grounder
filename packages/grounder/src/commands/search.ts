@@ -22,9 +22,6 @@ export interface SearchCommandOptions {
   json?: boolean;
 }
 
-const DEFAULT_LIMIT = 10;
-const DEFAULT_MAX_HITS = 50;
-
 const USAGE =
   "Usage: grounder search <query> [--terms <csv>] [--limit <n>] [--max-hits <n>] [--context <n>] [--since <date>] [--markdown] [--json]\n";
 
@@ -332,8 +329,8 @@ export async function runSearchWithOptions(options: SearchCommandOptions): Promi
       rootDir,
       query: options.query,
       terms: options.terms,
-      limit: options.limit ?? DEFAULT_LIMIT,
-      maxHits: options.maxHits ?? DEFAULT_MAX_HITS,
+      ...(options.limit !== undefined ? { limit: options.limit } : {}),
+      ...(options.maxHits !== undefined ? { maxHits: options.maxHits } : {}),
       ...(options.context !== undefined ? { context: options.context } : {}),
       ...(options.since !== undefined ? { since: options.since } : {}),
     });
