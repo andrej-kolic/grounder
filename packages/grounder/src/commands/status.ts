@@ -383,9 +383,17 @@ function writeTextOutput(status: GatheredStatus): void {
   writeGitLine(project.git);
 }
 
+/**
+ * Bump whenever `writeJsonOutput`'s payload shape changes (fields added,
+ * removed, or renamed) — consumers (the VS Code extension's `status.ts`)
+ * compare this directly instead of inferring compatibility structurally.
+ */
+export const STATUS_JSON_SCHEMA_VERSION = 1;
+
 function writeJsonOutput(status: GatheredStatus): void {
   const { machine, project } = status;
   const payload = {
+    schemaVersion: STATUS_JSON_SCHEMA_VERSION,
     machine: {
       configPath: machine.configPath,
       configState: machine.configState,

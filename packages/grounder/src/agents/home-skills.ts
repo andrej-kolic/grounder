@@ -64,7 +64,10 @@ export interface HomeSkillsLayout {
   /** @see AgentAdapter.expectedArtifacts */
   expectedArtifacts(homeDir?: string): string[];
   /** @see AgentAdapter.desiredArtifacts */
-  desiredArtifacts(homeDir?: string): Promise<Record<string, string>>;
+  desiredArtifacts(
+    homeDir?: string,
+    options?: { invocation?: string },
+  ): Promise<Record<string, string>>;
   /** @see AgentAdapter.tombstones */
   tombstones(homeDir?: string): string[];
   /** @see AgentAdapter.ownedPrefixes */
@@ -102,14 +105,16 @@ export function homeSkillsLayout(options: HomeSkillsLayoutOptions): HomeSkillsLa
     // shorthand method is the one member shape that can silently start using
     // `this` and type-check fine while breaking only at those detached call
     // sites.
-    desiredArtifacts: async (homeDir) => {
-      const cli = runtimeInvocation(homeDir);
+    desiredArtifacts: async (homeDir, renderOptions) => {
+      const cli = renderOptions?.invocation ?? runtimeInvocation(homeDir);
       const dir = skillsDir(homeDir);
+      const templates = await Promise.all(
+        SKILL_FILES.map((filename) => readFile(path.join(templateDir, filename), "utf8")),
+      );
       const desired: Record<string, string> = {};
-      for (const filename of SKILL_FILES) {
-        const template = await readFile(path.join(templateDir, filename), "utf8");
-        desired[path.join(dir, filename)] = template.replaceAll("{{GROUNDER_CLI}}", cli);
-      }
+      SKILL_FILES.forEach((filename, i) => {
+        desired[path.join(dir, filename)] = templates[i].replaceAll("{{GROUNDER_CLI}}", cli);
+      });
       return desired;
     },
 

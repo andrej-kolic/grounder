@@ -22,9 +22,6 @@ export interface SearchCommandOptions {
   json?: boolean;
 }
 
-const DEFAULT_LIMIT = 10;
-const DEFAULT_MAX_HITS = 50;
-
 const USAGE =
   "Usage: grounder search <query> [--terms <csv>] [--limit <n>] [--max-hits <n>] [--context <n>] [--since <date>] [--markdown] [--json]\n";
 
@@ -150,6 +147,12 @@ function writePlainOutput(outcome: SearchOutcome): void {
     const label = fileStem(file.filePath);
     const topicTag = file.topicsMatch ? " [topics]" : "";
     process.stdout.write(`${index + 1}. ${label}${topicTag}  \n  ${file.filePath}\n`);
+    if (file.hits.length === 0) {
+      // Filename-only match (2026-09-07): no body line to quote — say so
+      // instead of printing a bare file with no evidence of why it matched.
+      process.stdout.write(`  (matched by filename: ${file.matchedTerms.join(", ")})\n`);
+      return;
+    }
     for (const hit of file.hits) {
       const snippet = hit.snippet.replace(/\s+/g, " ").trim();
       process.stdout.write(`  L${hit.line} (${hit.matchedTerm}): ${snippet}\n`);
@@ -182,6 +185,11 @@ function writeMarkdownOutput(outcome: SearchOutcome): void {
   for (const file of outcome.files) {
     const label = fileStem(file.filePath);
     process.stdout.write(`### ${formatMarkdownFileLink(label, file.filePath)}\n\n`);
+    if (file.hits.length === 0) {
+      // Filename-only match (2026-09-07): no body line to quote.
+      process.stdout.write(`(matched by filename: ${file.matchedTerms.join(", ")})\n\n`);
+      continue;
+    }
     for (const hit of file.hits) {
       process.stdout.write(`L${hit.line} (${hit.matchedTerm}):\n\n`);
       process.stdout.write(formatSnippetBlock(hit.snippet));
@@ -204,6 +212,8 @@ function writeJsonOutput(outcome: SearchOutcome, rootDir: string): void {
     truncated: outcome.truncated,
     totalMatchCount: outcome.totalMatchCount,
     totalFileCount: outcome.totalFileCount,
+    vaultRoot: rootDir,
+    vaultRootUri: toFileUri(rootDir),
     hits: outcome.files.map((file) => ({
       file: file.filePath,
       relativePath: vaultRelativePath(rootDir, file.filePath),
@@ -319,8 +329,8 @@ export async function runSearchWithOptions(options: SearchCommandOptions): Promi
       rootDir,
       query: options.query,
       terms: options.terms,
-      limit: options.limit ?? DEFAULT_LIMIT,
-      maxHits: options.maxHits ?? DEFAULT_MAX_HITS,
+      ...(options.limit !== undefined ? { limit: options.limit } : {}),
+      ...(options.maxHits !== undefined ? { maxHits: options.maxHits } : {}),
       ...(options.context !== undefined ? { context: options.context } : {}),
       ...(options.since !== undefined ? { since: options.since } : {}),
     });

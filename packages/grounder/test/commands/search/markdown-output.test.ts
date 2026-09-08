@@ -1,4 +1,4 @@
-import { rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -46,6 +46,28 @@ describe("commands/search markdown output", () => {
     expect(out).toContain("```");
     expect(out).toContain("> quoted line with version marker");
     expect(out).not.toContain("> > quoted");
+  });
+
+  it("shows a matched-by-filename note for a stem-only hit instead of an empty snippet block", async () => {
+    const env = await createTempEnv({ packageName: "my-app", initGit: false });
+    cleanup = env.cleanup;
+    process.env.GROUNDER_HOME = env.home;
+
+    await writeHomeConfig({ vaultRoot: env.vault });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const plansDir = path.join(env.vault, "10-Projects", "my-app", "plans");
+    await mkdir(plansDir, { recursive: true });
+    await writeFile(path.join(plansDir, "p1.md"), "o1\n", "utf8");
+
+    const { code, out } = await captureStdout(() =>
+      runSearchWithOptions({ homeDir: env.home, cwd: env.repo, query: "p1", markdown: true }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toContain("(matched by filename: p1)");
+    expect(out).not.toContain("```");
+    expect(out).not.toContain("L1 (");
   });
 
   it("errors when project vault root is missing", async () => {

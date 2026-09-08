@@ -9,7 +9,15 @@ coverage/
 
 .grounder.json
 fixtures/dev/.grounder.json
+fixtures/dev-home/
 .tmp/
+*.vsix
+packages/vscode-extension/out/
+.vscode-test/
 
 # Claude Code machine-local permissions (nvm paths, etc.)
 .claude/settings.local.json
+
+# Contain local settings
+*.code-workspace
+fixtures/dev-vault/
