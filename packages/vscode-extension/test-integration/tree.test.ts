@@ -7,8 +7,10 @@ const EXTENSION_ID = "grounder-dev.grounder-vscode-extension";
 
 /**
  * Steps 3-8 dogfooding matrix cases 1-6 (tree structure), 7-9 (settings),
- * 10-12 (open), 14-16 (copy) against a real linked project + vault built by
- * `.vscode-test.mjs`'s `buildLinkedFixture` via the actual CLI.
+ * 10-12 (open), 14-16 (copy), 26-27 (live refresh, refresh/collapse-all)
+ * against a real linked project + vault built by `.vscode-test.mjs`'s
+ * `buildLinkedFixture` via the actual CLI. Case 24 (multi-root) lives in
+ * `multiroot.test.ts` — it needs its own two-folder workspace.
  *
  * Case 9 (revealOnOpen) isn't covered here — its only call site
  * (`revealInTree` in `commands.ts`) fires from the search QuickPick's accept
@@ -266,5 +268,47 @@ suite("copy commands", () => {
     };
     await vscode.commands.executeCommand("grounder.copyMention", node);
     assert.equal(await vscode.env.clipboard.readText(), "@in-workspace-note.md");
+  });
+});
+
+/** Waits for `provider.onDidChangeTreeData` to fire once, or for mocha's own test timeout to fail the test. */
+function onceTreeDataChanged(provider: Node): Promise<void> {
+  return new Promise((resolve) => {
+    const disposable = provider.onDidChangeTreeData(() => {
+      disposable.dispose();
+      resolve();
+    });
+  });
+}
+
+suite("live refresh and controls", () => {
+  let provider: Node;
+
+  suiteSetup(async () => {
+    provider = (await getApi()).provider;
+    // Establishes the category-dir file watchers (childrenForFolder's
+    // watchDir calls) before the file-watcher test below touches one.
+    await provider.getChildren();
+  });
+
+  test("file watcher: adding a file refreshes the tree without a manual refresh", async () => {
+    const root: Node[] = await provider.getChildren();
+    const notes = findCategory(provider, root, "Notes");
+    const changed = onceTreeDataChanged(provider);
+    // scheduleRefresh debounces file-watcher events by 300ms.
+    await writeFile(path.join(notes.dir, "live-refresh-note.md"), "# Live refresh\n");
+    await changed;
+    const children: Node[] = await provider.getChildren(notes);
+    assert.ok(children.some((n) => n.kind === "doc" && n.doc.label === "live-refresh-note"));
+  });
+
+  test("refresh command triggers a tree data change", async () => {
+    const changed = onceTreeDataChanged(provider);
+    await vscode.commands.executeCommand("grounder.refresh");
+    await changed;
+  });
+
+  test("collapse-all command executes without throwing", async () => {
+    await vscode.commands.executeCommand("grounder.collapseAll");
   });
 });

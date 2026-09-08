@@ -90,10 +90,53 @@ function buildLinkedFixture() {
   write(path.join(projectDir, ".hidden-note.md"), "# Should be filtered out\n");
   write(path.join(projectDir, ".obsidian", "workspace.json"), "{}\n");
 
-  return { homeDir, repoDir };
+  return { homeDir, vaultDir, repoDir };
+}
+
+/**
+ * A second project linked into the same vault/home as `buildLinkedFixture`'s
+ * (no `setup` needed — the home config already points at the vault), for the
+ * multi-root folder-grouping case.
+ */
+function buildSecondLinkedProject(homeDir, vaultDir) {
+  const base = mkdtempSync(path.join(os.tmpdir(), "grounder-vscode-test-fixture2-"));
+  tempDirs.push(base);
+  const repoDir = path.join(base, "repo");
+  mkdirSync(repoDir, { recursive: true });
+
+  const projectId = "grounder-vscode-test-fixture-two";
+  writeFileSync(
+    path.join(repoDir, "package.json"),
+    `${JSON.stringify({ name: projectId }, null, 2)}\n`,
+  );
+
+  const cliPath = path.resolve(here, "../grounder/dist/cli.js");
+  const env = { ...process.env, GROUNDER_HOME: homeDir, HOME: homeDir };
+  execFileSync(process.execPath, [cliPath, "link", "--yes"], {
+    cwd: repoDir,
+    env,
+    stdio: "inherit",
+  });
+
+  const notesDir = path.join(vaultDir, "10-Projects", projectId, "notes");
+  mkdirSync(notesDir, { recursive: true });
+  writeFileSync(path.join(notesDir, "second-project-note.md"), "# Second project note\n");
+
+  return { repoDir };
 }
 
 const linked = buildLinkedFixture();
+const second = buildSecondLinkedProject(linked.homeDir, linked.vaultDir);
+
+const multiRootWorkspaceFile = path.join(
+  mkdtempSync(path.join(os.tmpdir(), "grounder-vscode-test-workspace-")),
+  "multiroot.code-workspace",
+);
+tempDirs.push(path.dirname(multiRootWorkspaceFile));
+writeFileSync(
+  multiRootWorkspaceFile,
+  JSON.stringify({ folders: [{ path: linked.repoDir }, { path: second.repoDir }] }, null, 2),
+);
 
 /**
  * On macOS, the downloaded test VS Code build can show a native "Keychain
@@ -127,6 +170,14 @@ export default defineConfig({
       label: "tree",
       files: "out/test-integration/tree.test.js",
       workspaceFolder: linked.repoDir,
+      env: { GROUNDER_HOME: linked.homeDir, HOME: linked.homeDir },
+      launchArgs: commonLaunchArgs(freshUserDataDir()),
+      mocha: { timeout: 20_000 },
+    },
+    {
+      label: "multiroot",
+      files: "out/test-integration/multiroot.test.js",
+      workspaceFolder: multiRootWorkspaceFile,
       env: { GROUNDER_HOME: linked.homeDir, HOME: linked.homeDir },
       launchArgs: commonLaunchArgs(freshUserDataDir()),
       mocha: { timeout: 20_000 },
