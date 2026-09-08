@@ -56,6 +56,23 @@ pnpm --filter grounder-vscode-extension test:unit
 Open this directory (`packages/vscode-extension/`) itself as the workspace folder — not the
 monorepo root — so `.vscode/launch.json` here applies.
 
+### What stays manual-only
+
+Four of the dogfooding matrix's cases are permanently out of `test-integration/`'s reach, not
+temporarily-skipped TODOs:
+
+- **Reveal in Finder/Explorer** (`grounder.revealInOS`) opens the OS's native file manager — not
+  worth automating just to assert a `revealFileInOS` command call succeeded.
+- **Drag-and-drop into Cursor's, Claude Code's, or GitHub Copilot Chat's chat panel** all need
+  that *other* extension's real chat UI. `@vscode/test-electron` launches a bare VS Code (or a
+  pinned version) without Cursor and without those chat extensions installed, so this is
+  permanently dogfood-only — see the plan's Step 10 for the full cases-to-buckets mapping.
+
+Everything else `@vscode/test-electron` *can* reach — tree structure, settings, open/preview,
+copy, live refresh, multi-root grouping, and the search QuickPick flow (via
+`test-integration/quickPickHarness.ts`'s callback-capture technique) — has real coverage under
+`test-integration/`.
+
 ### If developing inside Cursor itself
 
 Press `F5` ("Run Extension"). This launches a **Cursor** Extension Development Host directly —
