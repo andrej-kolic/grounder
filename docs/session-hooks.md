@@ -2,7 +2,7 @@
 
 An opt-in safety net for the session loop: when a Cursor or Claude Code session starts in
 a linked project that already has a handoff, Grounder prints **one line** reminding you
-it exists. You (or the agent) still decide whether to run `/grounder-task`.
+it exists. You (or the agent) still decide whether to run `/grounder-recall`.
 
 ```bash
 grounder setup <path-to-your-vault> --hooks
@@ -15,7 +15,7 @@ later plain `migrate` will not silently re-enable it).
 Example teaser:
 
 ```text
-[grounder] Latest handoff: "auth middleware" (2026-07-28). Run /grounder-task to load it, or ignore if unrelated.
+[grounder] Latest handoff: "auth middleware" (2026-07-28). Run /grounder-recall to load it, or ignore if unrelated.
 ```
 
 ## What hooks do not do

@@ -8,25 +8,19 @@ const templatesRoot = path.resolve(
   "../../templates/agents",
 );
 
-const cursorHandoffTemplate = path.join(
-  templatesRoot,
-  "cursor/skills/grounder-task-handoff/SKILL.md",
-);
-const claudeHandoffTemplate = path.join(
-  templatesRoot,
-  "claude/skills/grounder-task-handoff/SKILL.md",
-);
+const cursorHandoffTemplate = path.join(templatesRoot, "cursor/skills/grounder-handoff/SKILL.md");
+const claudeHandoffTemplate = path.join(templatesRoot, "claude/skills/grounder-handoff/SKILL.md");
 const handoffTemplates = [cursorHandoffTemplate, claudeHandoffTemplate] as const;
 
 function stripFrontmatter(raw: string): string {
   return raw.replace(/^---\n[\s\S]*?\n---\n\n/, "");
 }
 
-describe("templates/grounder-task-handoff", () => {
+describe("templates/grounder-handoff", () => {
   it("has the intersection skill frontmatter", async () => {
     for (const filePath of handoffTemplates) {
       const body = await readFile(filePath, "utf8");
-      expect(body).toContain("name: grounder-task-handoff");
+      expect(body).toContain("name: grounder-handoff");
       expect(body).toContain("disable-model-invocation: true");
       expect(body).toMatch(/^description: .+$/m);
     }

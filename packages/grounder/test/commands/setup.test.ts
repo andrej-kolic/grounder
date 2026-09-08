@@ -6,9 +6,9 @@ import {
   cursor,
   cursorHooksJsonPath,
   cursorPeekHookCommand,
+  grounderHandoffCommandPath,
   grounderNoteCommandPath,
   grounderPlanCommandPath,
-  grounderTaskHandoffCommandPath,
 } from "../../src/agents/cursor.js";
 import { runtimeCliPath, runtimeInvocation } from "../../src/agents/hook-runtime.js";
 import { runSetup, runSetupWithOptions } from "../../src/commands/setup.js";
@@ -65,7 +65,7 @@ describe("commands/setup", () => {
     expect(code).toBe(0);
     expect(out).toContain(`cursor  ${grounderNoteCommandPath(env.home)}`);
     expect(out).toContain(`cursor  ${grounderPlanCommandPath(env.home)}`);
-    expect(out).toContain(`cursor  ${grounderTaskHandoffCommandPath(env.home)}`);
+    expect(out).toContain(`cursor  ${grounderHandoffCommandPath(env.home)}`);
     expect(out).not.toContain("(Cursor artifacts)");
     expect(hasRow(out, "created", grounderNoteCommandPath(env.home))).toBe(true);
     expect(hasRow(out, "created", statePath(env.home))).toBe(true);
@@ -81,10 +81,10 @@ describe("commands/setup", () => {
     expect(await readFile(grounderPlanCommandPath(env.home), "utf8")).toContain(
       'required_permissions: ["all"]',
     );
-    expect(await readFile(grounderTaskHandoffCommandPath(env.home), "utf8")).toContain(
+    expect(await readFile(grounderHandoffCommandPath(env.home), "utf8")).toContain(
       `${cli} handoff`,
     );
-    expect(await readFile(grounderTaskHandoffCommandPath(env.home), "utf8")).toContain(
+    expect(await readFile(grounderHandoffCommandPath(env.home), "utf8")).toContain(
       'required_permissions: ["all"]',
     );
     expect(await readGrounderState(env.home)).toEqual({
@@ -110,7 +110,7 @@ describe("commands/setup", () => {
       agents: ["cursor"],
     });
     const noteBefore = await readFile(grounderNoteCommandPath(env.home), "utf8");
-    const handoffBefore = await readFile(grounderTaskHandoffCommandPath(env.home), "utf8");
+    const handoffBefore = await readFile(grounderHandoffCommandPath(env.home), "utf8");
 
     const { code, out } = await captureStdout(() =>
       runSetupWithOptions({
@@ -126,7 +126,7 @@ describe("commands/setup", () => {
     expect(hasRow(out, "unchanged", grounderNoteCommandPath(env.home))).toBe(true);
     expect(hasRow(out, "unchanged", statePath(env.home))).toBe(true);
     expect(await readFile(grounderNoteCommandPath(env.home), "utf8")).toBe(noteBefore);
-    expect(await readFile(grounderTaskHandoffCommandPath(env.home), "utf8")).toBe(handoffBefore);
+    expect(await readFile(grounderHandoffCommandPath(env.home), "utf8")).toBe(handoffBefore);
   });
 
   it("dry-run previews writes without creating home config, vault scaffold, or agent artifacts", async () => {

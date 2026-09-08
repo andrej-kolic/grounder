@@ -5,7 +5,7 @@ import {
   cursor,
   cursorHooksJsonPath,
   grounderNoteCommandPath,
-  grounderTaskCommandPath,
+  grounderRecallCommandPath,
 } from "../../src/agents/cursor.js";
 import { grounderRuntimeDir, runtimeCliPath, shellQuote } from "../../src/agents/hook-runtime.js";
 import { runDoctorWithOptions } from "../../src/commands/doctor.js";
@@ -240,7 +240,7 @@ describe("commands/doctor", () => {
       agents: ["cursor"],
     });
     await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
-    await rm(grounderTaskCommandPath(env.home));
+    await rm(grounderRecallCommandPath(env.home));
 
     const { code, out } = await captureStdout(() =>
       runDoctorWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -248,7 +248,7 @@ describe("commands/doctor", () => {
 
     expect(code).toBe(1);
     expect(out).toContain("fail  agent-cursor");
-    expect(out).toContain("grounder-task/SKILL.md");
+    expect(out).toContain("grounder-recall/SKILL.md");
     expect(out).toContain("grounder migrate (or --agent=cursor)");
     expect(out).toContain("ok    agent-cursor-hooks");
     expect(out).toContain("ok    hook-runtime");

@@ -78,12 +78,12 @@ one-line reminder at session start when a saved session exists — see
 
 ## Daily use
 
-Work from the agent's chat. A typical loop starts by resuming the last saved session and
+Work from the agent's chat. A typical loop starts by recalling the last saved session and
 ends by saving a short summary.
 
 Anything after the skill name is an instruction, not file content. The agent follows
-it — writes a plan, saves a note, or searches the vault. `/grounder-task` and
-`/grounder-task-handoff` don't need text at all.
+it — writes a plan, saves a note, or searches the vault. `/grounder-recall` and
+`/grounder-handoff` don't need text at all.
 
 ### Examples
 
@@ -91,18 +91,18 @@ A typical session:
 
 | You type | What it does |
 | -------- | ------------ |
-| `/grounder-task` | Resume the latest saved session |
+| `/grounder-recall` | Recall the latest saved session |
 | `/grounder-plan save insights from this session as an implementation plan with steps` | Write a named plan |
 | `/grounder-search decisions and discussions on token refresh` | Search the vault |
 | `/grounder-note explain why we rejected cookie sessions` | Save a new note |
-| `/grounder-task-handoff` | Save a short session summary |
+| `/grounder-handoff` | Save a short session summary |
 
-Later, update the living plan or resume a named session:
+Later, update the living plan or recall a named session:
 
 | You type | What it does |
 | -------- | ------------ |
 | `/grounder-plan update the auth rewrite plan — jwt validator is done` | Update an existing plan |
-| `/grounder-task resume the auth-middleware session` | Resume a specific saved session, not the latest |
+| `/grounder-recall the auth-middleware session` | Recall a specific saved session, not the latest |
 
 ### Demo
 
@@ -133,7 +133,7 @@ Three things, and that's the whole model:
 `10-Projects/` is a common Obsidian vault convention, so Grounder slots into an existing vault instead
 of fighting it. A **handoff** is a saved session summary — what got done, what's next,
 what's blocked — and they live under `logs/` because they accumulate one per session.
-`/grounder-task` resumes the latest saved session by default, or an earlier one by name.
+`/grounder-recall` recalls the latest saved session by default, or an earlier one by name.
 
 Here's the living plan, `plans/auth-rewrite.md`:
 
@@ -185,7 +185,7 @@ Full flags and behavior: **[CLI reference](https://github.com/andrej-kolic/groun
 
 Those are instructions written once: stable rules about the project. Grounder stores
 what accumulates: what happened last session, what's next, the plan currently in flight.
-They're complements — `/grounder-task` reads the latest saved session *and* `AGENTS.md`.
+They're complements — `/grounder-recall` reads the latest saved session *and* `AGENTS.md`.
 
 ### Is this an MCP server?
 
@@ -223,7 +223,7 @@ No. Nothing is written or loaded unless you ask. That's the point.
 ## Roadmap
 
 - **Support for Copilot, Codex, and other popular agents** — expand beyond Cursor and Claude Code so more agent tools can use the same vault memory.
-- **Auto-draft handoff on session end** (under consideration) — a hook that has the agent write the same structured Done/Next/Blockers checkpoint automatically, instead of requiring `/grounder-task-handoff`.
+- **Auto-draft handoff on session end** (under consideration) — a hook that has the agent write the same structured Done/Next/Blockers checkpoint automatically, instead of requiring `/grounder-handoff`.
 
 ## Development
 

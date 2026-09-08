@@ -121,7 +121,7 @@ title: "auth"
 
     expect(code).toBe(0);
     expect(out).toBe(
-      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n',
+      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n',
     );
   });
 
@@ -145,7 +145,7 @@ title: "auth"
 
     expect(code).toBe(0);
     expect(out).toBe(
-      '[grounder] Latest handoff: "fix auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n',
+      '[grounder] Latest handoff: "fix auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n',
     );
   });
 
@@ -179,7 +179,7 @@ old
 
     expect(code).toBe(0);
     expect(out).toBe(
-      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n',
+      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n',
     );
   });
 
@@ -210,7 +210,7 @@ title: phase-2-dogfood
 
     expect(code).toBe(0);
     expect(out).toBe(
-      '[grounder] Latest handoff: "phase-2-dogfood" (2026-07-22). Run /grounder-task to load it, or ignore if unrelated.\n',
+      '[grounder] Latest handoff: "phase-2-dogfood" (2026-07-22). Run /grounder-recall to load it, or ignore if unrelated.\n',
     );
   });
 
@@ -245,7 +245,7 @@ body
     const result = runCli(["handoff", "peek"], withGroundedHome(env.home), env.repo);
     expect(result.status).toBe(0);
     expect(result.stdout).toBe(
-      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n',
+      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n',
     );
   });
 
@@ -280,7 +280,7 @@ body
 
     expect(result.status).toBe(0);
     expect(result.stdout).toBe(
-      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n',
+      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n',
     );
   });
 
@@ -316,7 +316,7 @@ body
 
     expect(result.status).toBe(0);
     expect(result.stdout).toBe(
-      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n',
+      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n',
     );
   });
 
@@ -349,7 +349,7 @@ title: "auth"
     expect(out.endsWith("\n")).toBe(true);
     expect(JSON.parse(out)).toEqual({
       additional_context:
-        '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.',
+        '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.',
     });
   });
 
@@ -405,7 +405,7 @@ body
     expect(result.status).toBe(0);
     expect(JSON.parse(result.stdout)).toEqual({
       additional_context:
-        '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.',
+        '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.',
     });
   });
 
@@ -451,7 +451,7 @@ body
 
     expect(code).toBe(0);
     expect(out).toBe(
-      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n[grounder] Install outdated — run: grounder migrate.\n',
+      '[grounder] Latest handoff: "auth" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n[grounder] Install outdated — run: grounder migrate.\n',
     );
   });
 
@@ -545,7 +545,7 @@ body
 
     expect(code).toBe(0);
     expect(out).toBe(
-      '[grounder] Latest handoff: "auth fix for login" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n',
+      '[grounder] Latest handoff: "auth fix for login" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n',
     );
   });
 
@@ -578,7 +578,7 @@ body
     expect(code).toBe(0);
     const expectedLabel = `${"x".repeat(79)}…`;
     expect(out).toBe(
-      `[grounder] Latest handoff: "${expectedLabel}" (2026-06-26). Run /grounder-task to load it, or ignore if unrelated.\n`,
+      `[grounder] Latest handoff: "${expectedLabel}" (2026-06-26). Run /grounder-recall to load it, or ignore if unrelated.\n`,
     );
   });
 });

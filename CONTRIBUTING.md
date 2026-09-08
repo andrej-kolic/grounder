@@ -42,8 +42,8 @@ pnpm grounder link --yes
 pnpm grounder note "hello from dev fixture"
 ```
 
-Session loop in the agent: (optional teaser on session start) → `/grounder-task` → work →
-`/grounder-task-handoff`.
+Session loop in the agent: (optional teaser on session start) → `/grounder-recall` → work →
+`/grounder-handoff`.
 
 More commands and dogfooding tips: [fixtures/dev/README.md](fixtures/dev/README.md).
 

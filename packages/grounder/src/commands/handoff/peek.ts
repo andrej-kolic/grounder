@@ -167,7 +167,7 @@ export async function runHandoffPeek(argv: string[]): Promise<number> {
  * Resolves the linked project and prints a one-line teaser for the newest *usable*
  * handoff, or nothing. "Usable" (via {@link findUsableHandoff}) skips empty/unreadable
  * files and falls back to the next-newest — the same selection `grounder handoff list
- * --head` uses, so the teaser and `/grounder-task` never disagree about which handoff
+ * --head` uses, so the teaser and `/grounder-recall` never disagree about which handoff
  * is current.
  * Also checks `state.json` and may add a one-line "run grounder migrate" hint
  * for people who never run doctor.
@@ -188,7 +188,7 @@ export async function runHandoffPeekWithOptions(options: HandoffPeekOptions = {}
             const label = sanitizeLabel(fm.title?.trim() || labelFromHandoffFilename(usable.path));
             const createdDate = formatCreatedDate(fm.created, usable.path);
             if (createdDate) {
-              handoffLine = `[grounder] Latest handoff: "${label}" (${createdDate}). Run /grounder-task to load it, or ignore if unrelated.`;
+              handoffLine = `[grounder] Latest handoff: "${label}" (${createdDate}). Run /grounder-recall to load it, or ignore if unrelated.`;
             }
           }
         }
