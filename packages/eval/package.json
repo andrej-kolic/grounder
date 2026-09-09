@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "eval:search": "node eval-search.mjs",
-    "eval:mode-lock": "node eval-mode-lock.mjs"
+    "eval:mode-lock": "node eval-mode-lock.mjs",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"
