@@ -15,7 +15,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveSweep } from "./lib/models.mjs";
+import { mapWithConcurrency } from "./lib/concurrency.mjs";
+import { resolveConcurrency, resolveSweep } from "./lib/models.mjs";
+import { assertRuntimeCurrent } from "./lib/preflight.mjs";
 import { linksUnderHeading, renderTable } from "./lib/report.mjs";
 import { runProbe } from "./lib/run-agent.mjs";
 import { setupSearchSandbox } from "./lib/sandbox.mjs";
@@ -49,23 +51,24 @@ async function saveAuditTranscript(results) {
 }
 
 async function main() {
+  await assertRuntimeCurrent();
+
   const sweep = resolveSweep(process.argv);
+  const concurrency = resolveConcurrency(process.argv);
   const probes = await loadProbes();
   const { homeDir, repoDir, vaultDir } = await setupSearchSandbox();
 
-  const tasks = sweep.flatMap((modelEntry) =>
-    probes.map(async (probe) => {
-      const prompt = `/grounder-search ${probe.input}`;
-      const outcome = await runProbe(modelEntry, prompt, {
-        cwd: repoDir,
-        addDir: vaultDir,
-        env: { GROUNDER_HOME: homeDir },
-      });
-      return { model: modelEntry.label, probe: probe.id, ...outcome };
-    }),
-  );
+  const runs = sweep.flatMap((modelEntry) => probes.map((probe) => ({ modelEntry, probe })));
 
-  const results = await Promise.all(tasks);
+  const results = await mapWithConcurrency(runs, concurrency, async ({ modelEntry, probe }) => {
+    const prompt = `/grounder-search ${probe.input}`;
+    const outcome = await runProbe(modelEntry, prompt, {
+      cwd: repoDir,
+      addDir: vaultDir,
+      env: { GROUNDER_HOME: homeDir },
+    });
+    return { model: modelEntry.label, probe: probe.id, ...outcome };
+  });
   const transcriptPath = await saveAuditTranscript(results);
 
   const rows = [];

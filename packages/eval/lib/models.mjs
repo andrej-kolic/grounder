@@ -50,10 +50,25 @@ function parseCsvFlag(argv, flag) {
     .filter((s) => s.length > 0);
 }
 
+const DEFAULT_CONCURRENCY = 4;
+
+/** `--concurrency <n>` — how many probe runs may be in flight at once (default 4). */
+export function resolveConcurrency(argv) {
+  const index = argv.indexOf("--concurrency");
+  if (index === -1 || argv[index + 1] === undefined) {
+    return DEFAULT_CONCURRENCY;
+  }
+  const value = Number.parseInt(argv[index + 1], 10);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`--concurrency must be a positive integer, got "${argv[index + 1]}".`);
+  }
+  return value;
+}
+
 /**
  * `--models <name-or-label,...>` narrows by model name (crosses every host
  * that supports it, e.g. `sonnet` alone still means both hosts) or by exact
- * label (e.g. `"sonnet (cursor)"`, one host only). `--hosts <host,...>`
+ * label (e.g. `"sonnet (cursor-agent)"`, one host only). `--hosts <host,...>`
  * narrows by host, independently — combine both to pin an exact pair, e.g.
  * `--models sonnet --hosts cursor-agent`.
  */

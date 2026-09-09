@@ -22,6 +22,8 @@ pnpm eval:mode-lock
 
 Both commands are fully self-contained: set up a sandbox, run the full model sweep, grade the result, print a report, exit non-zero on any failure. No orchestrator skill/command file, no interactive session — see [Design note](#design-note) for why.
 
+**This grades your machine's installed Grounder runtime and skill files, not this checkout.** `{{GROUNDER_CLI}}` resolves to `~/.grounder/runtime/dist/cli.js`, and the skills a probe actually invokes live under `~/.cursor`/`~/.claude`. Both commands refuse to run (`grounder status --json` reports `installCurrent: false`, or the runtime is missing outright) until you run `grounder migrate` — otherwise a green sweep could just mean yesterday's install, not this branch's skill-prompt changes.
+
 ## How it works
 
 1. **Sandbox** (`lib/sandbox.mjs`) — writes a scratch `~/.grounder`-shaped config under your OS temp dir (`$TMPDIR/grounder-eval/`, **not** inside this repo — see below) pointing `GROUNDER_HOME` at a sandboxed vault, plus a `.grounder.json` project marker in a scratch repo dir. Search reuses the committed `fixtures/eval-vault/` (read-only); mode-lock wipes and recreates a fully disposable vault every run (handoff probes write to it for real) and seeds two handoffs (so both a bare load and a `#2` selector probe have something real to resolve).
@@ -42,6 +44,8 @@ Narrow the sweep two ways, independently:
 Combine both to pin an exact pair. Labels/names with spaces need quoting; the flag values themselves are comma-separated only (not whitespace).
 
 Full sweep stays mandatory before merge/release; a narrowed sweep is dev-loop only, never a substitute.
+
+`--concurrency <n>` caps how many `(host, model, probe)` runs are in flight at once (default 4). A full default sweep is up to 11 (host, model) pairs × up to 6 probes; running all of it at once would share one scratch cwd/vault across dozens of concurrent CLI processes and likely trip rate limits.
 
 ## Examples
 
