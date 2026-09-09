@@ -48,12 +48,26 @@ describe("templates/grounder-recall", () => {
       const body = await readFile(filePath, "utf8");
       expect(body).toContain("Mode lock — load only");
       expect(body).toContain("Never write to the vault");
-      expect(body).toContain("never run `{{GROUNDER_CLI}} handoff` (write)");
+      expect(body).toContain("never run the write form of `handoff`");
       expect(body).toContain(
         "ignore any sibling verb that shows up only in a leftover command-payload wrapper",
       );
       expect(body).toContain("do not guess an index");
+      // The redirect sentence is gated on the typed text actually asking for it —
+      // a bare invocation must never emit it (regression caught in PR #103 review).
+      expect(body).toContain(
+        "If the typed text does ask to save/handoff/checkpoint/continue in a new session, still do this command's job",
+      );
       expect(body).toContain("did not save — run `/grounder-handoff`");
+    }
+  });
+
+  it("does not ban handoff list, only the write form", async () => {
+    for (const filePath of recallTemplates) {
+      const body = await readFile(filePath, "utf8");
+      expect(body).toContain(
+        "The read-only `handoff list` lookups in the steps below stay required",
+      );
     }
   });
 
@@ -64,6 +78,15 @@ describe("templates/grounder-recall", () => {
         "then stop and wait for the user's go-ahead — do not start acting on `## Next` or anything else unless the user explicitly says so in this session",
       );
       expect(body).not.toContain("then start work");
+    }
+  });
+
+  it("stops and waits on the empty-handoff branch too, not just after a summary", async () => {
+    for (const filePath of recallTemplates) {
+      const body = await readFile(filePath, "utf8");
+      expect(body).toContain(
+        "then read repo `AGENTS.md` only, then stop and wait for the user's go-ahead — same as step 5, do not start work unattended",
+      );
     }
   });
 });
