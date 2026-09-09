@@ -81,11 +81,13 @@ function extractFromClaudeEvents(events) {
  * Same, from `cursor-agent`'s stream-json events (different tool-call shape).
  * Also collects each shell call's reported `workingDirectory` (the ground
  * truth for whether this probe actually stayed inside the sandbox, see
- * `runProbe`'s escape check) and every non-shell file write (`editToolCall`).
+ * `runProbe`'s escape check) and every non-shell file mutation — writes
+ * (`editToolCall`) and deletes (`deleteToolCall`), confirmed as the two
+ * distinct event shapes by driving a real `cursor-agent -p` call for each.
  * Unlike `claude`, `cursor-agent` has no per-tool allowlist flag — a probe
- * could write a vault file via its Write/Edit tool instead of Bash and never
- * show up in `commands`, so callers that must never write (recall probes)
- * need this list too.
+ * could mutate a vault file via its Write/Edit/Delete tools instead of Bash
+ * and never show up in `commands`, so callers that must never write (recall
+ * probes) need this list too.
  */
 function extractFromCursorAgentEvents(events) {
   const commands = [];
@@ -107,6 +109,10 @@ function extractFromCursorAgentEvents(events) {
       const editPath = event.tool_call?.editToolCall?.args?.path;
       if (typeof editPath === "string") {
         writes.push(editPath);
+      }
+      const deletePath = event.tool_call?.deleteToolCall?.args?.path;
+      if (typeof deletePath === "string") {
+        writes.push(deletePath);
       }
     } else if (event.type === "result" && typeof event.result === "string") {
       finalText = event.result;
@@ -135,8 +141,9 @@ function findEscapedWorkingDir(workingDirs, cwd) {
  * @param options.cwd - scratch project dir (must hold the sandboxed `.grounder.json`).
  * @param options.addDir - sandboxed vault dir to grant Read access to.
  * @param options.env - extra env vars for the child process (`GROUNDER_HOME`).
- * @returns `{ finalText, commands }` on success, or `{ error }` on CLI failure
- *   or sandbox escape.
+ * @returns `{ finalText, commands }` on success (`cursor-agent` runs also
+ *   include `workingDirs` and `writes`), or `{ error }` on CLI failure or
+ *   sandbox escape.
  */
 export async function runProbe(modelEntry, prompt, { cwd, addDir, env }) {
   const { host, model } = modelEntry;
