@@ -43,4 +43,51 @@ describe("templates/grounder-handoff", () => {
     const body = await readFile(cursorHandoffTemplate, "utf8");
     expect(body).toContain('required_permissions: ["all"]');
   });
+
+  it("mode-locks to write only, ignoring stray resume/hydrate wording", async () => {
+    for (const filePath of handoffTemplates) {
+      const body = await readFile(filePath, "utf8");
+      expect(body).toContain("Mode lock — write only");
+      expect(body).toContain("Never hydrate or start work");
+      expect(body).toContain("always write a **new** file");
+      expect(body).toContain(
+        "The plain write form of `handoff` (a body argument, no `list`) stays required",
+      );
+      expect(body).toContain(
+        "ignore any sibling verb that shows up only in a leftover command-payload wrapper",
+      );
+      // The redirect sentence is gated on the typed text actually asking for it —
+      // a bare invocation must never emit it (regression caught in PR #103 review).
+      expect(body).toContain(
+        "If the typed text does ask to resume/load/hydrate/`/grounder-recall`, still do this command's job",
+      );
+      expect(body).toContain("saved — run `/grounder-recall` in a new chat to resume");
+    }
+  });
+
+  it("instructs linking the driving plan/ticket in Files", async () => {
+    for (const filePath of handoffTemplates) {
+      const body = await readFile(filePath, "utf8");
+      expect(body).toContain(
+        "If a vault plan (`grounder plan`) or ticket drove the session, list it first in `## Files`",
+      );
+      expect(body).toContain("path/to/plan.md (Status section updated)");
+    }
+  });
+
+  it("shows the plan/ticket line in the fenced body agents actually fill in, not just in Rules prose", async () => {
+    for (const filePath of handoffTemplates) {
+      const body = await readFile(filePath, "utf8");
+      const fenceMatch = body.match(/```markdown\n([\s\S]*?)\n```/);
+      expect(fenceMatch, "expected a fenced markdown body example").toBeTruthy();
+      const fence = fenceMatch?.[1];
+      expect(fence).toContain("path/to/plan.md (Status section updated)");
+    }
+  });
+
+  it("keeps the vault session-handoff reference in sync with the plan/ticket convention", async () => {
+    const referencePath = path.join(templatesRoot, "../vault/session-handoff.md");
+    const body = await readFile(referencePath, "utf8");
+    expect(body).toContain("path/to/plan.md (Status section updated)");
+  });
 });
