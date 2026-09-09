@@ -13,7 +13,7 @@ importers:
         version: 2.5.4
       rulesync:
         specifier: 16.24.1
-        version: 16.24.1(@types/node@26.0.1)(ajv-formats@3.0.1(ajv@8.20.0))(ajv@8.20.0)(jose@6.2.12)(openapi-types@12.1.3)(valibot@1.4.2(typescript@6.0.3))
+        version: 16.24.1(@types/node@26.0.1)(ajv-formats@3.0.1(ajv@8.20.0))(ajv@8.20.0)(jose@6.2.12)(openapi-types@12.1.3)(supports-color@8.1.1)(valibot@1.4.2(typescript@6.0.3))
 
   fixtures/dev:
     dependencies:
@@ -23,7 +23,11 @@ importers:
 
   packages/demo-casts: {}
 
-  packages/e2e: {}
+  packages/e2e:
+    devDependencies:
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.1)(vite@8.1.0(@types/node@26.0.1))
 
   packages/grounder:
     devDependencies:
@@ -53,7 +57,7 @@ importers:
         version: 0.0.15
       '@vscode/test-electron':
         specifier: ^3.1.0
-        version: 3.1.0
+        version: 3.1.0(supports-color@8.1.1)
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -2231,8 +2235,8 @@ snapshots:
       cross-spawn: 7.0.6
       eventsource: 3.0.7
       eventsource-parser: 3.1.1
-      express: 5.2.1
-      express-rate-limit: 8.7.0(express@5.2.1)
+      express: 5.2.1(supports-color@8.1.1)
+      express-rate-limit: 8.7.0(express@5.2.1(supports-color@8.1.1))
       hono: 4.13.7
       jose: 6.2.12
       json-schema-typed: 8.0.2
@@ -2398,7 +2402,7 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@tokenizer/inflate@0.4.1':
+  '@tokenizer/inflate@0.4.1(supports-color@8.1.1)':
     dependencies:
       debug: 4.4.3(supports-color@8.1.1)
       token-types: 6.1.2
@@ -2494,10 +2498,10 @@ snapshots:
     transitivePeerDependencies:
       - monocart-coverage-reports
 
-  '@vscode/test-electron@3.1.0':
+  '@vscode/test-electron@3.1.0(supports-color@8.1.1)':
     dependencies:
-      http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6
+      http-proxy-agent: 7.0.2(supports-color@8.1.1)
+      https-proxy-agent: 7.0.6(supports-color@8.1.1)
       jszip: 3.10.1
       ora: 8.2.0
       semver: 7.8.5
@@ -2514,7 +2518,7 @@ snapshots:
       mime-types: 3.0.2
       negotiator: 1.1.0
 
-  agent-base@6.0.2:
+  agent-base@6.0.2(supports-color@8.1.1):
     dependencies:
       debug: 4.4.3(supports-color@8.1.1)
     transitivePeerDependencies:
@@ -2557,11 +2561,11 @@ snapshots:
 
   asynckit@0.4.0: {}
 
-  axios@1.20.0(debug@4.4.3):
+  axios@1.20.0(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1):
     dependencies:
-      follow-redirects: 1.16.0(debug@4.4.3)
+      follow-redirects: 1.16.0(debug@4.4.3(supports-color@8.1.1))
       form-data: 4.0.6
-      https-proxy-agent: 5.0.1
+      https-proxy-agent: 5.0.1(supports-color@8.1.1)
       proxy-from-env: 2.1.0
     transitivePeerDependencies:
       - debug
@@ -2573,7 +2577,7 @@ snapshots:
 
   before-after-hook@4.0.0: {}
 
-  body-parser@2.3.0:
+  body-parser@2.3.0(supports-color@8.1.1):
     dependencies:
       bytes: 3.1.2
       content-type: 2.1.0
@@ -2826,18 +2830,18 @@ snapshots:
 
   expect-type@1.4.0: {}
 
-  express-rate-limit@8.7.0(express@5.2.1):
+  express-rate-limit@8.7.0(express@5.2.1(supports-color@8.1.1)):
     dependencies:
       debug: 4.4.3(supports-color@8.1.1)
-      express: 5.2.1
+      express: 5.2.1(supports-color@8.1.1)
       ip-address: 10.7.0
     transitivePeerDependencies:
       - supports-color
 
-  express@5.2.1:
+  express@5.2.1(supports-color@8.1.1):
     dependencies:
       accepts: 2.0.0
-      body-parser: 2.3.0
+      body-parser: 2.3.0(supports-color@8.1.1)
       content-disposition: 1.1.0
       content-type: 1.0.5
       cookie: 0.7.2
@@ -2847,7 +2851,7 @@ snapshots:
       encodeurl: 2.0.0
       escape-html: 1.0.3
       etag: 1.8.1
-      finalhandler: 2.1.1
+      finalhandler: 2.1.1(supports-color@8.1.1)
       fresh: 2.0.0
       http-errors: 2.0.1
       merge-descriptors: 2.0.0
@@ -2858,8 +2862,8 @@ snapshots:
       proxy-addr: 2.0.7
       qs: 6.16.0
       range-parser: 1.3.0
-      router: 2.2.0
-      send: 1.2.1
+      router: 2.2.0(supports-color@8.1.1)
+      send: 1.2.1(supports-color@8.1.1)
       serve-static: 2.2.1
       statuses: 2.0.2
       type-is: 2.1.0
@@ -2897,16 +2901,16 @@ snapshots:
     dependencies:
       fast-string-width: 3.0.2
 
-  fastmcp@4.20.0(@valibot/to-json-schema@1.7.1(valibot@1.4.2(typescript@6.0.3)))(ajv-formats@3.0.1(ajv@8.20.0))(ajv@8.20.0)(effect@3.22.1)(jose@6.2.12)(openapi-types@12.1.3)(sury@10.0.4):
+  fastmcp@4.20.0(@valibot/to-json-schema@1.7.1(valibot@1.4.2(typescript@6.0.3)))(ajv-formats@3.0.1(ajv@8.20.0))(ajv@8.20.0)(effect@3.22.1)(jose@6.2.12)(openapi-types@12.1.3)(supports-color@8.1.1)(sury@10.0.4):
     dependencies:
       '@apidevtools/swagger-parser': 12.1.0(openapi-types@12.1.3)
       '@modelcontextprotocol/sdk': 1.30.0(zod@4.5.4)
       '@standard-schema/spec': 1.1.0
       execa: 9.6.1
-      file-type: 21.3.4
+      file-type: 21.3.4(supports-color@8.1.1)
       fuse.js: 7.5.0
       hono: 4.13.7
-      mcp-proxy: 6.7.14
+      mcp-proxy: 6.7.14(supports-color@8.1.1)
       strict-event-emitter-types: 2.0.0
       uri-templates: 0.2.0
       xsschema: 0.4.4(@valibot/to-json-schema@1.7.1(valibot@1.4.2(typescript@6.0.3)))(effect@3.22.1)(sury@10.0.4)(zod-to-json-schema@3.25.2(zod@4.5.4))(zod@4.5.4)
@@ -2938,9 +2942,9 @@ snapshots:
     dependencies:
       is-unicode-supported: 2.1.0
 
-  file-type@21.3.4:
+  file-type@21.3.4(supports-color@8.1.1):
     dependencies:
-      '@tokenizer/inflate': 0.4.1
+      '@tokenizer/inflate': 0.4.1(supports-color@8.1.1)
       strtok3: 10.3.5
       token-types: 6.1.2
       uint8array-extras: 1.5.0
@@ -2951,7 +2955,7 @@ snapshots:
     dependencies:
       to-regex-range: 5.0.1
 
-  finalhandler@2.1.1:
+  finalhandler@2.1.1(supports-color@8.1.1):
     dependencies:
       debug: 4.4.3(supports-color@8.1.1)
       encodeurl: 2.0.0
@@ -2969,7 +2973,7 @@ snapshots:
 
   flat@5.0.2: {}
 
-  follow-redirects@1.16.0(debug@4.4.3):
+  follow-redirects@1.16.0(debug@4.4.3(supports-color@8.1.1)):
     optionalDependencies:
       debug: 4.4.3(supports-color@8.1.1)
 
@@ -3105,21 +3109,21 @@ snapshots:
       statuses: 2.0.2
       toidentifier: 1.0.1
 
-  http-proxy-agent@7.0.2:
+  http-proxy-agent@7.0.2(supports-color@8.1.1):
     dependencies:
       agent-base: 7.1.4
       debug: 4.4.3(supports-color@8.1.1)
     transitivePeerDependencies:
       - supports-color
 
-  https-proxy-agent@5.0.1:
+  https-proxy-agent@5.0.1(supports-color@8.1.1):
     dependencies:
-      agent-base: 6.0.2
+      agent-base: 6.0.2(supports-color@8.1.1)
       debug: 4.4.3(supports-color@8.1.1)
     transitivePeerDependencies:
       - supports-color
 
-  https-proxy-agent@7.0.6:
+  https-proxy-agent@7.0.6(supports-color@8.1.1):
     dependencies:
       agent-base: 7.1.4
       debug: 4.4.3(supports-color@8.1.1)
@@ -3243,7 +3247,7 @@ snapshots:
 
   koa-compose@4.1.0: {}
 
-  koa-router@14.0.0:
+  koa-router@14.0.0(supports-color@8.1.1):
     dependencies:
       debug: 4.4.3(supports-color@8.1.1)
       http-errors: 2.0.1
@@ -3354,11 +3358,11 @@ snapshots:
 
   math-intrinsics@1.1.0: {}
 
-  mcp-proxy@6.7.14:
+  mcp-proxy@6.7.14(supports-color@8.1.1):
     dependencies:
       '@modelcontextprotocol/client': 2.0.0
       '@modelcontextprotocol/server': 2.0.0
-      pipenet: 1.4.2
+      pipenet: 1.4.2(supports-color@8.1.1)
     transitivePeerDependencies:
       - supports-color
 
@@ -3514,13 +3518,13 @@ snapshots:
 
   picomatch@4.0.4: {}
 
-  pipenet@1.4.2:
+  pipenet@1.4.2(supports-color@8.1.1):
     dependencies:
-      axios: 1.20.0(debug@4.4.3)
+      axios: 1.20.0(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
       debug: 4.4.3(supports-color@8.1.1)
       human-readable-ids: 1.0.4
       koa: 3.2.1
-      koa-router: 14.0.0
+      koa-router: 14.0.0(supports-color@8.1.1)
       pump: 3.0.4
       tldjs: 2.3.2
       yargs: 18.1.0
@@ -3623,7 +3627,7 @@ snapshots:
       '@rolldown/binding-win32-arm64-msvc': 1.1.3
       '@rolldown/binding-win32-x64-msvc': 1.1.3
 
-  router@2.2.0:
+  router@2.2.0(supports-color@8.1.1):
     dependencies:
       debug: 4.4.3(supports-color@8.1.1)
       depd: 2.0.0
@@ -3633,7 +3637,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  rulesync@16.24.1(@types/node@26.0.1)(ajv-formats@3.0.1(ajv@8.20.0))(ajv@8.20.0)(jose@6.2.12)(openapi-types@12.1.3)(valibot@1.4.2(typescript@6.0.3)):
+  rulesync@16.24.1(@types/node@26.0.1)(ajv-formats@3.0.1(ajv@8.20.0))(ajv@8.20.0)(jose@6.2.12)(openapi-types@12.1.3)(supports-color@8.1.1)(valibot@1.4.2(typescript@6.0.3)):
     dependencies:
       '@inquirer/checkbox': 5.2.4(@types/node@26.0.1)
       '@modelcontextprotocol/sdk': 1.30.0(zod@4.5.4)
@@ -3644,7 +3648,7 @@ snapshots:
       commander: 15.0.0
       effect: 3.22.1
       es-toolkit: 1.52.0
-      fastmcp: 4.20.0(@valibot/to-json-schema@1.7.1(valibot@1.4.2(typescript@6.0.3)))(ajv-formats@3.0.1(ajv@8.20.0))(ajv@8.20.0)(effect@3.22.1)(jose@6.2.12)(openapi-types@12.1.3)(sury@10.0.4)
+      fastmcp: 4.20.0(@valibot/to-json-schema@1.7.1(valibot@1.4.2(typescript@6.0.3)))(ajv-formats@3.0.1(ajv@8.20.0))(ajv@8.20.0)(effect@3.22.1)(jose@6.2.12)(openapi-types@12.1.3)(supports-color@8.1.1)(sury@10.0.4)
       globby: 16.2.4
       gray-matter: 4.0.3
       js-yaml: 5.4.1
@@ -3682,7 +3686,7 @@ snapshots:
 
   semver@7.8.5: {}
 
-  send@1.2.1:
+  send@1.2.1(supports-color@8.1.1):
     dependencies:
       debug: 4.4.3(supports-color@8.1.1)
       encodeurl: 2.0.0
@@ -3707,7 +3711,7 @@ snapshots:
       encodeurl: 2.0.0
       escape-html: 1.0.3
       parseurl: 1.3.3
-      send: 1.2.1
+      send: 1.2.1(supports-color@8.1.1)
     transitivePeerDependencies:
       - supports-color
 
