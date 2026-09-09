@@ -87,6 +87,19 @@ export function resolveSweep(argv) {
     }
   }
 
+  if (wantedModels) {
+    const knownNames = new Set(DEFAULT_SWEEP.map((e) => e.name));
+    const knownLabels = new Set(DEFAULT_SWEEP.map((e) => e.label));
+    // Validate every token, not just whether the overall filter ends up
+    // non-empty — "sonnet,nope" would otherwise silently run just sonnet.
+    const unknown = wantedModels.filter((m) => !knownNames.has(m) && !knownLabels.has(m));
+    if (unknown.length > 0) {
+      throw new Error(
+        `Unknown --models value(s): ${unknown.join(", ")}. Known model names: ${[...knownNames].join(", ")}.`,
+      );
+    }
+  }
+
   let sweep = DEFAULT_SWEEP;
   if (wantedModels) {
     sweep = sweep.filter((e) => wantedModels.includes(e.name) || wantedModels.includes(e.label));

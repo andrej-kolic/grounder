@@ -1,6 +1,6 @@
 # @grounder/eval
 
-Live-agent eval harness for Grounder skill prompts (ticket #102). Kept as its own workspace package, same as `packages/e2e` — not part of root `pnpm test`/`check`, never installed to end users.
+Live-agent eval harness for Grounder skill prompts (ticket #102). Kept as its own workspace package, same as `packages/e2e` — never installed to end users. The live sweeps (`pnpm eval:search`/`eval:mode-lock`) are real API calls and are not part of root `pnpm test`/`check`; this package's own fast unit tests (`test/`) are, like any workspace package's.
 
 ## Glossary
 

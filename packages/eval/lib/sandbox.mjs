@@ -88,18 +88,20 @@ export async function setupSearchSandbox() {
 }
 
 /**
- * Sandbox for mode-lock probes: a disposable vault (handoff probes write to
- * it for real), seeded with two handoffs so recall probes have something to
- * load — including a `#2` selector. `writeUniqueMarkdown` never collides, so
- * parallel writes from
- * multiple models *within* one run are safe — but the vault itself is wiped
- * at the start of every run, so results from a previous run (more handoffs,
- * different titles) never bleed into this one.
+ * Sandbox for one mode-lock probe run: a disposable vault (handoff probes
+ * write to it for real), seeded with two handoffs so recall probes have
+ * something to load — including a `#2` selector. `key` must be unique per
+ * (model, probe) run: `writeUniqueMarkdown` never collides on filenames, but
+ * listing order is newest-first, so two concurrent runs sharing one vault
+ * could still change which file is "#2" for a sibling's selector probe out
+ * from under it. A fresh, uniquely-keyed vault every call removes that
+ * entirely, rather than just avoiding file corruption.
  */
-export async function setupModeLockSandbox() {
-  const homeDir = path.join(SCRATCH_ROOT, "mode-lock-home");
-  const repoDir = path.join(SCRATCH_ROOT, "mode-lock-repo");
-  const vaultDir = path.join(SCRATCH_ROOT, "mode-lock-vault");
+export async function setupModeLockSandbox(key) {
+  const base = path.join(SCRATCH_ROOT, "mode-lock", key);
+  const homeDir = path.join(base, "home");
+  const repoDir = path.join(base, "repo");
+  const vaultDir = path.join(base, "vault");
 
   await rm(vaultDir, { recursive: true, force: true });
   await rm(repoDir, { recursive: true, force: true });

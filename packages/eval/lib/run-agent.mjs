@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { sandboxEnv } from "./sandbox.mjs";
 
 const TIMEOUT_MS = 5 * 60 * 1000;
@@ -114,11 +115,29 @@ function extractFromCursorAgentEvents(events) {
       if (typeof deletePath === "string") {
         writes.push(deletePath);
       }
+      // Not observed on the currently installed cursor-agent build — a live
+      // create-a-new-file probe there goes through editToolCall too, and
+      // grepping the installed binary for tool-call field names turns up no
+      // `writeToolCall` — but the name is plausible for a future build, and
+      // tracking it costs nothing.
+      const writePath = event.tool_call?.writeToolCall?.args?.path;
+      if (typeof writePath === "string") {
+        writes.push(writePath);
+      }
     } else if (event.type === "result" && typeof event.result === "string") {
       finalText = event.result;
     }
   }
   return { commands, finalText, workingDirs, writes };
+}
+
+/** `realpath`, falling back to the input unresolved if the path doesn't exist (or isn't readable). */
+function tryRealpath(p) {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
 }
 
 /**
@@ -127,9 +146,18 @@ function extractFromCursorAgentEvents(events) {
  * vault instead of the sandboxed one, with no explicit `cd` and no error —
  * only the resulting file paths gave it away. This check makes that failure
  * loud (an `error` result) instead of a silently-wrong grade.
+ *
+ * Compares `realpath`s, not raw strings: `cwd` is built from `os.tmpdir()`,
+ * which on macOS is `/var/folders/...` — a symlink to `/private/var/folders/...`.
+ * If `cursor-agent` reports the resolved form, a plain string comparison
+ * would flag every legitimate in-sandbox call as an escape.
  */
 function findEscapedWorkingDir(workingDirs, cwd) {
-  return workingDirs.find((dir) => dir !== cwd && !dir.startsWith(`${cwd}/`));
+  const realCwd = tryRealpath(cwd);
+  return workingDirs.find((dir) => {
+    const realDir = tryRealpath(dir);
+    return realDir !== realCwd && !realDir.startsWith(`${realCwd}/`);
+  });
 }
 
 /**

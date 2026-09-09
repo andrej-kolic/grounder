@@ -6,7 +6,7 @@ Grounder is a Node CLI (`packages/grounder`) that links project folders to perso
 
 - `packages/grounder/` — publishable package; all implementation lives here
 - `packages/e2e/` — real-CLI smoke tests (`pnpm e2e`), a separate vitest suite/config from `packages/grounder/test/` (spawns the built CLI, kept out of `pnpm test`/`check`)
-- `packages/eval/` — live-agent skill eval harness (`pnpm eval:search`, `pnpm eval:mode-lock`), maintainer-only, kept out of `pnpm test`/`check`
+- `packages/eval/` — live-agent skill eval harness (`pnpm eval:search`, `pnpm eval:mode-lock`), maintainer-only; those two live sweeps are kept out of `pnpm test`/`check` (real API cost), but its own fast unit tests (`packages/eval/test/`) run under `pnpm test`/`check` like any workspace package
 - `skills/grounder-setup/` — skills.sh meta-skill (CLI driver; not in the npm tarball)
 - `fixtures/minimal-git-repo/` — stable test fixture (automated tests)
 - `fixtures/dev/` — local CLI sandbox (`pnpm fixture:setup`)

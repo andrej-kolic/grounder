@@ -58,17 +58,27 @@ async function saveAuditTranscript(results) {
   return filePath;
 }
 
+/** Filesystem-safe key identifying one (model, probe) run, for its own scratch sandbox. */
+function sandboxKey(modelEntry, probe) {
+  return `${modelEntry.label}-${probe.id}`.replace(/[^a-zA-Z0-9._-]+/g, "-");
+}
+
 async function main() {
   await assertRuntimeCurrent();
 
   const sweep = resolveSweep(process.argv);
   const concurrency = resolveConcurrency(process.argv);
   const probes = await loadProbes();
-  const { homeDir, repoDir, vaultDir } = await setupModeLockSandbox();
 
   const runs = sweep.flatMap((modelEntry) => probes.map((probe) => ({ modelEntry, probe })));
 
   const results = await mapWithConcurrency(runs, concurrency, async ({ modelEntry, probe }) => {
+    // Each (model, probe) run gets its own sandbox — otherwise every
+    // concurrent run shares one vault, and a sibling's handoff write can
+    // change which file is "#2" for the selector probe out from under it.
+    const { homeDir, repoDir, vaultDir } = await setupModeLockSandbox(
+      sandboxKey(modelEntry, probe),
+    );
     const prompt = probe.input ? `/${probe.skill} ${probe.input}` : `/${probe.skill}`;
     const outcome = await runProbe(modelEntry, prompt, {
       cwd: repoDir,
@@ -118,6 +128,25 @@ async function main() {
           hasNotice ? "PASS" : "FAIL",
         ]);
         if (!hasNotice) {
+          failures++;
+        }
+      }
+
+      // "Never crossed the boundary" also passes on a model that did nothing
+      // at all. requiredCommandPattern (set on the control probes) asserts
+      // the model actually did its one job — loaded, or wrote — not just
+      // that it avoided the other skill's job.
+      if (probe.requiredCommandPattern) {
+        const required = new RegExp(probe.requiredCommandPattern);
+        const didJob = (result.commands ?? []).some((cmd) => required.test(cmd));
+        rows.push([
+          modelEntry.label,
+          probe.id,
+          "did job",
+          didJob ? "ran" : "no-op",
+          didJob ? "PASS" : "FAIL",
+        ]);
+        if (!didJob) {
           failures++;
         }
       }
