@@ -1,31 +1,31 @@
 # `@grounder/e2e`
 
-Private workspace package of manual end-to-end smoke scripts for the `grounder` CLI. Unlike `packages/grounder/test/` (vitest, calls the internal functions in-process), each `scripts/e2e-*.mjs` spawns the real built `dist/cli.js` against an isolated `GROUNDER_HOME`/vault temp dir — so it also catches wiring bugs the in-process suite can't (flag parsing, env resolution, real file I/O, actual exit codes).
+Private workspace package of real end-to-end smoke tests for the `grounder` CLI. Unlike `packages/grounder/test/` (vitest, calls the internal functions in-process), each `test/*.test.mjs` here spawns the real built `dist/cli.js` against an isolated `GROUNDER_HOME`/vault temp dir — so it also catches wiring bugs the in-process suite can't (flag parsing, env resolution, real file I/O, actual exit codes). It's vitest too, just its own package with its own config — kept out of `pnpm test`/`pnpm check` (see [Usage](#usage)) because these spawn real CLI processes and are slower.
 
 **Not published to npm.**
 
 ## Usage
 
 ```bash
-pnpm build               # from repo root — these scripts run the built CLI, not src/
-pnpm e2e                 # runs every scripts/e2e-*.mjs in this package
+pnpm build               # from repo root — these tests run the built CLI, not src/
+pnpm e2e                 # runs every test/*.test.mjs in this package
 pnpm --filter @grounder/e2e e2e   # same, explicit
-node packages/e2e/scripts/e2e-ledger-migration.mjs   # run just one
+pnpm --filter @grounder/e2e exec vitest run test/ledger-migration.test.mjs   # run just one file
 ```
 
 ## Layout
 
 ```text
-scripts/
-  run-e2e.mjs                  # discovers and runs every e2e-*.mjs in this dir
-  lib.mjs                      # shared harness (CLI resolution, checks, PASS/FAIL/cleanup) — not a script itself
-  e2e-ledger-migration.mjs     # v0.5.0 → current ledgerSchema upgrade, on a real migrate
-  e2e-no-hooks.mjs             # session-hook fragment install / --no-hooks sticky opt-out
-  e2e-legacy-retirement.mjs    # pre-skill command file tombstone retirement + --force
-  e2e-drift-conflict.mjs       # hand-edited skill file conflict detection + --force
-  e2e-copy-mode.mjs            # ~/.grounder/runtime copy mode (forced npx-cache-shaped source)
+test/
+  helpers.mjs                  # shared harness (CLI resolution, temp-dir cleanup) — not itself a test file
+  ledger-migration.test.mjs    # v0.5.0 → current ledgerSchema upgrade, on a real migrate
+  no-hooks.test.mjs            # session-hook fragment install / --no-hooks sticky opt-out
+  legacy-retirement.test.mjs   # pre-skill command file tombstone retirement + --force
+  drift-conflict.test.mjs      # hand-edited skill file conflict detection + --force
+  copy-mode.test.mjs           # ~/.grounder/runtime copy mode (forced npx-cache-shaped source)
+vitest.config.mjs              # this package's own config — separate from packages/grounder/vitest.config.ts
 ```
 
-## Adding a new script
+## Adding a new test
 
-Drop a new `scripts/e2e-<name>.mjs` — `run-e2e.mjs` auto-discovers it (glob on the `e2e-*.mjs` filename), no wiring needed elsewhere (`lib.mjs` is exempt from the glob, so shared helpers can live there without being run as a script). Each script is self-contained: build its own isolated temp `GROUNDER_HOME`/vault, spawn the CLI via `execFileSync`, print `PASS`/`FAIL` per check, clean up on success (leaves the temp dirs for inspection on failure), and exit non-zero on any failed check.
+Drop a new `test/<name>.test.mjs` — vitest auto-discovers it via `vitest.config.mjs`'s `include` glob, no wiring needed elsewhere. Each test is self-contained: call `useE2eHarness(prefix)` from `helpers.mjs` for an isolated temp `GROUNDER_HOME`/vault, a `section()`/`log()` output buffer, and a `createCliRunner()` factory. Assert with `expect.soft(...)` so one failed check doesn't hide the rest of the test. On a pass, nothing prints and the temp dirs are cleaned up; on a failure, the buffered `section()`/CLI output (real stdout+stderr) is flushed and the temp dirs are left on disk for inspection (path printed).

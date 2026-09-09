@@ -5,7 +5,7 @@ Grounder is a Node CLI (`packages/grounder`) that links project folders to perso
 ## Layout
 
 - `packages/grounder/` — publishable package; all implementation lives here
-- `packages/e2e/` — real-CLI smoke scripts (`pnpm e2e`), not the vitest suite in `packages/grounder/test/`
+- `packages/e2e/` — real-CLI smoke tests (`pnpm e2e`), a separate vitest suite/config from `packages/grounder/test/` (spawns the built CLI, kept out of `pnpm test`/`check`)
 - `skills/grounder-setup/` — skills.sh meta-skill (CLI driver; not in the npm tarball)
 - `fixtures/minimal-git-repo/` — stable test fixture (automated tests)
 - `fixtures/dev/` — local CLI sandbox (`pnpm fixture:setup`)
@@ -123,7 +123,7 @@ pnpm test             # unit + CLI smoke tests
 pnpm check            # build + typecheck + lint + test (CI / local one-shot)
 pnpm grounder --version
 pnpm fixture:setup    # print dev fixture next steps
-pnpm e2e              # real-CLI smoke scripts (packages/e2e/), not part of `check`
+pnpm e2e              # real-CLI smoke tests (packages/e2e/), not part of `check`
 ```
 
 Root scripts are the quality contract — CI and agents should call these entrypoints, not ad-hoc tool invocations. Keep dependencies minimal.
