@@ -1,0 +1,14 @@
+[
+  {
+    "id": "architecture-topic",
+    "input": "find notes about the system architecture and how components are split up",
+    "expectedTopRelativePaths": ["notes/architecture-overview.md"],
+    "description": "Clear topic match should outrank an unrelated note (coffee brewing)."
+  },
+  {
+    "id": "retry-policy-topic",
+    "input": "look up the plan for retrying failed background jobs",
+    "expectedTopRelativePaths": ["plans/retry-policy-design.md"],
+    "description": "Named plan doc should outrank an unrelated plan (settings redesign)."
+  }
+]

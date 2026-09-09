@@ -13,6 +13,8 @@
     "grounder": "node packages/grounder/dist/cli.js",
     "fixture:setup": "node scripts/fixture-setup.mjs",
     "e2e": "pnpm build && pnpm --filter @grounder/e2e e2e",
+    "eval:search": "pnpm --filter @grounder/eval eval:search",
+    "eval:mode-lock": "pnpm --filter @grounder/eval eval:mode-lock",
     "rules:fetch": "rulesync fetch andrej-kolic/playbook -f rules -t rulesync -p .rulesync",
     "rules:generate": "rulesync generate -f rules -t claudecode,cursor",
     "rules:install": "pnpm run rules:fetch && pnpm run rules:generate"
