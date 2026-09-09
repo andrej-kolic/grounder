@@ -4,7 +4,8 @@
  * Live-agent eval for the `/grounder-search` skill prompt (ticket #102).
  *
  * Spawns one headless agent CLI call per (model, probe) against a sandboxed,
- * seeded fixture vault (`fixtures/eval-vault`) — a real slash-command turn,
+ * disposable copy of the seeded fixture vault (`fixtures/eval-vault`) — a
+ * real slash-command turn,
  * not a direct CLI invocation, since the thing under test is whether a model
  * follows the skill prompt, not whether the CLI ranks correctly (that's
  * already covered by packages/grounder/test/vault/search.test.ts).

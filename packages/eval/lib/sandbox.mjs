@@ -42,13 +42,30 @@ async function writeJson(filePath, data) {
   await writeFile(filePath, JSON.stringify(data));
 }
 
+/** Best-effort recursive chmod — tolerates the path not existing yet (nothing to fix up). */
+function chmodRecursiveBestEffort(dir, mode) {
+  return new Promise((resolve) => {
+    execFile("chmod", ["-R", mode, dir], () => resolve());
+  });
+}
+
+/** Recursive chmod that must succeed — used where a failure means the sandbox isn't actually locked down. */
+function chmodRecursive(dir, mode) {
+  return new Promise((resolve, reject) => {
+    execFile("chmod", ["-R", mode, dir], (error) => (error ? reject(error) : resolve()));
+  });
+}
+
 /**
  * Sandbox for search probes: a disposable copy of the committed seeded
- * fixture vault (`fixtures/eval-vault`), wiped and recopied every run. The
- * probes only ever ask the model to search, but the CLI grants the model
- * unrestricted Bash — nothing stops it from also running `grounder note` or
- * similar, so the sandbox must be a throwaway copy, never the committed
- * fixture directly.
+ * fixture vault (`fixtures/eval-vault`), wiped and recopied every run, then
+ * locked read-only. The probes only ever ask the model to search, but the
+ * CLI grants the model unrestricted Bash — nothing stops it from also
+ * running `grounder note` (or `rm`), so the sandbox must be a throwaway
+ * copy, never the committed fixture directly. Read-only also matters
+ * *within* one run: every concurrent probe shares this one vault copy, so
+ * without it, one probe mutating the vault could change what a sibling
+ * probe running at the same time grades against.
  */
 export async function setupSearchSandbox() {
   const homeDir = path.join(SCRATCH_ROOT, "search-home");
@@ -56,9 +73,13 @@ export async function setupSearchSandbox() {
   const vaultDir = path.join(SCRATCH_ROOT, "search-vault");
   const seedVaultDir = path.join(PKG_ROOT, "fixtures", "eval-vault");
 
+  // Undo last run's read-only lock first — `rm` needs write permission on
+  // every directory it deletes from, not just the files themselves.
+  await chmodRecursiveBestEffort(vaultDir, "u+w");
   await rm(vaultDir, { recursive: true, force: true });
   await rm(repoDir, { recursive: true, force: true });
   await cp(seedVaultDir, vaultDir, { recursive: true });
+  await chmodRecursive(vaultDir, "a-w");
 
   await writeJson(path.join(homeDir, ".grounder", "config.json"), { vaultRoot: vaultDir });
   await writeJson(path.join(repoDir, ".grounder.json"), { version: 1, projectId: "eval-search" });
