@@ -24,6 +24,29 @@ export function resolveCliPath() {
 }
 
 /**
+ * These mirror path conventions the real source computes (`statePath` in
+ * connector/state.ts, `cursorHooksJsonPath` in agents/cursor.ts,
+ * `claudeSettingsJsonPath` in agents/claude.ts) — as independently
+ * hardcoded strings, not imports of those functions. The e2e suite never
+ * imports from packages/grounder/src; it only spawns the built CLI, so
+ * re-deriving the expected on-disk path here is part of what makes this a
+ * black-box check instead of a tautology.
+ */
+// Named stateJsonPath, not statePath, since every test's own local variable
+// for its result is already called `statePath`.
+export function stateJsonPath(home) {
+  return path.join(home, ".grounder", "state.json");
+}
+
+export function cursorHooksJsonPath(home) {
+  return path.join(home, ".cursor", "hooks.json");
+}
+
+export function claudeSettingsJsonPath(home) {
+  return path.join(home, ".claude", "settings.json");
+}
+
+/**
  * `GROUNDER_HOME` alone already routes every agent path (`.cursor/...`)
  * through the temp home — see `resolveHomeDir` in connector/home.ts. `HOME`
  * is set too anyway, matching packages/grounder/test/helpers.ts's
@@ -43,7 +66,7 @@ export function envWithHome(home) {
  *
  * On a passing run nothing is printed — matches the rest of the quality
  * gate staying quiet when green. On failure, everything buffered via
- * `log`/`section`/a `createCliRunner` runner (real CLI stdout+stderr
+ * `log`/`section`/a `createCliRunner`(`Raw`) runner (real CLI stdout+stderr
  * included) is flushed, and the temp dirs are left on disk (path printed)
  * instead of cleaned up, so a failure can be inspected after the fact.
  *
@@ -78,14 +101,25 @@ export function useE2eHarness(prefix) {
   // on both success and failure — execFileSync's return value is stdout
   // only, and Node inherits its stderr straight to the real terminal by
   // default (upgrade banners, warnings), which would leak on a passing run.
+  //
+  // `cwd` defaults to unset (inherits this process's cwd) — pass it for
+  // commands like `link`/`note` that resolve the project from `process.cwd()`
+  // with no `--cwd` flag of their own (see commands/link.ts, commands/note.ts).
+  function spawnCli(cliPath, args, env, cwd) {
+    const result = spawnSync("node", [cliPath, ...args], { env, cwd, encoding: "utf8" });
+    if (result.stdout) log(result.stdout);
+    if (result.stderr) log(result.stderr);
+    return result;
+  }
+
+  // Throws on a non-zero exit or a spawn error — for the common case where a
+  // failed CLI call is itself a test failure, not something under test.
   // Returns the captured stdout, for the rare caller (e.g. copy-mode's
   // `status` check) that asserts on the CLI's own output rather than just
   // running it for a file-system side effect.
   function createCliRunner(cliPath, env) {
-    return function runCli(args) {
-      const result = spawnSync("node", [cliPath, ...args], { env, encoding: "utf8" });
-      if (result.stdout) log(result.stdout);
-      if (result.stderr) log(result.stderr);
+    return function runCli(args, { cwd } = {}) {
+      const result = spawnCli(cliPath, args, env, cwd);
       if (result.error) {
         throw result.error;
       }
@@ -93,6 +127,21 @@ export function useE2eHarness(prefix) {
         throw new Error(`node ${cliPath} ${args.join(" ")} exited with status ${result.status}`);
       }
       return result.stdout;
+    };
+  }
+
+  // Never throws on a non-zero exit — for tests that assert on the exit
+  // code/stderr of a call that's *expected* to fail (bad argv, an unlinked
+  // project, ...). Returns { stdout, stderr, status } instead of just
+  // stdout, since the exit code and stderr are usually exactly what these
+  // tests check.
+  function createRawCliRunner(cliPath, env) {
+    return function runCliRaw(args, { cwd } = {}) {
+      const result = spawnCli(cliPath, args, env, cwd);
+      if (result.error) {
+        throw result.error;
+      }
+      return { stdout: result.stdout, stderr: result.stderr, status: result.status };
     };
   }
 
@@ -106,5 +155,5 @@ export function useE2eHarness(prefix) {
     }
   });
 
-  return { home, vault, log, section, createCliRunner };
+  return { home, vault, log, section, createCliRunner, createRawCliRunner };
 }

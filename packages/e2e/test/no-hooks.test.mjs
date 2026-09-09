@@ -4,16 +4,21 @@
 // parsing, GROUNDER_HOME resolution, real file I/O).
 
 import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
 import { expect, test } from "vitest";
-import { envWithHome, resolveCliPath, useE2eHarness } from "./helpers.mjs";
+import {
+  cursorHooksJsonPath,
+  envWithHome,
+  resolveCliPath,
+  stateJsonPath,
+  useE2eHarness,
+} from "./helpers.mjs";
 
 const cliPath = resolveCliPath();
 
 test("--no-hooks sticky opt-out survives a plain migrate", () => {
   const { home, vault, section, createCliRunner } = useE2eHarness("nohooks-smoke");
-  const statePath = path.join(home, ".grounder", "state.json");
-  const hooksJsonPath = path.join(home, ".cursor", "hooks.json");
+  const statePath = stateJsonPath(home);
+  const hooksJsonPath = cursorHooksJsonPath(home);
   const runCli = createCliRunner(cliPath, envWithHome(home));
 
   function readHooksEnabled() {

@@ -5,9 +5,14 @@
 // resolution, actual process exit codes).
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import path from "node:path";
 import { expect, test } from "vitest";
-import { envWithHome, resolveCliPath, useE2eHarness } from "./helpers.mjs";
+import {
+  cursorHooksJsonPath,
+  envWithHome,
+  resolveCliPath,
+  stateJsonPath,
+  useE2eHarness,
+} from "./helpers.mjs";
 
 const cliPath = resolveCliPath();
 
@@ -26,7 +31,7 @@ function printState(label, state, log) {
 
 test("migrate upgrades a v0.5.0 ledger to the current schema", () => {
   const { home, vault, log, section, createCliRunner } = useE2eHarness("ledger-smoke");
-  const statePath = path.join(home, ".grounder", "state.json");
+  const statePath = stateJsonPath(home);
   const runCli = createCliRunner(cliPath, envWithHome(home));
 
   section("1. Real setup (fresh, current-schema state.json)");
@@ -65,7 +70,7 @@ test("migrate upgrades a v0.5.0 ledger to the current schema", () => {
   // `hooksEnabled:true` (just asserted above) makes this plain `migrate` a
   // real side effect, not a no-op: step 1's setup never passed `--hooks`, so
   // this is the migrate run that actually installs the session hook.
-  const hooksJsonPath = path.join(home, ".cursor", "hooks.json");
+  const hooksJsonPath = cursorHooksJsonPath(home);
   const hooksInstalled =
     existsSync(hooksJsonPath) &&
     JSON.stringify(JSON.parse(readFileSync(hooksJsonPath, "utf8"))).includes("handoff peek");

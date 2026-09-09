@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "vitest";
-import { envWithHome, resolveCliPath, useE2eHarness } from "./helpers.mjs";
+import { envWithHome, resolveCliPath, stateJsonPath, useE2eHarness } from "./helpers.mjs";
 
 const cliPath = resolveCliPath();
 
@@ -21,7 +21,7 @@ test("migrate auto-deletes only known, unedited legacy command files", () => {
   const { home, vault, section, createCliRunner } = useE2eHarness("retire-smoke");
   // The one pre-skill command path cursor.ts still tombstones.
   const legacyPath = path.join(home, ".cursor", "commands", "grounder-note.md");
-  const statePath = path.join(home, ".grounder", "state.json");
+  const statePath = stateJsonPath(home);
   const runCli = createCliRunner(cliPath, envWithHome(home));
 
   function writeLegacyFile(content) {
