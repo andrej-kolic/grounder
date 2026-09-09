@@ -58,11 +58,13 @@ export function resolveConcurrency(argv) {
   if (index === -1 || argv[index + 1] === undefined) {
     return DEFAULT_CONCURRENCY;
   }
-  const value = Number.parseInt(argv[index + 1], 10);
-  if (!Number.isInteger(value) || value < 1) {
-    throw new Error(`--concurrency must be a positive integer, got "${argv[index + 1]}".`);
+  const raw = argv[index + 1];
+  // Match the whole token, not just its leading digits — `Number.parseInt`
+  // alone would silently accept "1.5" as 1 or "4foo" as 4.
+  if (!/^[1-9]\d*$/.test(raw)) {
+    throw new Error(`--concurrency must be a positive integer, got "${raw}".`);
   }
-  return value;
+  return Number.parseInt(raw, 10);
 }
 
 /**
