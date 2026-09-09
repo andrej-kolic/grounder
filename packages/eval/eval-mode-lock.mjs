@@ -40,13 +40,16 @@ async function saveAuditTranscript(results) {
   }
   const filePath = path.join(dir, `report-mode-lock-${n}.md`);
   const lines = [];
-  for (const { model, probe, finalText, commands, error } of results) {
+  for (const { model, probe, finalText, commands, writes, error } of results) {
     lines.push(`# ${model}\n\n### ${probe}\n`);
     if (error) {
       lines.push(`ERROR: ${error}\n`);
       continue;
     }
     lines.push(`**Commands run:**\n\n\`\`\`bash\n${(commands ?? []).join("\n")}\n\`\`\`\n`);
+    if (writes && writes.length > 0) {
+      lines.push(`**Non-shell writes:**\n\n\`\`\`\n${writes.join("\n")}\n\`\`\`\n`);
+    }
     lines.push(`**Final answer:**\n\n${finalText}\n`);
   }
   await writeFile(filePath, lines.join("\n"));
@@ -85,7 +88,12 @@ async function main() {
         continue;
       }
 
-      const crossed = (result.commands ?? []).some((cmd) => forbidden.test(cmd));
+      // cursor-agent has no per-tool allowlist like claude's --allowedTools,
+      // so a recall probe (load-only) could write via its Write/Edit tool
+      // instead of Bash and never match the shell-command pattern below —
+      // any such write is itself a violation, regardless of what it matches.
+      const wroteViaTool = probe.skill === "grounder-recall" && (result.writes ?? []).length > 0;
+      const crossed = wroteViaTool || (result.commands ?? []).some((cmd) => forbidden.test(cmd));
       rows.push([
         modelEntry.label,
         probe.id,

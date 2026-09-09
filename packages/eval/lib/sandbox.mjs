@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,19 +24,41 @@ export function grounderCliPath() {
   return path.join(os.homedir(), ".grounder", "runtime", "dist", "cli.js");
 }
 
+/**
+ * `process.env` plus `extra`, with `GROUNDER_VAULT` stripped. Vault
+ * resolution (`resolveVaultRoot`) prefers `GROUNDER_VAULT` over the
+ * sandbox's own `config.json`, so a maintainer with that var set in their
+ * shell would otherwise have every sandboxed call silently read (search) or
+ * write (mode-lock, handoff seeding) their real vault instead.
+ */
+export function sandboxEnv(extra) {
+  const env = { ...process.env, ...extra };
+  delete env.GROUNDER_VAULT;
+  return env;
+}
+
 async function writeJson(filePath, data) {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, JSON.stringify(data));
 }
 
 /**
- * Sandbox for search probes: read-only, points at the committed seeded
- * fixture vault. Safe to reuse across every model in the sweep.
+ * Sandbox for search probes: a disposable copy of the committed seeded
+ * fixture vault (`fixtures/eval-vault`), wiped and recopied every run. The
+ * probes only ever ask the model to search, but the CLI grants the model
+ * unrestricted Bash — nothing stops it from also running `grounder note` or
+ * similar, so the sandbox must be a throwaway copy, never the committed
+ * fixture directly.
  */
 export async function setupSearchSandbox() {
   const homeDir = path.join(SCRATCH_ROOT, "search-home");
   const repoDir = path.join(SCRATCH_ROOT, "search-repo");
-  const vaultDir = path.join(PKG_ROOT, "fixtures", "eval-vault");
+  const vaultDir = path.join(SCRATCH_ROOT, "search-vault");
+  const seedVaultDir = path.join(PKG_ROOT, "fixtures", "eval-vault");
+
+  await rm(vaultDir, { recursive: true, force: true });
+  await rm(repoDir, { recursive: true, force: true });
+  await cp(seedVaultDir, vaultDir, { recursive: true });
 
   await writeJson(path.join(homeDir, ".grounder", "config.json"), { vaultRoot: vaultDir });
   await writeJson(path.join(repoDir, ".grounder.json"), { version: 1, projectId: "eval-search" });
@@ -46,8 +68,9 @@ export async function setupSearchSandbox() {
 
 /**
  * Sandbox for mode-lock probes: a disposable vault (handoff probes write to
- * it for real), seeded with one handoff so recall probes have something to
- * load. `writeUniqueMarkdown` never collides, so parallel writes from
+ * it for real), seeded with two handoffs so recall probes have something to
+ * load — including a `#2` selector. `writeUniqueMarkdown` never collides, so
+ * parallel writes from
  * multiple models *within* one run are safe — but the vault itself is wiped
  * at the start of every run, so results from a previous run (more handoffs,
  * different titles) never bleed into this one.
@@ -89,7 +112,7 @@ export async function setupModeLockSandbox() {
       execFile(
         "node",
         [grounderCliPath(), "handoff", seedBody(label), "--title", `eval-seed-${label}`],
-        { cwd: repoDir, env: { ...process.env, GROUNDER_HOME: homeDir } },
+        { cwd: repoDir, env: sandboxEnv({ GROUNDER_HOME: homeDir }) },
         (error) => (error ? reject(error) : resolve()),
       );
     });

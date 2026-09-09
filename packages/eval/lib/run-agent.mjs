@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { sandboxEnv } from "./sandbox.mjs";
 
 const TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_BUFFER = 20 * 1024 * 1024;
@@ -78,28 +79,40 @@ function extractFromClaudeEvents(events) {
 
 /**
  * Same, from `cursor-agent`'s stream-json events (different tool-call shape).
- * Also collects each shell call's reported `workingDirectory` — the ground
- * truth for whether this probe actually stayed inside the sandbox (see
- * `runProbe`'s escape check).
+ * Also collects each shell call's reported `workingDirectory` (the ground
+ * truth for whether this probe actually stayed inside the sandbox, see
+ * `runProbe`'s escape check) and every non-shell file write (`editToolCall`).
+ * Unlike `claude`, `cursor-agent` has no per-tool allowlist flag — a probe
+ * could write a vault file via its Write/Edit tool instead of Bash and never
+ * show up in `commands`, so callers that must never write (recall probes)
+ * need this list too.
  */
 function extractFromCursorAgentEvents(events) {
   const commands = [];
   const workingDirs = [];
+  const writes = [];
   let finalText = "";
   for (const event of events) {
     if (event.type === "tool_call" && event.subtype === "completed") {
-      const args = event.tool_call?.shellToolCall?.args;
-      if (typeof args?.command === "string") {
-        commands.push(args.command);
-        if (typeof args.workingDirectory === "string" && args.workingDirectory.length > 0) {
-          workingDirs.push(args.workingDirectory);
+      const shellArgs = event.tool_call?.shellToolCall?.args;
+      if (typeof shellArgs?.command === "string") {
+        commands.push(shellArgs.command);
+        if (
+          typeof shellArgs.workingDirectory === "string" &&
+          shellArgs.workingDirectory.length > 0
+        ) {
+          workingDirs.push(shellArgs.workingDirectory);
         }
+      }
+      const editPath = event.tool_call?.editToolCall?.args?.path;
+      if (typeof editPath === "string") {
+        writes.push(editPath);
       }
     } else if (event.type === "result" && typeof event.result === "string") {
       finalText = event.result;
     }
   }
-  return { commands, finalText, workingDirs };
+  return { commands, finalText, workingDirs, writes };
 }
 
 /**
@@ -138,14 +151,26 @@ export async function runProbe(modelEntry, prompt, { cwd, addDir, env }) {
       args,
       {
         cwd,
-        env: { ...process.env, ...env },
+        env: sandboxEnv(env),
         timeout: TIMEOUT_MS,
         maxBuffer: MAX_BUFFER,
       },
       (error, stdout) => {
+        // A timeout, non-zero exit, or signal means the turn never finished
+        // cleanly — grade it as an error even if some NDJSON events made it
+        // out before the cut, rather than judging a partial transcript as if
+        // it were the model's finished answer.
+        if (error) {
+          const reason =
+            error.killed || error.signal
+              ? `CLI timed out or was killed (${error.signal ?? "SIGTERM"}).`
+              : `CLI exited with error: ${error.message}`;
+          resolve({ error: reason });
+          return;
+        }
         const events = parseNdjson(stdout ?? "");
         if (events.length === 0) {
-          resolve({ error: error ? error.message : "No output from CLI." });
+          resolve({ error: "No output from CLI." });
           return;
         }
         const extracted =
