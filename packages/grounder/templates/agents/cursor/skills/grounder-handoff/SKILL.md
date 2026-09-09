@@ -6,6 +6,11 @@ disable-model-invocation: true
 
 Write a session handoff checkpoint to the markdown vault for this project.
 
+**Mode lock — write only.**
+- Never hydrate or start work, regardless of typed extra text (resume / load / hydrate / `/grounder-recall`) — never run `{{GROUNDER_CLI}} handoff list` to pick or overwrite an existing file; always write a **new** file. Still do this command's job, then add one sentence: saved — run `/grounder-recall` in a new chat to resume. Skip that sentence for "continue in a new session" wording (that's the point of saving) or when the mention only appears in stale payload text.
+- Typed extra text is only what the user wrote after `/grounder-handoff` in the chat line — empty or bare command means no extra instruction; ignore any sibling verb that shows up only in a leftover command-payload wrapper. Otherwise, extra text is body guidance for this handoff.
+- `#N` here means leftover Next item N from *this* session, not file N in a listing.
+
 Summarize the session into a structured handoff — not a chat transcript.
 Do not dump tool traces, full conversation, or false starts.
 
@@ -35,6 +40,7 @@ Rules:
 - **Next is mandatory and ordered** — if only one section is read, this is it
 - Empty sections are OK (`Blockers: None` beats omission)
 - Few concrete file paths, not an exhaustive diff
+- If a vault plan (`grounder plan`) or ticket drove the session, list it first in `## Files` with a short note on what changed — e.g. `path/to/plan.md (Status section updated)`, `#123 (new ticket filed)`
 
 Then run from the linked project folder or any subdirectory beneath it:
 

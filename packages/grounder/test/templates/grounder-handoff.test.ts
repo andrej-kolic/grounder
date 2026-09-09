@@ -43,4 +43,27 @@ describe("templates/grounder-handoff", () => {
     const body = await readFile(cursorHandoffTemplate, "utf8");
     expect(body).toContain('required_permissions: ["all"]');
   });
+
+  it("mode-locks to write only, ignoring stray resume/hydrate wording", async () => {
+    for (const filePath of handoffTemplates) {
+      const body = await readFile(filePath, "utf8");
+      expect(body).toContain("Mode lock — write only");
+      expect(body).toContain("Never hydrate or start work");
+      expect(body).toContain("always write a **new** file");
+      expect(body).toContain(
+        "ignore any sibling verb that shows up only in a leftover command-payload wrapper",
+      );
+      expect(body).toContain("saved — run `/grounder-recall` in a new chat to resume");
+    }
+  });
+
+  it("instructs linking the driving plan/ticket in Files", async () => {
+    for (const filePath of handoffTemplates) {
+      const body = await readFile(filePath, "utf8");
+      expect(body).toContain(
+        "If a vault plan (`grounder plan`) or ticket drove the session, list it first in `## Files`",
+      );
+      expect(body).toContain("path/to/plan.md (Status section updated)");
+    }
+  });
 });
