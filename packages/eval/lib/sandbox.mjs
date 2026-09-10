@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -37,6 +38,22 @@ export function sandboxEnv(extra) {
   return env;
 }
 
+/**
+ * Opaque key identifying one (model, probe) run's scratch dir. Grading
+ * regexes do an unanchored substring search over whole command strings,
+ * which include this key whenever the model runs something like `ls` on its
+ * own cwd — a human-readable key built from the probe id (e.g.
+ * "recall-flip-to-handoff") would then match its *own* forbidden pattern by
+ * just appearing in a path, not because the model actually crossed
+ * anything (caught live: this exact probe false-failed the run right after
+ * switching to per-probe sandboxes). A hex digest can't spell "handoff",
+ * "recall", "list", or "peek" — none of those words are hex-alphabet-only —
+ * so it can't collide.
+ */
+export function sandboxKey(modelEntry, probe) {
+  return createHash("sha1").update(`${modelEntry.label}::${probe.id}`).digest("hex").slice(0, 16);
+}
+
 async function writeJson(filePath, data) {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, JSON.stringify(data));
@@ -57,19 +74,18 @@ function chmodRecursive(dir, mode) {
 }
 
 /**
- * Sandbox for search probes: a disposable copy of the committed seeded
- * fixture vault (`fixtures/eval-vault`), wiped and recopied every run, then
- * locked read-only. The probes only ever ask the model to search, but the
- * CLI grants the model unrestricted Bash — nothing stops it from also
- * running `grounder note` (or `rm`), so the sandbox must be a throwaway
- * copy, never the committed fixture directly. Read-only also matters
- * *within* one run: every concurrent probe shares this one vault copy, so
- * without it, one probe mutating the vault could change what a sibling
- * probe running at the same time grades against.
+ * Shared sandbox state for search probes: a disposable copy of the
+ * committed seeded fixture vault (`fixtures/eval-vault`), wiped and
+ * recopied once per sweep, then locked read-only. Safe to share across
+ * every concurrent probe in the sweep *because* it's read-only — nothing
+ * left for one probe to mutate that a sibling would then grade against.
+ * The CLI grants the model unrestricted Bash, so nothing stops it from also
+ * running `grounder note` (or `rm`) — hence a throwaway copy, never the
+ * committed fixture directly, and hence the lock. Call once per sweep; call
+ * {@link setupSearchRepoDir} per probe for the part that must be unique.
  */
 export async function setupSearchSandbox() {
   const homeDir = path.join(SCRATCH_ROOT, "search-home");
-  const repoDir = path.join(SCRATCH_ROOT, "search-repo");
   const vaultDir = path.join(SCRATCH_ROOT, "search-vault");
   const seedVaultDir = path.join(PKG_ROOT, "fixtures", "eval-vault");
 
@@ -77,14 +93,37 @@ export async function setupSearchSandbox() {
   // every directory it deletes from, not just the files themselves.
   await chmodRecursiveBestEffort(vaultDir, "u+w");
   await rm(vaultDir, { recursive: true, force: true });
-  await rm(repoDir, { recursive: true, force: true });
   await cp(seedVaultDir, vaultDir, { recursive: true });
   await chmodRecursive(vaultDir, "a-w");
 
   await writeJson(path.join(homeDir, ".grounder", "config.json"), { vaultRoot: vaultDir });
-  await writeJson(path.join(repoDir, ".grounder.json"), { version: 1, projectId: "eval-search" });
 
-  return { homeDir, repoDir, vaultDir };
+  return { homeDir, vaultDir };
+}
+
+/**
+ * Fresh repo dir for one search probe run, keyed by {@link sandboxKey}.
+ * Kept separate from the shared vault: sharing one `--workspace` cwd across
+ * concurrent `cursor-agent`/`claude` processes risks each host's own
+ * per-project session-file writes colliding — the same class of problem
+ * that forced scratch dirs outside this git repo in the first place.
+ */
+export async function setupSearchRepoDir(key) {
+  const repoDir = path.join(SCRATCH_ROOT, "search-repo", key);
+  await rm(repoDir, { recursive: true, force: true });
+  await writeJson(path.join(repoDir, ".grounder.json"), { version: 1, projectId: "eval-search" });
+  return repoDir;
+}
+
+/**
+ * Wipes every previous run's per-probe mode-lock scratch dirs. Each is keyed
+ * by a hash of (model, probe), so nothing accumulates *within* a sweep, but
+ * with no cleanup at all they'd pile up across every sweep ever run on this
+ * machine. Call once at the start of a sweep, before any per-probe sandbox
+ * is created.
+ */
+export async function wipeModeLockScratch() {
+  await rm(path.join(SCRATCH_ROOT, "mode-lock"), { recursive: true, force: true });
 }
 
 /**

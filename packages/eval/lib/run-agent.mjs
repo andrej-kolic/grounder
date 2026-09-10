@@ -37,7 +37,7 @@ function cursorAgentArgs(model, prompt, addDir, cwd) {
   ];
 }
 
-function parseNdjson(stdout) {
+export function parseNdjson(stdout) {
   const events = [];
   for (const line of stdout.split("\n")) {
     const trimmed = line.trim();
@@ -54,7 +54,7 @@ function parseNdjson(stdout) {
 }
 
 /** Bash commands the model actually ran, and the final chat answer — from `claude`'s stream-json events. */
-function extractFromClaudeEvents(events) {
+export function extractFromClaudeEvents(events) {
   const commands = [];
   let finalText = "";
   for (const event of events) {
@@ -90,7 +90,7 @@ function extractFromClaudeEvents(events) {
  * and never show up in `commands`, so callers that must never write (recall
  * probes) need this list too.
  */
-function extractFromCursorAgentEvents(events) {
+export function extractFromCursorAgentEvents(events) {
   const commands = [];
   const workingDirs = [];
   const writes = [];
@@ -152,7 +152,7 @@ function tryRealpath(p) {
  * If `cursor-agent` reports the resolved form, a plain string comparison
  * would flag every legitimate in-sandbox call as an escape.
  */
-function findEscapedWorkingDir(workingDirs, cwd) {
+export function findEscapedWorkingDir(workingDirs, cwd) {
   const realCwd = tryRealpath(cwd);
   return workingDirs.find((dir) => {
     const realDir = tryRealpath(dir);

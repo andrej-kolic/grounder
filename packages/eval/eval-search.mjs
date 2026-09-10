@@ -13,7 +13,7 @@
  * Usage: pnpm eval:search [-- --models sonnet,haiku]
  */
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mapWithConcurrency } from "./lib/concurrency.mjs";
@@ -21,7 +21,8 @@ import { resolveConcurrency, resolveSweep } from "./lib/models.mjs";
 import { assertRuntimeCurrent } from "./lib/preflight.mjs";
 import { linksUnderHeading, renderTable } from "./lib/report.mjs";
 import { runProbe } from "./lib/run-agent.mjs";
-import { setupSearchSandbox } from "./lib/sandbox.mjs";
+import { sandboxKey, setupSearchRepoDir, setupSearchSandbox } from "./lib/sandbox.mjs";
+import { saveAuditTranscript } from "./lib/transcript.mjs";
 
 const PKG_ROOT = path.resolve(fileURLToPath(new URL(".", import.meta.url)));
 
@@ -30,25 +31,8 @@ async function loadProbes() {
   return JSON.parse(raw);
 }
 
-async function saveAuditTranscript(results) {
-  const dir = path.join(PKG_ROOT, ".tmp");
-  await mkdir(dir, { recursive: true });
-  let n = 1;
-  while (
-    await readFile(path.join(dir, `report-search-${n}.md`))
-      .then(() => true)
-      .catch(() => false)
-  ) {
-    n++;
-  }
-  const filePath = path.join(dir, `report-search-${n}.md`);
-  const lines = [];
-  for (const { model, probe, finalText, error } of results) {
-    lines.push(`# ${model}\n\n### ${probe}\n`);
-    lines.push(error ? `ERROR: ${error}\n` : `${finalText}\n`);
-  }
-  await writeFile(filePath, lines.join("\n"));
-  return filePath;
+function renderTranscriptEntry({ finalText, error }) {
+  return [error ? `ERROR: ${error}\n` : `${finalText}\n`];
 }
 
 async function main() {
@@ -57,20 +41,37 @@ async function main() {
   const sweep = resolveSweep(process.argv);
   const concurrency = resolveConcurrency(process.argv);
   const probes = await loadProbes();
-  const { homeDir, repoDir, vaultDir } = await setupSearchSandbox();
+  const { homeDir, vaultDir } = await setupSearchSandbox();
 
   const runs = sweep.flatMap((modelEntry) => probes.map((probe) => ({ modelEntry, probe })));
 
   const results = await mapWithConcurrency(runs, concurrency, async ({ modelEntry, probe }) => {
-    const prompt = `/grounder-search ${probe.input}`;
-    const outcome = await runProbe(modelEntry, prompt, {
-      cwd: repoDir,
-      addDir: vaultDir,
-      env: { GROUNDER_HOME: homeDir },
-    });
-    return { model: modelEntry.label, probe: probe.id, ...outcome };
+    const base = { model: modelEntry.label, probe: probe.id };
+    try {
+      // Each (model, probe) run gets its own repo dir — the vault itself is
+      // shared and locked read-only, but sharing one `--workspace` cwd
+      // across concurrent CLI processes risks each host's own per-project
+      // session-file writes colliding.
+      const repoDir = await setupSearchRepoDir(sandboxKey(modelEntry, probe));
+      const prompt = `/grounder-search ${probe.input}`;
+      const outcome = await runProbe(modelEntry, prompt, {
+        cwd: repoDir,
+        addDir: vaultDir,
+        env: { GROUNDER_HOME: homeDir },
+      });
+      return { ...base, ...outcome };
+    } catch (error) {
+      // A sandbox-setup failure must not take down every other in-flight
+      // probe with it — mapWithConcurrency has no try/catch of its own.
+      return { ...base, error: `Sandbox setup failed: ${error.message}` };
+    }
   });
-  const transcriptPath = await saveAuditTranscript(results);
+  const transcriptPath = await saveAuditTranscript(
+    PKG_ROOT,
+    "search",
+    results,
+    renderTranscriptEntry,
+  );
 
   const rows = [];
   let failures = 0;
@@ -88,6 +89,19 @@ async function main() {
         failures++;
         continue;
       }
+
+      // The vault copy is chmod'd read-only, so an attempted write can't
+      // actually corrupt anything — but a cursor-agent Write/Edit/Delete
+      // attempt is still a boundary violation worth failing loudly on,
+      // not a silent pass just because the ranking answer still came out
+      // right. (Claude's writes aren't tracked here: --allowedTools "Bash
+      // Read" already keeps it off any non-shell mutation tool.)
+      const attemptedWrite = (result.writes ?? []).length > 0;
+      if (attemptedWrite) {
+        rows.push([modelEntry.label, probe.id, "(read-only vault)", "attempted write", "FAIL"]);
+        failures++;
+      }
+
       const top = linksUnderHeading(result.finalText, "Read these")[0]?.title ?? "(none)";
       const pass = probe.expectedTopRelativePaths.includes(top);
       rows.push([

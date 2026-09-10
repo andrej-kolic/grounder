@@ -4,16 +4,19 @@
  * Live-agent eval for the `grounder-recall`/`grounder-handoff` mode lock (ticket #102).
  *
  * Spawns one headless agent CLI call per (model, probe) against a disposable
- * sandbox vault, then grades the *actual* Bash commands the CLI reports the
- * model ran (from its own tool-call events) against a forbidden-command
- * pattern — not a self-report, since a model failing the boundary could also
+ * sandbox vault. Grades the write-side boundary (recall must never add a
+ * file to `logs/`; handoff-control must) off the vault's own file listing —
+ * ground truth, immune to *how* a write happened (CLI, a raw Bash redirect,
+ * a cursor-agent Write/Edit/Delete tool call). The read-side boundary
+ * (handoff must never list/peek an existing handoff) has no file-state
+ * signature, so that one still comes from the CLI's own reported tool-call
+ * events — not a self-report, since a model failing the boundary could also
  * misreport having failed it.
  *
  * Usage: pnpm eval:mode-lock [-- --models sonnet,haiku]
  */
 
-import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mapWithConcurrency } from "./lib/concurrency.mjs";
@@ -21,7 +24,9 @@ import { resolveConcurrency, resolveSweep } from "./lib/models.mjs";
 import { assertRuntimeCurrent } from "./lib/preflight.mjs";
 import { renderTable } from "./lib/report.mjs";
 import { runProbe } from "./lib/run-agent.mjs";
-import { setupModeLockSandbox } from "./lib/sandbox.mjs";
+import { sandboxKey, setupModeLockSandbox, wipeModeLockScratch } from "./lib/sandbox.mjs";
+import { saveAuditTranscript } from "./lib/transcript.mjs";
+import { hasNewFile, listLogFiles } from "./lib/vault-log-files.mjs";
 
 const PKG_ROOT = path.resolve(fileURLToPath(new URL(".", import.meta.url)));
 
@@ -30,47 +35,16 @@ async function loadProbes() {
   return JSON.parse(raw);
 }
 
-async function saveAuditTranscript(results) {
-  const dir = path.join(PKG_ROOT, ".tmp");
-  await mkdir(dir, { recursive: true });
-  let n = 1;
-  while (
-    await readFile(path.join(dir, `report-mode-lock-${n}.md`))
-      .then(() => true)
-      .catch(() => false)
-  ) {
-    n++;
+function renderTranscriptEntry({ finalText, commands, writes, error }) {
+  if (error) {
+    return [`ERROR: ${error}\n`];
   }
-  const filePath = path.join(dir, `report-mode-lock-${n}.md`);
-  const lines = [];
-  for (const { model, probe, finalText, commands, writes, error } of results) {
-    lines.push(`# ${model}\n\n### ${probe}\n`);
-    if (error) {
-      lines.push(`ERROR: ${error}\n`);
-      continue;
-    }
-    lines.push(`**Commands run:**\n\n\`\`\`bash\n${(commands ?? []).join("\n")}\n\`\`\`\n`);
-    if (writes && writes.length > 0) {
-      lines.push(`**Non-shell writes:**\n\n\`\`\`\n${writes.join("\n")}\n\`\`\`\n`);
-    }
-    lines.push(`**Final answer:**\n\n${finalText}\n`);
+  const lines = [`**Commands run:**\n\n\`\`\`bash\n${(commands ?? []).join("\n")}\n\`\`\`\n`];
+  if (writes && writes.length > 0) {
+    lines.push(`**Non-shell writes:**\n\n\`\`\`\n${writes.join("\n")}\n\`\`\`\n`);
   }
-  await writeFile(filePath, lines.join("\n"));
-  return filePath;
-}
-
-/**
- * Opaque key identifying one (model, probe) run's scratch sandbox. Grading
- * regexes (`forbiddenCommandPattern`) do an unanchored substring search over
- * whole command strings, which include this sandbox's own path whenever the
- * model runs something like `ls` on its cwd — a human-readable key built
- * from the probe id (e.g. "recall-flip-to-handoff") would then match its
- * *own* pattern by just appearing in a path, not because the model actually
- * crossed anything. A hex digest can't spell "handoff", "recall", "list", or
- * "peek" (none of those words are hex-alphabet-only), so it can't collide.
- */
-function sandboxKey(modelEntry, probe) {
-  return createHash("sha1").update(`${modelEntry.label}::${probe.id}`).digest("hex").slice(0, 16);
+  lines.push(`**Final answer:**\n\n${finalText}\n`);
+  return lines;
 }
 
 async function main() {
@@ -80,29 +54,51 @@ async function main() {
   const concurrency = resolveConcurrency(process.argv);
   const probes = await loadProbes();
 
+  // Keyed by hash of (model, probe), so nothing collides *within* a sweep —
+  // but with no cleanup, every sweep ever run on this machine would pile up.
+  await wipeModeLockScratch();
+
   const runs = sweep.flatMap((modelEntry) => probes.map((probe) => ({ modelEntry, probe })));
 
   const results = await mapWithConcurrency(runs, concurrency, async ({ modelEntry, probe }) => {
-    // Each (model, probe) run gets its own sandbox — otherwise every
-    // concurrent run shares one vault, and a sibling's handoff write can
-    // change which file is "#2" for the selector probe out from under it.
-    const { homeDir, repoDir, vaultDir } = await setupModeLockSandbox(
-      sandboxKey(modelEntry, probe),
-    );
-    const prompt = probe.input ? `/${probe.skill} ${probe.input}` : `/${probe.skill}`;
-    const outcome = await runProbe(modelEntry, prompt, {
-      cwd: repoDir,
-      addDir: vaultDir,
-      env: { GROUNDER_HOME: homeDir },
-    });
-    return { model: modelEntry.label, probe: probe.id, ...outcome };
+    const base = { model: modelEntry.label, probe: probe.id };
+    try {
+      // Each (model, probe) run gets its own sandbox — otherwise every
+      // concurrent run shares one vault, and a sibling's handoff write can
+      // change which file is "#2" for the selector probe out from under it.
+      const { homeDir, repoDir, vaultDir } = await setupModeLockSandbox(
+        sandboxKey(modelEntry, probe),
+      );
+      const logsBefore = await listLogFiles(vaultDir);
+      const prompt = probe.input ? `/${probe.skill} ${probe.input}` : `/${probe.skill}`;
+      const outcome = await runProbe(modelEntry, prompt, {
+        cwd: repoDir,
+        addDir: vaultDir,
+        env: { GROUNDER_HOME: homeDir },
+      });
+      const logsAfter = await listLogFiles(vaultDir);
+      return { ...base, wroteNewFile: hasNewFile(logsBefore, logsAfter), ...outcome };
+    } catch (error) {
+      // A sandbox-setup failure (e.g. a transient seeding hiccup) must not
+      // take down every other in-flight probe in the sweep with it —
+      // mapWithConcurrency has no try/catch of its own around `fn`.
+      return { ...base, error: `Sandbox setup failed: ${error.message}` };
+    }
   });
-  const transcriptPath = await saveAuditTranscript(results);
+  const transcriptPath = await saveAuditTranscript(
+    PKG_ROOT,
+    "mode-lock",
+    results,
+    renderTranscriptEntry,
+  );
 
   const rows = [];
   let failures = 0;
   for (const probe of probes) {
-    const forbidden = new RegExp(probe.forbiddenCommandPattern);
+    const forbidden = probe.forbiddenCommandPattern
+      ? new RegExp(probe.forbiddenCommandPattern)
+      : null;
+    const required = probe.requiredCommandPattern ? new RegExp(probe.requiredCommandPattern) : null;
     for (const modelEntry of sweep) {
       const result = results.find((r) => r.model === modelEntry.label && r.probe === probe.id);
       if (result.error) {
@@ -111,12 +107,15 @@ async function main() {
         continue;
       }
 
-      // cursor-agent has no per-tool allowlist like claude's --allowedTools,
-      // so a recall probe (load-only) could write via its Write/Edit tool
-      // instead of Bash and never match the shell-command pattern below —
-      // any such write is itself a violation, regardless of what it matches.
-      const wroteViaTool = probe.skill === "grounder-recall" && (result.writes ?? []).length > 0;
-      const crossed = wroteViaTool || (result.commands ?? []).some((cmd) => forbidden.test(cmd));
+      // Write-side boundary: ground truth from the vault's own file listing.
+      // Read-side boundary (handoff must not list/peek): no file-state
+      // signature, so this is still command text — narrowly anchored to an
+      // actual CLI invocation (`cli.js' handoff list|peek`), not a bare
+      // "handoff" substring, which also matches things like a path
+      // (`grounder-handoff/SKILL.md`) that were never a real crossing.
+      const crossed = forbidden
+        ? (result.commands ?? []).some((cmd) => forbidden.test(cmd))
+        : result.wroteNewFile;
       rows.push([
         modelEntry.label,
         probe.id,
@@ -142,13 +141,16 @@ async function main() {
         }
       }
 
-      // "Never crossed the boundary" also passes on a model that did nothing
-      // at all. requiredCommandPattern (set on the control probes) asserts
-      // the model actually did its one job — loaded, or wrote — not just
-      // that it avoided the other skill's job.
-      if (probe.requiredCommandPattern) {
-        const required = new RegExp(probe.requiredCommandPattern);
-        const didJob = (result.commands ?? []).some((cmd) => required.test(cmd));
+      // "Never crossed the boundary" also passes on a model that did
+      // nothing at all — control probes (assertDidJob) check the model
+      // actually did its one job, not just that it avoided the other
+      // skill's job. Write-side (handoff-control) is ground truth again;
+      // read-side (recall-control) is the same anchored CLI-invocation
+      // pattern.
+      if (probe.assertDidJob) {
+        const didJob = required
+          ? (result.commands ?? []).some((cmd) => required.test(cmd))
+          : result.wroteNewFile;
         rows.push([
           modelEntry.label,
           probe.id,
