@@ -127,6 +127,38 @@ title: "auth"
     expect(out).toBe(`${expectedTeaser("auth", "2026-06-26")}\n`);
   });
 
+  it("omits the date parenthetical when a usable handoff has no parseable date", async () => {
+    const env = await createTempEnv({ packageName: "my-app" });
+    cleanup = env.cleanup;
+
+    await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
+    await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
+
+    const logsDir = path.join(env.vault, "10-Projects", "my-app", "logs");
+    // Simulates a renamed/imported handoff: no timestamp-prefixed filename to
+    // fall back on, and no frontmatter `created` field either.
+    await writeFile(
+      path.join(logsDir, "my-session.md"),
+      `---
+project: "my-app"
+title: "my session"
+---
+
+notes
+`,
+      "utf8",
+    );
+
+    const { code, out } = await captureStdout(() =>
+      runHandoffPeekWithOptions({ cwd: env.repo, homeDir: env.home }),
+    );
+
+    expect(code).toBe(0);
+    expect(out).toBe(
+      '[grounder] Latest handoff: "my session". Run /grounder-recall to load it, or ignore if unrelated.\n',
+    );
+  });
+
   it("falls back to filename label when frontmatter is corrupted", async () => {
     const env = await createTempEnv({ packageName: "my-app" });
     cleanup = env.cleanup;

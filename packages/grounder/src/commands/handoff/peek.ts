@@ -187,9 +187,8 @@ export async function runHandoffPeekWithOptions(options: HandoffPeekOptions = {}
             const fm = parseHandoffFrontmatter(usable.content);
             const label = sanitizeLabel(fm.title?.trim() || labelFromHandoffFilename(usable.path));
             const createdDate = formatCreatedDate(fm.created, usable.path);
-            if (createdDate) {
-              handoffLine = `[grounder] Latest handoff: "${label}" (${createdDate}). Run /grounder-recall to load it, or ignore if unrelated.`;
-            }
+            const dateSuffix = createdDate ? ` (${createdDate})` : "";
+            handoffLine = `[grounder] Latest handoff: "${label}"${dateSuffix}. Run /grounder-recall to load it, or ignore if unrelated.`;
           }
         }
       } catch {

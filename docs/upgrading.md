@@ -47,6 +47,12 @@ flagging them (they can otherwise cause a duplicate `/grounder-*` menu entry) un
 re-run with `--force`. Note that `grounder setup` never does this cleanup, even with
 `--force` — only `migrate` retires old install shapes.
 
+Two of those command files were also renamed, not just converted to skill format:
+`grounder-task` is now `/grounder-recall`, and `grounder-task-handoff` is now
+`/grounder-handoff`. If you had either bound to a habit or a saved prompt, switch to the
+new name — the old one won't autocomplete after `migrate` retires the command file.
+`grounder-note`, `grounder-search`, and `grounder-plan` kept their names.
+
 Contributor detail on the install ledger and hash drift:
 [State reconciliation](architecture/state-reconciliation.md).
 

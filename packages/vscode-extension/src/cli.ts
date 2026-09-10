@@ -84,6 +84,22 @@ export type CliResult =
   | { kind: "error"; code: number | null; stderr: string };
 
 /**
+ * Env for the spawned CLI process: the extension host's own environment,
+ * with `GROUNDER_VAULT` stripped. `resolveVaultRoot` (grounder's
+ * `connector/vault.ts`) prefers `GROUNDER_VAULT` over the home config, so a
+ * leftover value in the host's environment (e.g. from a terminal used for
+ * eval/dogfood work) would otherwise silently redirect every `status`/
+ * `search`/`link` call to the wrong vault instead of the linked project's
+ * real one — the same hazard `packages/eval`'s `sandboxEnv` strips for the
+ * same reason.
+ */
+export function childEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
+  delete env.GROUNDER_VAULT;
+  return env;
+}
+
+/**
  * Invokes the materialized runtime CLI via the extension host's own Node
  * (`process.execPath` + `ELECTRON_RUN_AS_NODE=1`), per the plan's CLI
  * resolution decision — no PATH lookup, no `npx`.
@@ -109,7 +125,7 @@ export async function invokeCli(
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [cliPath, ...args], {
       cwd: options.cwd,
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+      env: childEnv(),
     });
 
     let stdout = "";

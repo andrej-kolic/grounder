@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  childEnv,
   compareVersions,
   invokeCli,
   meetsMinVersion,
@@ -78,6 +79,32 @@ describe("meetsMinVersion", () => {
 
   it("is lenient (treats as met) when the version string is unparsable", () => {
     expect(meetsMinVersion("weird-build-tag", "0.6.0")).toBe(true);
+  });
+});
+
+describe("childEnv", () => {
+  const originalVault = process.env.GROUNDER_VAULT;
+
+  afterEach(() => {
+    if (originalVault === undefined) {
+      delete process.env.GROUNDER_VAULT;
+    } else {
+      process.env.GROUNDER_VAULT = originalVault;
+    }
+  });
+
+  it("strips GROUNDER_VAULT inherited from the extension host's environment", () => {
+    process.env.GROUNDER_VAULT = "/some/other/vault";
+    expect(childEnv().GROUNDER_VAULT).toBeUndefined();
+  });
+
+  it("keeps the rest of the host environment intact", () => {
+    process.env.GROUNDER_VAULT = "/some/other/vault";
+    process.env.SOME_UNRELATED_VAR = "kept";
+    const env = childEnv();
+    expect(env.SOME_UNRELATED_VAR).toBe("kept");
+    expect(env.ELECTRON_RUN_AS_NODE).toBe("1");
+    delete process.env.SOME_UNRELATED_VAR;
   });
 });
 
