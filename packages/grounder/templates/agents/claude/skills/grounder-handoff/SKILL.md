@@ -39,6 +39,7 @@ Build a markdown body with these sections (lean; roughly half a screen to one sc
 ```
 
 Rules:
+- **Nothing done yet is not a reason to skip writing** — a fresh or empty session still gets a handoff (`Done: None`, `Next: 1. n/a` or one reasonable next step); never reply with a menu of options instead of running the write.
 - **Next is mandatory and ordered** — if only one section is read, this is it
 - Empty sections are OK (`Blockers: None` beats omission)
 - Few concrete file paths, not an exhaustive diff
