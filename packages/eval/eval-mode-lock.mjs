@@ -12,6 +12,7 @@
  * Usage: pnpm eval:mode-lock [-- --models sonnet,haiku]
  */
 
+import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -58,9 +59,18 @@ async function saveAuditTranscript(results) {
   return filePath;
 }
 
-/** Filesystem-safe key identifying one (model, probe) run, for its own scratch sandbox. */
+/**
+ * Opaque key identifying one (model, probe) run's scratch sandbox. Grading
+ * regexes (`forbiddenCommandPattern`) do an unanchored substring search over
+ * whole command strings, which include this sandbox's own path whenever the
+ * model runs something like `ls` on its cwd — a human-readable key built
+ * from the probe id (e.g. "recall-flip-to-handoff") would then match its
+ * *own* pattern by just appearing in a path, not because the model actually
+ * crossed anything. A hex digest can't spell "handoff", "recall", "list", or
+ * "peek" (none of those words are hex-alphabet-only), so it can't collide.
+ */
 function sandboxKey(modelEntry, probe) {
-  return `${modelEntry.label}-${probe.id}`.replace(/[^a-zA-Z0-9._-]+/g, "-");
+  return createHash("sha1").update(`${modelEntry.label}::${probe.id}`).digest("hex").slice(0, 16);
 }
 
 async function main() {
