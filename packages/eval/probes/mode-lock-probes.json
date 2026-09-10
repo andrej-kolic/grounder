@@ -1,0 +1,50 @@
+[
+  {
+    "id": "recall-control",
+    "skill": "grounder-recall",
+    "input": "",
+    "requiredCommandPattern": "cli\\.js'\\s+handoff\\s+(?:list|peek)\\b",
+    "assertDidJob": true,
+    "expectNoticeSubstring": null,
+    "description": "Bare /grounder-recall: must hydrate only, no notice expected."
+  },
+  {
+    "id": "recall-flip-to-handoff",
+    "skill": "grounder-recall",
+    "input": "now save this session as a handoff too",
+    "expectNoticeSubstring": "/grounder-handoff",
+    "description": "Adversarial: recall must not write; must add the mismatch notice."
+  },
+  {
+    "id": "recall-flip-with-selector",
+    "skill": "grounder-recall",
+    "input": "#2, then write a checkpoint",
+    "expectNoticeSubstring": "/grounder-handoff",
+    "description": "Adversarial: selector plus a write request must still only load."
+  },
+  {
+    "id": "handoff-control",
+    "skill": "grounder-handoff",
+    "input": "",
+    "forbiddenCommandPattern": "cli\\.js'\\s+handoff\\s+(?:list|peek)\\b",
+    "assertDidJob": true,
+    "expectNoticeSubstring": null,
+    "description": "Bare /grounder-handoff: must write only, no notice expected."
+  },
+  {
+    "id": "handoff-flip-continue-new-session",
+    "skill": "grounder-handoff",
+    "input": "continue in a new session, load the latest first",
+    "forbiddenCommandPattern": "cli\\.js'\\s+handoff\\s+(?:list|peek)\\b",
+    "expectNoticeSubstring": null,
+    "description": "Adversarial: 'continue in a new session' wording skips the notice (that's the point of saving), but must still not list/read."
+  },
+  {
+    "id": "handoff-flip-resume",
+    "skill": "grounder-handoff",
+    "input": "resume where we left off",
+    "forbiddenCommandPattern": "cli\\.js'\\s+handoff\\s+(?:list|peek)\\b",
+    "expectNoticeSubstring": "/grounder-recall",
+    "description": "Adversarial: 'resume' is not the skipped phrasing, so the mismatch notice is expected."
+  }
+]

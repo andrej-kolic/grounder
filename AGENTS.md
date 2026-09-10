@@ -6,6 +6,7 @@ Grounder is a Node CLI (`packages/grounder`) that links project folders to perso
 
 - `packages/grounder/` — publishable package; all implementation lives here
 - `packages/e2e/` — real-CLI smoke tests (`pnpm e2e`), a separate vitest suite/config from `packages/grounder/test/` (spawns the built CLI, kept out of `pnpm test`/`check`)
+- `packages/eval/` — live-agent skill eval harness (`pnpm eval:search`, `pnpm eval:mode-lock`), maintainer-only; those two live sweeps are kept out of `pnpm test`/`check` (real API cost), but its own fast unit tests (`packages/eval/test/`) run under `pnpm test`/`check` like any workspace package
 - `skills/grounder-setup/` — skills.sh meta-skill (CLI driver; not in the npm tarball)
 - `fixtures/minimal-git-repo/` — stable test fixture (automated tests)
 - `fixtures/dev/` — local CLI sandbox (`pnpm fixture:setup`)
@@ -124,7 +125,19 @@ pnpm check            # build + typecheck + lint + test (CI / local one-shot)
 pnpm grounder --version
 pnpm fixture:setup    # print dev fixture next steps
 pnpm e2e              # real-CLI smoke tests (packages/e2e/), not part of `check`
+pnpm eval:search      # live-agent search-relevance eval (packages/eval/), not part of `check`
+pnpm eval:mode-lock   # live-agent recall/handoff mode-lock eval (packages/eval/), not part of `check`
 ```
+
+## Skill eval harness (maintainer-only)
+
+Static tests under `packages/grounder/test/templates/` only prove skill-prompt text
+exists, not that a model follows it. `pnpm eval:search` / `pnpm eval:mode-lock`
+(`packages/eval/`) each spawn a real headless-CLI model sweep (`claude -p` /
+`cursor-agent -p`) that types the actual slash command and grades the result — no
+orchestrator skill/command file and no interactive session involved. See
+`packages/eval/README.md` for how it works and `plans/skill-eval-harness.md` in the
+vault for the full design history.
 
 Root scripts are the quality contract — CI and agents should call these entrypoints, not ad-hoc tool invocations. Keep dependencies minimal.
 

@@ -65,6 +65,14 @@ describe("templates/grounder-handoff", () => {
     }
   });
 
+  it("still writes a handoff on a fresh/empty session, not a menu of options", async () => {
+    for (const filePath of handoffTemplates) {
+      const body = await readFile(filePath, "utf8");
+      expect(body).toContain("Nothing done yet is not a reason to skip writing");
+      expect(body).toContain("never reply with a menu of options instead of running the write");
+    }
+  });
+
   it("instructs linking the driving plan/ticket in Files", async () => {
     for (const filePath of handoffTemplates) {
       const body = await readFile(filePath, "utf8");

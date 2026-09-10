@@ -1,0 +1,16 @@
+{
+  "name": "@grounder/eval",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Live-agent eval harness for Grounder skill prompts (search relevance, recall/handoff mode lock)",
+  "type": "module",
+  "scripts": {
+    "eval:search": "node eval-search.mjs",
+    "eval:mode-lock": "node eval-mode-lock.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

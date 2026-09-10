@@ -9,6 +9,9 @@ This repo is the monorepo that publishes the [`grounder`](packages/grounder) npm
 grounder/
 ├── packages/
 │   ├── grounder/          # publishable npm package (`grounder`)
+│   ├── e2e/               # real-CLI smoke tests (`pnpm e2e`)
+│   ├── eval/              # live-agent skill eval harness (`pnpm eval:search`/`eval:mode-lock`, maintainer-only)
+│   ├── vscode-extension/  # thin VS Code wrapper (requires the CLI)
 │   └── demo-casts/        # generate GIF for READMEs (`pnpm demo:cast`)
 ├── skills/
 │   └── grounder-setup/    # skills.sh listing (`npx skills add …`; not in the npm tarball)
