@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <title>Grounder Mark</title>
+  <path d="M500,100 L400,0 L200,0 L0,200 L200,400 L400,400 L600,200 L400,200 L300,300 L200,200 L300,100 Z" fill="#1B5C8C"/>
+  <path d="M400,0 L200,0 L0,200 L200,200 Z" fill="#45C3DA"/>
+  <path d="M600,200 L400,200 L300,300 L400,400 Z" fill="#45C3DA"/>
+  <path d="M400,0 L200,0 L300,100 Z" fill="#3090B3"/>
+  <path d="M300,300 L200,400 L400,400 Z" fill="#3090B3"/>
+</svg>
