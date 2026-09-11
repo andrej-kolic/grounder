@@ -4,9 +4,9 @@
 
   <defs>
     <radialGradient id="glow" cx="512" cy="213.3" r="558" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#102C38"/>
-      <stop offset="0.35" stop-color="#0C1F27"/>
-      <stop offset="0.62" stop-color="#0B1C23"/>
+      <stop offset="0" stop-color="#0B383D"/>
+      <stop offset="0.35" stop-color="#09242A"/>
+      <stop offset="0.62" stop-color="#081B26"/>
       <stop offset="1" stop-color="#080A14"/>
     </radialGradient>
     <symbol id="folder" viewBox="0 0 16 13">
@@ -18,13 +18,13 @@
   <style>
     .bg { fill: #080A14; }
     .glow { fill: url(#glow); }
-    .frame { fill: none; stroke: #25353C; stroke-width: 1.35; }
-    .card { fill: #0A0E17; stroke: #293E47; stroke-width: 1.35; }
-    .card-dash { fill: none; stroke: #293E47; stroke-width: 1.35; stroke-dasharray: 5.4 6.3; }
-    .panel { fill: #080C14; stroke: #293E47; stroke-width: 1.35; }
+    .frame { fill: none; stroke: #223A3F; stroke-width: 1.35; }
+    .card { fill: #0A1117; stroke: #25434B; stroke-width: 1.35; }
+    .card-dash { fill: none; stroke: #25434B; stroke-width: 1.35; stroke-dasharray: 5.4 6.3; }
+    .panel { fill: #080E14; stroke: #25434B; stroke-width: 1.35; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-    .kicker { fill: #4D9EC1; font-size: 22.5px; font-weight: 600; letter-spacing: 3.06px; }
+    .kicker { fill: #3FC4CF; font-size: 22.5px; font-weight: 600; letter-spacing: 3.06px; }
     .name { fill: #F6F6F6; font-size: 18px; font-weight: 600; }
     .more { fill: #FFFFFF; fill-opacity: 0.55; font-size: 18px; font-weight: 500; }
     .caption { fill: #C4C4C4; font-size: 18px; font-weight: 500; }
@@ -32,9 +32,9 @@
     .note { fill: #FFFFFF; fill-opacity: 0.55; font-size: 18px; font-weight: 500; }
 
     .arrow { fill: none; stroke: #C4C4C4; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-    .tree { fill: none; stroke: #293E47; stroke-width: 1.26; }
-    .folder { fill: none; stroke: #4D9EC1; stroke-width: 1.08; }
-    .rule { fill: none; stroke: #25353C; stroke-width: 0.9; }
+    .tree { fill: none; stroke: #25434B; stroke-width: 1.26; }
+    .folder { fill: none; stroke: #3FC4CF; stroke-width: 1.08; }
+    .rule { fill: none; stroke: #223A3F; stroke-width: 0.9; }
   </style>
 
   <rect class="bg" width="1024" height="426.6" rx="18"/>
