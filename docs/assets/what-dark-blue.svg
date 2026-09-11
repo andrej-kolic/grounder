@@ -12,6 +12,16 @@
     <symbol id="folder" viewBox="0 0 16 13">
       <path class="folder" d="M1.2 2.6q0-1.4 1.4-1.4h3.4l1.5 1.9h5.9q1.4 0 1.4 1.4v5.9q0 1.4-1.4 1.4H2.2q-1 0-1-1.4z"/>
     </symbol>
+    <filter id="textGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="2.6" result="blur"/>
+      <feComponentTransfer in="blur" result="blur">
+        <feFuncA type="linear" slope="0.6"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
 
   <!-- 90% of 20 / 25, then gutter stretched to fill 1024 -->
@@ -24,7 +34,7 @@
     .panel { fill: #080C14; stroke: #293E47; stroke-width: 1.35; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-    .kicker { fill: #4D9EC1; font-size: 22.5px; font-weight: 600; letter-spacing: 3.06px; }
+    .kicker { fill: #8FE8F5; font-size: 22.5px; font-weight: 600; letter-spacing: 3.06px; filter: url(#textGlow); }
     .name { fill: #F6F6F6; font-size: 18px; font-weight: 600; }
     .more { fill: #FFFFFF; fill-opacity: 0.55; font-size: 18px; font-weight: 500; }
     .caption { fill: #C4C4C4; font-size: 18px; font-weight: 500; }
