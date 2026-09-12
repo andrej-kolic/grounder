@@ -4,7 +4,7 @@ import path from "node:path";
 import * as vscode from "vscode";
 import { waitFor } from "./quickPickHarness.js";
 
-const EXTENSION_ID = "grounder-dev.grounder-vscode-extension";
+const EXTENSION_ID = "grounder.grounder-vscode-extension";
 
 /**
  * Steps 3-8 dogfooding matrix cases 1-6 (tree structure), 7-9 (settings),

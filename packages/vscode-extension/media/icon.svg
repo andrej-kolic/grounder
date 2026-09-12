@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Grounder</title>
+  <!-- Darker than the mark's navy stop so the shape still reads at 128px. -->
+  <rect width="512" height="512" fill="#071821"/>
+  <g transform="translate(76 136) scale(0.6)">
+    <defs>
+      <linearGradient id="gTealV" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="400">
+        <stop offset="0%" stop-color="#8FE8F5"/>
+        <stop offset="100%" stop-color="#146B82"/>
+      </linearGradient>
+      <linearGradient id="gNavyV" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="400">
+        <stop offset="0%" stop-color="#3E7FAE"/>
+        <stop offset="100%" stop-color="#0A2A40"/>
+      </linearGradient>
+      <linearGradient id="gMidV" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="400">
+        <stop offset="0%" stop-color="#67B4D2"/>
+        <stop offset="100%" stop-color="#0F4B61"/>
+      </linearGradient>
+    </defs>
+    <path d="M500,100 L400,0 L200,0 L0,200 L200,400 L400,400 L600,200 L400,200 L300,300 L200,200 L300,100 Z" fill="url(#gNavyV)"/>
+    <path d="M400,0 L200,0 L0,200 L200,200 Z" fill="url(#gTealV)"/>
+    <path d="M600,200 L400,200 L300,300 L400,400 Z" fill="url(#gTealV)"/>
+    <path d="M400,0 L200,0 L300,100 Z" fill="url(#gMidV)"/>
+    <path d="M300,300 L200,400 L400,400 Z" fill="url(#gMidV)"/>
+  </g>
+</svg>

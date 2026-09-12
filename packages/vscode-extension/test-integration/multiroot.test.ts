@@ -7,7 +7,7 @@ import {
   waitFor,
 } from "./quickPickHarness.js";
 
-const EXTENSION_ID = "grounder-dev.grounder-vscode-extension";
+const EXTENSION_ID = "grounder.grounder-vscode-extension";
 
 // biome-ignore lint/suspicious/noExplicitAny: GrounderNode/QuickPickItem are plain data shapes and the compiled extension ships no .d.ts, so tests treat them structurally.
 type Node = any;

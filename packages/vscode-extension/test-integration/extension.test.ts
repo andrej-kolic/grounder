@@ -1,7 +1,7 @@
 import * as assert from "node:assert/strict";
 import * as vscode from "vscode";
 
-const EXTENSION_ID = "grounder-dev.grounder-vscode-extension";
+const EXTENSION_ID = "grounder.grounder-vscode-extension";
 
 /**
  * Harness smoke test (Step 10a) — proves `@vscode/test-electron` can boot a

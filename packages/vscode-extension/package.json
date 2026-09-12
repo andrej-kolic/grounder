@@ -1,11 +1,35 @@
 {
   "name": "grounder-vscode-extension",
   "displayName": "Grounder",
-  "description": "Browse your Grounder vault (notes/handoffs/plans) and drag a doc into Cursor's or Claude Code's chat panel. Not yet published — see README.",
-  "version": "0.0.1",
+  "description": "Browse your Grounder vault — notes, handoffs, plans — in the sidebar, and drag any doc into Cursor's or Claude Code's chat as context.",
+  "version": "0.1.0",
   "private": true,
-  "publisher": "grounder-dev",
+  "publisher": "grounder",
   "license": "MIT",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#071821",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrej-kolic/grounder.git",
+    "directory": "packages/vscode-extension"
+  },
+  "bugs": {
+    "url": "https://github.com/andrej-kolic/grounder/issues"
+  },
+  "homepage": "https://github.com/andrej-kolic/grounder/tree/main/packages/vscode-extension#readme",
+  "keywords": [
+    "obsidian",
+    "cursor",
+    "claude-code",
+    "vault",
+    "notes",
+    "handoff",
+    "agent-memory",
+    "markdown"
+  ],
   "engines": {
     "vscode": "^1.90.0"
   },
