@@ -10,3 +10,4 @@ vitest.config.ts
 **/*.map
 .gitignore
 media/icon.svg
+CONTRIBUTING.md
