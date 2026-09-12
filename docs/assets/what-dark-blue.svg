@@ -34,7 +34,7 @@
     .panel { fill: #080C14; stroke: #293E47; stroke-width: 1.35; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-    .kicker { fill: #8FE8F5; font-size: 22.5px; font-weight: 600; letter-spacing: 3.06px; filter: url(#textGlow); }
+    .kicker { fill: #67B4D2; font-size: 22.5px; font-weight: 600; letter-spacing: 3.06px; filter: url(#textGlow); }
     .name { fill: #F6F6F6; font-size: 18px; font-weight: 600; }
     .more { fill: #FFFFFF; fill-opacity: 0.55; font-size: 18px; font-weight: 500; }
     .caption { fill: #C4C4C4; font-size: 18px; font-weight: 500; }
