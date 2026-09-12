@@ -12,16 +12,6 @@
     <symbol id="folder" viewBox="0 0 16 13">
       <path class="folder" d="M1.2 2.6q0-1.4 1.4-1.4h3.4l1.5 1.9h5.9q1.4 0 1.4 1.4v5.9q0 1.4-1.4 1.4H2.2q-1 0-1-1.4z"/>
     </symbol>
-    <filter id="textGlow" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="2.6" result="blur"/>
-      <feComponentTransfer in="blur" result="blur">
-        <feFuncA type="linear" slope="0.6"/>
-      </feComponentTransfer>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
   </defs>
 
   <!-- 90% of 20 / 25, then gutter stretched to fill 1024 -->
@@ -34,7 +24,7 @@
     .panel { fill: #080C14; stroke: #293E47; stroke-width: 1.35; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-    .kicker { fill: #67B4D2; font-size: 22.5px; font-weight: 600; letter-spacing: 3.06px; filter: url(#textGlow); }
+    .kicker { fill: #7EBFD9; font-size: 22.5px; font-weight: 600; letter-spacing: 3.06px; }
     .name { fill: #F6F6F6; font-size: 18px; font-weight: 600; }
     .more { fill: #FFFFFF; fill-opacity: 0.55; font-size: 18px; font-weight: 500; }
     .caption { fill: #C4C4C4; font-size: 18px; font-weight: 500; }
@@ -43,7 +33,7 @@
 
     .arrow { fill: none; stroke: #C4C4C4; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     .tree { fill: none; stroke: #293E47; stroke-width: 1.26; }
-    .folder { fill: none; stroke: #4D9EC1; stroke-width: 1.08; }
+    .folder { fill: none; stroke: #7EBFD9; stroke-width: 1.08; }
     .rule { fill: none; stroke: #25353C; stroke-width: 0.9; }
   </style>
 
