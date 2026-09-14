@@ -1,8 +1,17 @@
+<div align="center">
+
+<img alt="Grounder logo" src="media/icon.png" width="96">
+
 # Grounder for VS Code
 
-Browse your [Grounder](https://github.com/andrej-kolic/grounder) vault — notes, handoffs,
-plans — in the sidebar, and drag any doc into **Cursor**'s or the **Claude Code** extension's
-chat panel to attach it as context.
+</div>
+
+**[Grounder](https://github.com/andrej-kolic/grounder)** keeps AI coding agent memory — notes,
+handoffs, plans — in plain markdown files instead of chat history, so work picked up in
+Cursor or Claude Code survives across sessions and machines.
+
+This extension browses that vault in the sidebar, and lets you drag any doc into **Cursor**'s
+or the **Claude Code** extension's chat panel to attach it as context.
 
 Not published to the Marketplace yet — see [CONTRIBUTING.md](CONTRIBUTING.md) to build and
 sideload it, or the main repo's plan for status.
@@ -12,10 +21,10 @@ sideload it, or the main repo's plan for status.
 
 ## Requirements
 
-- The `grounder` CLI, installed and linked for the open project (`grounder setup` +
-  `grounder link` — see the [main README](https://github.com/andrej-kolic/grounder)). The
-  extension shells out to it; it never imports the CLI's internals.
-- `grounder` CLI <!-- placeholder pending #113 --> `0.6.0`+.
+- The `grounder` CLI, `0.6.0`+ <!-- placeholder pending #113 -->, installed and linked for the
+  open project (`grounder setup` + `grounder link` — see the [main
+  README](https://github.com/andrej-kolic/grounder)). The extension shells out to it; it never
+  imports the CLI's internals.
 
 ## What you get
 
