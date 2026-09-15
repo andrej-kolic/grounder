@@ -16,8 +16,7 @@ or the **Claude Code** extension's chat panel to attach it as context.
 Not published to the Marketplace yet — see [CONTRIBUTING.md](CONTRIBUTING.md) to build and
 sideload it, or the main repo's plan for status.
 
-<!-- TODO(#110): screenshot/gif of the tree view + drag-to-chat, once the extension is far
-     enough along to be worth capturing for the Marketplace listing. -->
+![Dragging a plan from the Grounder tree into Cursor's chat panel](../../docs/assets/vscode-extension-drag-to-chat.gif)
 
 ## Requirements
 
