@@ -23,6 +23,30 @@ pnpm --filter grounder-vscode-extension build   # from repo root
 pnpm --filter grounder-vscode-extension test:unit
 ```
 
+## Release
+
+Published independently of the CLI's own npm release cadence — no lockstep, no shared version.
+Every push to `main` under this package already builds and uploads a `.vsix` as a CI artifact
+(`.github/workflows/vscode-extension.yml`), but that never publishes.
+
+To actually publish to the VS Code Marketplace and Open VSX:
+
+1. Bump `version` in `package.json` and move `CHANGELOG.md`'s `[Unreleased]` section to a new
+   dated entry.
+2. Tag and push (annotated, matching the CLI's own tag convention):
+   ```bash
+   git tag -a vscode-v<version> -m "vscode-v<version>"
+   git push origin vscode-v<version>
+   ```
+3. `.github/workflows/vscode-extension-release.yml` picks up the `vscode-v*` tag, asserts it
+   matches `package.json`'s version, runs `test:unit`, packages the `.vsix`, publishes it to both
+   registries using the `VSCE_PAT`/`OVSX_PAT` repo secrets, and creates a GitHub Release.
+
+Both secrets are Marketplace/Open VSX Personal Access Tokens for the `grounder` publisher/namespace
+(see GitHub issue #108 for how they were provisioned) — an org-scoped Azure DevOps PAT for
+`VSCE_PAT` (Azure DevOps retired *global* PATs in 2026; org-scoped is the long-term-correct form,
+not a stopgap), an Open VSX namespace token for `OVSX_PAT`.
+
 ## Manual testing
 
 Open this directory (`packages/vscode-extension/`) itself as the workspace folder — not the

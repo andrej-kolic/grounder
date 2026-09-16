@@ -93,6 +93,9 @@ git push origin v0.1.0
 5. After the tag publishes, bump `version` to the next `x.y.z-dev.1` so `grounder -v`
    does not claim the published number. Do not tag prereleases.
 
+`packages/vscode-extension` releases independently, on its own `vscode-v*` tags (not `v*`) —
+see [its own CONTRIBUTING.md](packages/vscode-extension/CONTRIBUTING.md#release).
+
 ## Demo GIF
 
 The README GIF is generated from hand-authored scene scripts in

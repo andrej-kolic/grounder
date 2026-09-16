@@ -1,6 +1,6 @@
 <div align="center">
 
-<img alt="Grounder logo" src="media/icon.png" width="96">
+<img alt="Grounder logo" src="https://raw.githubusercontent.com/andrej-kolic/grounder/main/packages/vscode-extension/media/icon.png" width="96">
 
 # Grounder for VS Code
 
@@ -13,14 +13,15 @@ Cursor or Claude Code survives across sessions and machines.
 This extension browses that vault in the sidebar, and lets you drag any doc into **Cursor**'s
 or the **Claude Code** extension's chat panel to attach it as context.
 
-Not published to the Marketplace yet — see [CONTRIBUTING.md](CONTRIBUTING.md) to build and
-sideload it, or the main repo's plan for status.
+Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=grounder.grounder-vscode-extension)
+or [Open VSX](https://open-vsx.org/extension/grounder/grounder-vscode-extension), or search
+"Grounder" in your editor's Extensions view.
 
-![Dragging a plan from the Grounder tree into Cursor's chat panel](../../docs/assets/vscode-extension-drag-to-chat.gif)
+![Dragging a plan from the Grounder tree into Cursor's chat panel](https://raw.githubusercontent.com/andrej-kolic/grounder/main/docs/assets/vscode-extension-drag-to-chat.gif)
 
 ## Requirements
 
-- The `grounder` CLI, `0.6.0`+ <!-- placeholder pending #113 -->, installed and linked for the
+- The `grounder` CLI, `0.6.0`+, installed and linked for the
   open project (`grounder setup` + `grounder link` — see the [main
   README](https://github.com/andrej-kolic/grounder)). The extension shells out to it; it never
   imports the CLI's internals.
@@ -44,4 +45,5 @@ The tree view has no way to detect or show this.
 ## Links
 
 - [Grounder on GitHub](https://github.com/andrej-kolic/grounder) — CLI, docs, and the vault model
-- [CONTRIBUTING.md](CONTRIBUTING.md) — build, test, and manual dogfooding for this extension
+- [CONTRIBUTING.md](https://github.com/andrej-kolic/grounder/blob/main/packages/vscode-extension/CONTRIBUTING.md) —
+  build, test, and manual dogfooding for this extension

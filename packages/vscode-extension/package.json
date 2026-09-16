@@ -3,7 +3,6 @@
   "displayName": "Grounder",
   "description": "Browse your Grounder vault — notes, handoffs, plans — in the sidebar, and drag any doc into Cursor's or Claude Code's chat as context.",
   "version": "0.1.0",
-  "private": true,
   "publisher": "grounder",
   "license": "MIT",
   "icon": "media/icon.png",

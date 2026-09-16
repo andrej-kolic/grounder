@@ -1,0 +1,58 @@
+name: VS Code Extension Release
+
+on:
+  push:
+    tags: ["vscode-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Assert tag matches package version
+        run: |
+          tag="${GITHUB_REF_NAME#vscode-v}"
+          version="$(node -p "JSON.parse(require('fs').readFileSync('packages/vscode-extension/package.json','utf8')).version")"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Tag vscode-v${tag} does not match packages/vscode-extension version ${version}"
+            exit 1
+          fi
+
+      - name: Test
+        run: pnpm --filter grounder-vscode-extension test:unit
+
+      - name: Package .vsix
+        run: pnpm --filter grounder-vscode-extension package
+
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx --yes @vscode/vsce@4.0.0 publish --no-dependencies --skip-duplicate --packagePath packages/vscode-extension/*.vsix
+
+      - name: Publish to Open VSX
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: npx --yes ovsx@1.2.0 publish --skip-duplicate packages/vscode-extension/*.vsix
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: packages/vscode-extension/*.vsix
