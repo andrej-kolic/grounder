@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-09-16
+
+### Changed
+
+- Marketplace `displayName` changed from `Grounder` to `Grounder for VS Code` — the
+  Marketplace permanently blocks reusing a deleted extension's displayName too, not
+  just its `name` (same collision as 0.1.4, one field later). Open VSX and everywhere
+  else (repo, README, in-app UI) still say plain "Grounder."
+
 ## [0.1.4] - 2026-09-16
 
 ### Changed
