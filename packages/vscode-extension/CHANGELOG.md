@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-16
+
+### Changed
+
+- Updated the Marketplace description.
+
 ## [0.1.0] - 2026-09-15
 
 ### Added

@@ -1,8 +1,8 @@
 {
   "name": "grounder-vscode-extension",
   "displayName": "Grounder",
-  "description": "Browse your Grounder vault — notes, handoffs, plans — in the sidebar, and drag any doc into Cursor's or Claude Code's chat as context.",
-  "version": "0.1.0",
+  "description": "AI agent memory in Obsidian — notes, handoffs, plans — drag into Cursor or Claude Code chat.",
+  "version": "0.1.1",
   "publisher": "grounder",
   "license": "MIT",
   "icon": "media/icon.png",
