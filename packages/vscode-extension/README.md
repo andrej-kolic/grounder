@@ -2,7 +2,7 @@
 
 <img alt="Grounder logo" src="https://raw.githubusercontent.com/andrej-kolic/grounder/main/packages/vscode-extension/media/icon.png" width="96">
 
-# Grounder for VS Code
+# Grounder Xplorer
 
 </div>
 
