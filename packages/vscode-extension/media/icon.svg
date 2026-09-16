@@ -2,7 +2,7 @@
   <title>Grounder</title>
   <!-- Darker than the mark's navy stop so the shape still reads at 128px. -->
   <rect width="512" height="512" fill="#071821"/>
-  <g transform="translate(76 136) scale(0.6)">
+  <g transform="translate(40 112) scale(0.72)">
     <defs>
       <linearGradient id="gTealV" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="400">
         <stop offset="0%" stop-color="#8FE8F5"/>

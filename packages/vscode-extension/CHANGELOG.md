@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-16
+
+### Changed
+
+- Re-cropped the extension icon so the mark fills more of the frame.
+
 ## [0.1.1] - 2026-09-16
 
 ### Changed

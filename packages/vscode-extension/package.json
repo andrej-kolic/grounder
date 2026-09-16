@@ -2,7 +2,7 @@
   "name": "grounder-vscode-extension",
   "displayName": "Grounder",
   "description": "AI agent memory in Obsidian — notes, handoffs, plans — drag into Cursor or Claude Code chat.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "grounder",
   "license": "MIT",
   "icon": "media/icon.png",
