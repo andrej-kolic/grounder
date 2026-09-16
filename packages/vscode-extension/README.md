@@ -13,8 +13,8 @@ Cursor or Claude Code survives across sessions and machines.
 This extension browses that vault in the sidebar, and lets you drag any doc into **Cursor**'s
 or the **Claude Code** extension's chat panel to attach it as context.
 
-Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=grounder.grounder-vscode-extension)
-or [Open VSX](https://open-vsx.org/extension/grounder/grounder-vscode-extension), or search
+Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=andrej-kolic.grounder-vscode)
+or [Open VSX](https://open-vsx.org/extension/andrej-kolic/grounder-vscode), or search
 "Grounder" in your editor's Extensions view.
 
 ![Dragging a plan from the Grounder tree into Cursor's chat panel](https://raw.githubusercontent.com/andrej-kolic/grounder/main/docs/assets/vscode-extension-drag-to-chat.gif)

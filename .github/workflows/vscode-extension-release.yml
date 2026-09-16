@@ -35,10 +35,10 @@ jobs:
           fi
 
       - name: Test
-        run: pnpm --filter grounder-vscode-extension test:unit
+        run: pnpm --filter grounder-vscode test:unit
 
       - name: Package .vsix
-        run: pnpm --filter grounder-vscode-extension package
+        run: pnpm --filter grounder-vscode package
 
       - name: Publish to VS Code Marketplace
         env:

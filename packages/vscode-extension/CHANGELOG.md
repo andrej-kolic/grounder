@@ -5,13 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [0.1.3] - 2026-09-16
+## [0.1.4] - 2026-09-16
 
 ### Changed
 
 - Migrated publisher from `grounder` to `andrej-kolic` on the VS Code Marketplace and
-  Open VSX — the old `grounder.grounder-vscode-extension` listing is being retired in
-  favor of this personal, brand-neutral identity (see #119).
+  Open VSX, moving to a personal, brand-neutral identity (see #119). The old
+  `grounder.grounder-vscode-extension` listing was deleted to free the collision — the
+  Marketplace permanently blocks reusing a deleted extension's name, so the extension
+  `name` also changed, from `grounder-vscode-extension` to `grounder-vscode` (new id:
+  `andrej-kolic.grounder-vscode`).
 
 ## [0.1.2] - 2026-09-16
 

@@ -19,8 +19,8 @@ unrelated disposable test profile).
 ## Build
 
 ```bash
-pnpm --filter grounder-vscode-extension build   # from repo root
-pnpm --filter grounder-vscode-extension test:unit
+pnpm --filter grounder-vscode build   # from repo root
+pnpm --filter grounder-vscode test:unit
 ```
 
 ## Release
@@ -42,8 +42,9 @@ To actually publish to the VS Code Marketplace and Open VSX:
    matches `package.json`'s version, runs `test:unit`, packages the `.vsix`, publishes it to both
    registries using the `VSCE_PAT`/`OVSX_PAT` repo secrets, and creates a GitHub Release.
 
-Both secrets are Marketplace/Open VSX Personal Access Tokens for the `grounder` publisher/namespace
-(see GitHub issue #108 for how they were provisioned) — an org-scoped Azure DevOps PAT for
+Both secrets are Marketplace/Open VSX Personal Access Tokens for the `andrej-kolic` publisher/namespace
+(originally provisioned for `grounder`, see GitHub issue #108 — migrated to `andrej-kolic` per #119)
+— an org-scoped Azure DevOps PAT for
 `VSCE_PAT` (Azure DevOps retired *global* PATs in 2026; org-scoped is the long-term-correct form,
 not a stopgap), an Open VSX namespace token for `OVSX_PAT`.
 
@@ -85,8 +86,8 @@ open a linked project there and drag/drop-test against Cursor's real chat panel.
 panel. Instead, package and sideload into real Cursor:
 
 ```bash
-pnpm --filter grounder-vscode-extension build
-pnpm --filter grounder-vscode-extension package   # runs `npx @vscode/vsce package`, produces a .vsix
+pnpm --filter grounder-vscode build
+pnpm --filter grounder-vscode package   # runs `npx @vscode/vsce package`, produces a .vsix
 ```
 
 Then in Cursor: Extensions view → `...` menu → "Install from VSIX..." → pick the generated
