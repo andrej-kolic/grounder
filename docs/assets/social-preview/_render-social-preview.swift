@@ -176,23 +176,20 @@ let tagline = attributed(
     tracking: 0.2
 )
 
-// Grounder mark (docs/assets/grounder-logo-gradient.svg), authored in a 600x400,
+// Grounder mark, flat version (docs/assets/grounder-logo.svg), authored in a 600x400,
 // y-down local box. Kept here as plain point lists so raster + SVG output share one
 // source of truth instead of duplicating hand-picked path data per format.
 typealias RGB = (CGFloat, CGFloat, CGFloat)
-let logoNavy: RGB = (0.2431, 0.4980, 0.6824) // #3E7FAE
-let logoNavyDeep: RGB = (0.0392, 0.1647, 0.2510) // #0A2A40
-let logoTeal: RGB = (0.5608, 0.9098, 0.9608) // #8FE8F5
-let logoTealDeep: RGB = (0.0784, 0.4196, 0.5098) // #146B82
-let logoMid: RGB = (0.4039, 0.7059, 0.8235) // #67B4D2
-let logoMidDeep: RGB = (0.0588, 0.2941, 0.3804) // #0F4B61
+let logoNavy: RGB = (0.1059, 0.3608, 0.5490) // #1B5C8C
+let logoTeal: RGB = (0.2706, 0.7647, 0.8549) // #45C3DA
+let logoMid: RGB = (0.1882, 0.5647, 0.7020) // #3090B3
 
-let logoShapes: [(points: [(CGFloat, CGFloat)], top: RGB, bottom: RGB, gradientId: String)] = [
-    ([(500, 100), (400, 0), (200, 0), (0, 200), (200, 400), (400, 400), (600, 200), (400, 200), (300, 300), (200, 200), (300, 100)], logoNavy, logoNavyDeep, "logoNavyV"),
-    ([(400, 0), (200, 0), (0, 200), (200, 200)], logoTeal, logoTealDeep, "logoTealV"),
-    ([(600, 200), (400, 200), (300, 300), (400, 400)], logoTeal, logoTealDeep, "logoTealV"),
-    ([(400, 0), (200, 0), (300, 100)], logoMid, logoMidDeep, "logoMidV"),
-    ([(300, 300), (200, 400), (400, 400)], logoMid, logoMidDeep, "logoMidV"),
+let logoShapes: [(points: [(CGFloat, CGFloat)], color: RGB, hex: String)] = [
+    ([(500, 100), (400, 0), (200, 0), (0, 200), (200, 400), (400, 400), (600, 200), (400, 200), (300, 300), (200, 200), (300, 100)], logoNavy, "#1B5C8C"),
+    ([(400, 0), (200, 0), (0, 200), (200, 200)], logoTeal, "#45C3DA"),
+    ([(600, 200), (400, 200), (300, 300), (400, 400)], logoTeal, "#45C3DA"),
+    ([(400, 0), (200, 0), (300, 100)], logoMid, "#3090B3"),
+    ([(300, 300), (200, 400), (400, 400)], logoMid, "#3090B3"),
 ]
 let logoLocalHeight: CGFloat = 400
 let logoLocalWidth: CGFloat = 600
@@ -227,34 +224,20 @@ func logoPoint(_ p: (CGFloat, CGFloat), boxX: CGFloat, topY: CGFloat, scale: CGF
     CGPoint(x: boxX + p.0 * scale, y: topY - p.1 * scale)
 }
 
-func fillLogoShape(_ points: [(CGFloat, CGFloat)], top: RGB, bottom: RGB, boxX: CGFloat, topY: CGFloat, scale: CGFloat, in ctx: CGContext) {
+func fillLogoShape(_ points: [(CGFloat, CGFloat)], color: RGB, boxX: CGFloat, topY: CGFloat, scale: CGFloat, in ctx: CGContext) {
     let path = CGMutablePath()
     let mapped = points.map { logoPoint($0, boxX: boxX, topY: topY, scale: scale) }
     path.addLines(between: mapped)
     path.closeSubpath()
-
-    let colors = [
-        CGColor(red: top.0, green: top.1, blue: top.2, alpha: 1),
-        CGColor(red: bottom.0, green: bottom.1, blue: bottom.2, alpha: 1),
-    ] as CFArray
-    guard let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0, 1]) else { return }
-
-    ctx.saveGState()
+    ctx.setFillColor(CGColor(red: color.0, green: color.1, blue: color.2, alpha: 1))
     ctx.addPath(path)
-    ctx.clip()
-    ctx.drawLinearGradient(
-        gradient,
-        start: CGPoint(x: boxX, y: topY),
-        end: CGPoint(x: boxX, y: topY - logoLocalHeight * scale),
-        options: []
-    )
-    ctx.restoreGState()
+    ctx.fillPath()
 }
 
 let logoTopY = y
 y -= logoHeight
 for shape in logoShapes {
-    fillLogoShape(shape.points, top: shape.top, bottom: shape.bottom, boxX: logoBoxX, topY: logoTopY, scale: logoScale, in: ctx)
+    fillLogoShape(shape.points, color: shape.color, boxX: logoBoxX, topY: logoTopY, scale: logoScale, in: ctx)
 }
 y -= gapLogo
 
@@ -314,7 +297,7 @@ func svgLogoPath(_ points: [(CGFloat, CGFloat)], boxX: CGFloat, topY: CGFloat, s
 var logoMarkup = ""
 for shape in logoShapes {
     let d = svgLogoPath(shape.points, boxX: logoBoxX, topY: logoTopSVG, scale: logoScale)
-    logoMarkup += "  <path fill=\"url(#\(shape.gradientId))\" d=\"\(d)\"/>\n"
+    logoMarkup += "  <path fill=\"\(shape.hex)\" d=\"\(d)\"/>\n"
 }
 
 let titleOrigin = lineOrigin(title, size: titleSize, top: svgY)
@@ -355,15 +338,6 @@ let svgGlowStops = svgGlowOffsets
     .map { "      <stop offset=\"\($0)\" stop-color=\"\(hex(interpolateGlow(at: $0)))\"/>" }
     .joined(separator: "\n")
 
-func svgLinearGradient(id: String, top: RGB, bottom: RGB) -> String {
-    """
-        <linearGradient id="\(id)" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="\(Int(logoLocalHeight))">
-          <stop offset="0" stop-color="\(hex(top))"/>
-          <stop offset="1" stop-color="\(hex(bottom))"/>
-        </linearGradient>
-    """
-}
-
 let svgBg = hex((0.0314, 0.0392, 0.0784))
 
 let svg = """
@@ -373,9 +347,6 @@ let svg = """
     <radialGradient id="glow" cx="\(Int(glowCenter.x))" cy="\(Int(glowCenter.y))" r="\(Int(glowRadius))" gradientUnits="userSpaceOnUse" color-interpolation="sRGB">
 \(svgGlowStops)
     </radialGradient>
-\(svgLinearGradient(id: "logoNavyV", top: logoNavy, bottom: logoNavyDeep))
-\(svgLinearGradient(id: "logoTealV", top: logoTeal, bottom: logoTealDeep))
-\(svgLinearGradient(id: "logoMidV", top: logoMid, bottom: logoMidDeep))
   </defs>
   <rect width="\(width)" height="\(height)" fill="\(svgBg)"/>
   <circle cx="\(Int(glowCenter.x))" cy="\(Int(glowCenter.y))" r="\(Int(glowRadius))" fill="url(#glow)"/>
