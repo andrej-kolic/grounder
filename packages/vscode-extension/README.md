@@ -1,10 +1,4 @@
-<div align="center">
-
-<img alt="Grounder logo" src="https://raw.githubusercontent.com/andrej-kolic/grounder/main/packages/vscode-extension/media/icon.png" width="96">
-
 # Grounder Xplorer
-
-</div>
 
 **[Grounder](https://github.com/andrej-kolic/grounder)** keeps AI coding agent memory — notes,
 handoffs, plans — in plain markdown files instead of chat history, so work picked up in
