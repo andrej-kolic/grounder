@@ -8,7 +8,7 @@ _ = NSApplication.shared
 
 let outURL = URL(fileURLWithPath: CommandLine.arguments[1])
 let width = 1280
-let height = 685
+let height = 640
 let bytesPerPixel = 4
 let bytesPerRow = width * bytesPerPixel
 
@@ -29,16 +29,15 @@ guard let ctx = CGContext(
     exit(1)
 }
 
-// Matches docs/assets/what-dark.svg: steel-blue-teal wash on near-black, not the
-// earlier green-teal field.
+// Matches docs/assets/what-dark.svg: steel-blue-teal wash on near-black.
 let bg = CGColor(red: 0.0314, green: 0.0392, blue: 0.0784, alpha: 1)
 ctx.setFillColor(bg)
 ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
 
 let glowCenter = CGPoint(x: Double(width) / 2, y: Double(height) / 2)
-// Raster keeps the wide mathematical radius; grain + JPEG hide the outer wash.
 let glowRadius: CGFloat = 480
-let glowKeys: [(CGFloat, (CGFloat, CGFloat, CGFloat))] = [
+typealias RGB = (CGFloat, CGFloat, CGFloat)
+let glowKeys: [(CGFloat, RGB)] = [
     (0, (0.0627, 0.1725, 0.2196)), // #102C38
     (0.32, (0.0471, 0.1216, 0.1529)), // #0C1F27
     (0.62, (0.0431, 0.1098, 0.1373)), // #0B1C23
@@ -68,7 +67,7 @@ for i in 0 ..< (width * height) {
     }
 }
 
-let fontsDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("assets/fonts")
+let fontsDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("fonts")
 
 func font(named file: String, size: CGFloat, weight: CGFloat = 400) -> NSFont {
     let url = fontsDir.appendingPathComponent(file)
@@ -176,50 +175,40 @@ let tagline = attributed(
     tracking: 0.2
 )
 
-// Grounder mark (docs/assets/grounder-logo-gradient.svg), authored in a 600x400,
-// y-down local box. Kept here as plain point lists so raster + SVG output share one
-// source of truth instead of duplicating hand-picked path data per format.
-typealias RGB = (CGFloat, CGFloat, CGFloat)
-let logoNavy: RGB = (0.2431, 0.4980, 0.6824) // #3E7FAE
-let logoNavyDeep: RGB = (0.0392, 0.1647, 0.2510) // #0A2A40
-let logoTeal: RGB = (0.5608, 0.9098, 0.9608) // #8FE8F5
-let logoTealDeep: RGB = (0.0784, 0.4196, 0.5098) // #146B82
-let logoMid: RGB = (0.4039, 0.7059, 0.8235) // #67B4D2
-let logoMidDeep: RGB = (0.0588, 0.2941, 0.3804) // #0F4B61
-
-let logoShapes: [(points: [(CGFloat, CGFloat)], top: RGB, bottom: RGB, gradientId: String)] = [
-    ([(500, 100), (400, 0), (200, 0), (0, 200), (200, 400), (400, 400), (600, 200), (400, 200), (300, 300), (200, 200), (300, 100)], logoNavy, logoNavyDeep, "logoNavyV"),
-    ([(400, 0), (200, 0), (0, 200), (200, 200)], logoTeal, logoTealDeep, "logoTealV"),
-    ([(600, 200), (400, 200), (300, 300), (400, 400)], logoTeal, logoTealDeep, "logoTealV"),
-    ([(400, 0), (200, 0), (300, 100)], logoMid, logoMidDeep, "logoMidV"),
-    ([(300, 300), (200, 400), (400, 400)], logoMid, logoMidDeep, "logoMidV"),
+// Grounder mark, flat version (docs/assets/grounder-logo.svg), 600x400 y-down local box.
+let logoShapes: [(points: [(CGFloat, CGFloat)], fill: String, cg: RGB)] = [
+    ([(500, 100), (400, 0), (200, 0), (0, 200), (200, 400), (400, 400), (600, 200), (400, 200), (300, 300), (200, 200), (300, 100)], "#1B5C8C", (0.1059, 0.3608, 0.5490)),
+    ([(400, 0), (200, 0), (0, 200), (200, 200)], "#45C3DA", (0.2706, 0.7647, 0.8549)),
+    ([(600, 200), (400, 200), (300, 300), (400, 400)], "#45C3DA", (0.2706, 0.7647, 0.8549)),
+    ([(400, 0), (200, 0), (300, 100)], "#3090B3", (0.1882, 0.5647, 0.7020)),
+    ([(300, 300), (200, 400), (400, 400)], "#3090B3", (0.1882, 0.5647, 0.7020)),
 ]
 let logoLocalHeight: CGFloat = 400
 let logoLocalWidth: CGFloat = 600
 
-// ~1.2x the title's cap height (124.3pt at this size): big enough to read as a
-// deliberate mark of its own above the wordmark, not just a same-size echo of "G".
-let logoHeight: CGFloat = 150
-let logoWidth: CGFloat = logoHeight * logoLocalWidth / logoLocalHeight
-let logoScale: CGFloat = logoHeight / logoLocalHeight
-// Tuned so logo-bottom -> top of title's "u" equals bottom of "u" -> top of
-// subtitle's "o": both measured off actual glyph ink (x-height letters, no
-// cap-overshoot/descender noise), not the line box or the whole-word bounding box.
-let gapLogo: CGFloat = -10.0
+// --- layout: logo left of "Grounder", sized to the title's cap height ---
+//
+// Sized off the font's cap-height metric, not "G"'s own ink bbox: round letters
+// (G, O, C, S) overshoot the cap-height line on both ends by design, so the eye
+// reads them as the same size as flat-topped letters despite taller ink. Sizing
+// the logo to that overshot ink made it read as visibly larger than the "G".
+let titleFont = title.attribute(.font, at: 0, effectiveRange: nil) as! NSFont
+let capHeight = titleFont.capHeight
+let logoHeight = capHeight
+let logoWidth = logoHeight * logoLocalWidth / logoLocalHeight
+let logoScale = logoHeight / logoLocalHeight
+let gapLogoTitle: CGFloat = 28
 
 let titleSize = title.size()
 let subtitleSize = subtitle.size()
 let taglineSize = tagline.size()
 let gapTitle: CGFloat = 16
 let gapSub: CGFloat = 12
-let textBlockHeight = titleSize.height + gapTitle + subtitleSize.height + gapSub + taglineSize.height
-let blockHeight = logoHeight + gapLogo + textBlockHeight
-fputs("widths title=\(Int(titleSize.width)) sub=\(Int(subtitleSize.width)) tag=\(Int(taglineSize.width)) blockH=\(Int(blockHeight))\n", stderr)
-// CG y-axis is up; start at the top of the centered block and draw downward.
-// -1: measured against rendered ink so top and bottom padding come out equal.
-var y = (CGFloat(height) + blockHeight) / 2 - 1
+let blockHeight = titleSize.height + gapTitle + subtitleSize.height + gapSub + taglineSize.height
 
-let logoBoxX = (CGFloat(width) - logoWidth) / 2
+let rowWidth = logoWidth + gapLogoTitle + titleSize.width
+let rowX = (CGFloat(width) - rowWidth) / 2
+let titleX = rowX + logoWidth + gapLogoTitle
 
 // Maps a local (x, y-down) point into the CG bitmap's y-up space for a box whose
 // top edge sits at `topY`.
@@ -227,51 +216,45 @@ func logoPoint(_ p: (CGFloat, CGFloat), boxX: CGFloat, topY: CGFloat, scale: CGF
     CGPoint(x: boxX + p.0 * scale, y: topY - p.1 * scale)
 }
 
-func fillLogoShape(_ points: [(CGFloat, CGFloat)], top: RGB, bottom: RGB, boxX: CGFloat, topY: CGFloat, scale: CGFloat, in ctx: CGContext) {
+func fillLogoShape(_ points: [(CGFloat, CGFloat)], color: RGB, boxX: CGFloat, topY: CGFloat, scale: CGFloat, in ctx: CGContext) {
     let path = CGMutablePath()
     let mapped = points.map { logoPoint($0, boxX: boxX, topY: topY, scale: scale) }
     path.addLines(between: mapped)
     path.closeSubpath()
-
-    let colors = [
-        CGColor(red: top.0, green: top.1, blue: top.2, alpha: 1),
-        CGColor(red: bottom.0, green: bottom.1, blue: bottom.2, alpha: 1),
-    ] as CFArray
-    guard let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0, 1]) else { return }
-
-    ctx.saveGState()
+    ctx.setFillColor(CGColor(red: color.0, green: color.1, blue: color.2, alpha: 1))
     ctx.addPath(path)
-    ctx.clip()
-    ctx.drawLinearGradient(
-        gradient,
-        start: CGPoint(x: boxX, y: topY),
-        end: CGPoint(x: boxX, y: topY - logoLocalHeight * scale),
-        options: []
-    )
-    ctx.restoreGState()
+    ctx.fillPath()
 }
 
-let logoTopY = y
-y -= logoHeight
-for shape in logoShapes {
-    fillLogoShape(shape.points, top: shape.top, bottom: shape.bottom, boxX: logoBoxX, topY: logoTopY, scale: logoScale, in: ctx)
-}
-y -= gapLogo
+// Line-box metrics (not ink) drive blockHeight, and the 176pt title's ascender
+// headroom above its cap line dwarfs the tagline's descender below — left uncorrected,
+// that reads as a bottom-heavy line box needing a big downward correction, which then
+// overshoots on actual ink. +23 (measured empirically, pixel-diffed against the
+// rendered ink extent) puts equal ink padding above the logo and below the tagline.
+var y = (CGFloat(height) + blockHeight) / 2 + 23
 
 NSGraphicsContext.saveGraphicsState()
 NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
 
-func draw(_ s: NSAttributedString, size: NSSize, y: inout CGFloat) {
+func draw(_ s: NSAttributedString, size: NSSize, x: CGFloat, y: inout CGFloat) {
     y -= size.height
-    let x = (CGFloat(width) - size.width) / 2
     s.draw(in: NSRect(x: x, y: y, width: size.width, height: size.height))
 }
 
-draw(title, size: titleSize, y: &y)
+let titleBottomY = y - titleSize.height
+draw(title, size: titleSize, x: titleX, y: &y)
+
+// Bottom edge sits on the baseline, top edge one cap-height above it.
+let titleBaselineY = titleBottomY + (titleSize.height - titleFont.ascender)
+let logoTopY = titleBaselineY + capHeight
+for shape in logoShapes {
+    fillLogoShape(shape.points, color: shape.cg, boxX: rowX, topY: logoTopY, scale: logoScale, in: ctx)
+}
+
 y -= gapTitle
-draw(subtitle, size: subtitleSize, y: &y)
+draw(subtitle, size: subtitleSize, x: (CGFloat(width) - subtitleSize.width) / 2, y: &y)
 y -= gapSub
-draw(tagline, size: taglineSize, y: &y)
+draw(tagline, size: taglineSize, x: (CGFloat(width) - taglineSize.width) / 2, y: &y)
 
 NSGraphicsContext.restoreGraphicsState()
 
@@ -279,7 +262,6 @@ guard let image = ctx.makeImage() else {
     fputs("failed to make image\n", stderr)
     exit(1)
 }
-
 guard let dest = CGImageDestinationCreateWithURL(outURL as CFURL, UTType.png.identifier as CFString, 1, nil) else {
     fputs("failed to create image destination\n", stderr)
     exit(1)
@@ -290,15 +272,23 @@ if !CGImageDestinationFinalize(dest) {
     exit(1)
 }
 
-var svgY = (CGFloat(height) - blockHeight) / 2 + 1
-func lineOrigin(_ s: NSAttributedString, size: NSSize, top: CGFloat) -> CGPoint {
+// --- SVG (y-down) — mirrors the raster layout above ---
+
+var svgY = (CGFloat(height) - blockHeight) / 2 - 23 // top of the title's line box
+
+func lineOrigin(_ s: NSAttributedString, size: NSSize, top: CGFloat, x: CGFloat) -> CGPoint {
     let f = s.attribute(.font, at: 0, effectiveRange: nil) as! NSFont
-    let x = (CGFloat(width) - size.width) / 2
     return CGPoint(x: x, y: top + f.ascender)
 }
 
-let logoTopSVG = svgY
-svgY += logoHeight + gapLogo
+let titleOrigin = lineOrigin(title, size: titleSize, top: svgY, x: titleX)
+let baselineY = titleOrigin.y
+let logoTopSVG = baselineY - capHeight
+
+svgY += titleSize.height + gapTitle
+let subtitleOrigin = lineOrigin(subtitle, size: subtitleSize, top: svgY, x: (CGFloat(width) - subtitleSize.width) / 2)
+svgY += subtitleSize.height + gapSub
+let taglineOrigin = lineOrigin(tagline, size: taglineSize, top: svgY, x: (CGFloat(width) - taglineSize.width) / 2)
 
 func svgLogoPath(_ points: [(CGFloat, CGFloat)], boxX: CGFloat, topY: CGFloat, scale: CGFloat) -> String {
     var d = ""
@@ -313,15 +303,9 @@ func svgLogoPath(_ points: [(CGFloat, CGFloat)], boxX: CGFloat, topY: CGFloat, s
 
 var logoMarkup = ""
 for shape in logoShapes {
-    let d = svgLogoPath(shape.points, boxX: logoBoxX, topY: logoTopSVG, scale: logoScale)
-    logoMarkup += "  <path fill=\"url(#\(shape.gradientId))\" d=\"\(d)\"/>\n"
+    let d = svgLogoPath(shape.points, boxX: rowX, topY: logoTopSVG, scale: logoScale)
+    logoMarkup += "  <path fill=\"\(shape.fill)\" d=\"\(d)\"/>\n"
 }
-
-let titleOrigin = lineOrigin(title, size: titleSize, top: svgY)
-svgY += titleSize.height + gapTitle
-let subtitleOrigin = lineOrigin(subtitle, size: subtitleSize, top: svgY)
-svgY += subtitleSize.height + gapSub
-let taglineOrigin = lineOrigin(tagline, size: taglineSize, top: svgY)
 
 var pathMarkup = ""
 for (d, fill) in svgPaths(for: title, origin: titleOrigin)
@@ -331,40 +315,20 @@ for (d, fill) in svgPaths(for: title, origin: titleOrigin)
     pathMarkup += "  <path fill=\"\(fill)\" d=\"\(d)\"/>\n"
 }
 
-// Same 4 keys driving the raster radial glow, resampled at finer offsets — vector
-// output has no dithering to hide banding, so it needs more stops than the raster.
-func lerp(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat { a + (b - a) * t }
-func interpolateGlow(at t: CGFloat) -> RGB {
-    if t <= glowKeys.first!.0 { return glowKeys.first!.1 }
-    if t >= glowKeys.last!.0 { return glowKeys.last!.1 }
-    for i in 0 ..< (glowKeys.count - 1) {
-        let (o0, c0) = glowKeys[i]
-        let (o1, c1) = glowKeys[i + 1]
-        if t >= o0 && t <= o1 {
-            let f = (t - o0) / (o1 - o0)
-            return (lerp(c0.0, c1.0, f), lerp(c0.1, c1.1, f), lerp(c0.2, c1.2, f))
-        }
-    }
-    return glowKeys.last!.1
-}
-func hex(_ c: RGB) -> String {
-    String(format: "#%02X%02X%02X", Int((c.0 * 255).rounded()), Int((c.1 * 255).rounded()), Int((c.2 * 255).rounded()))
-}
-let svgGlowOffsets: [CGFloat] = [0, 0.08, 0.16, 0.24, 0.32, 0.40, 0.50, 0.62, 0.75, 0.88, 1]
-let svgGlowStops = svgGlowOffsets
-    .map { "      <stop offset=\"\($0)\" stop-color=\"\(hex(interpolateGlow(at: $0)))\"/>" }
-    .joined(separator: "\n")
-
-func svgLinearGradient(id: String, top: RGB, bottom: RGB) -> String {
-    """
-        <linearGradient id="\(id)" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="\(Int(logoLocalHeight))">
-          <stop offset="0" stop-color="\(hex(top))"/>
-          <stop offset="1" stop-color="\(hex(bottom))"/>
-        </linearGradient>
-    """
-}
-
-let svgBg = hex((0.0314, 0.0392, 0.0784))
+// Same glow stops as the main generator (what-dark.svg palette).
+let svgGlowStops = """
+      <stop offset="0" stop-color="#102C38"/>
+      <stop offset="0.08" stop-color="#0F2934"/>
+      <stop offset="0.16" stop-color="#0E252F"/>
+      <stop offset="0.24" stop-color="#0D222B"/>
+      <stop offset="0.32" stop-color="#0C1F27"/>
+      <stop offset="0.40" stop-color="#0C1E26"/>
+      <stop offset="0.50" stop-color="#0B1D25"/>
+      <stop offset="0.62" stop-color="#0B1C23"/>
+      <stop offset="0.75" stop-color="#0A161E"/>
+      <stop offset="0.88" stop-color="#091019"/>
+      <stop offset="1" stop-color="#080A14"/>
+"""
 
 let svg = """
 <svg xmlns="http://www.w3.org/2000/svg" width="\(width)" height="\(height)" viewBox="0 0 \(width) \(height)">
@@ -373,11 +337,8 @@ let svg = """
     <radialGradient id="glow" cx="\(Int(glowCenter.x))" cy="\(Int(glowCenter.y))" r="\(Int(glowRadius))" gradientUnits="userSpaceOnUse" color-interpolation="sRGB">
 \(svgGlowStops)
     </radialGradient>
-\(svgLinearGradient(id: "logoNavyV", top: logoNavy, bottom: logoNavyDeep))
-\(svgLinearGradient(id: "logoTealV", top: logoTeal, bottom: logoTealDeep))
-\(svgLinearGradient(id: "logoMidV", top: logoMid, bottom: logoMidDeep))
   </defs>
-  <rect width="\(width)" height="\(height)" fill="\(svgBg)"/>
+  <rect width="\(width)" height="\(height)" fill="#080A14"/>
   <circle cx="\(Int(glowCenter.x))" cy="\(Int(glowCenter.y))" r="\(Int(glowRadius))" fill="url(#glow)"/>
 \(logoMarkup)\(pathMarkup)</svg>
 """
