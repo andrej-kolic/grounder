@@ -24,7 +24,7 @@
     .panel { fill: #FFFFFF; stroke: #BFCED4; stroke-width: 1.35; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-    .kicker { fill: #146B82; font-size: 22.5px; font-weight: 600; letter-spacing: 3.06px; }
+    .kicker { fill: #1B5C8C; font-size: 22.5px; font-weight: 600; letter-spacing: 3.06px; }
     .name { fill: #05060C; font-size: 18px; font-weight: 600; }
     .more { fill: #6B757A; font-size: 18px; font-weight: 500; }
     .caption { fill: #3E474B; font-size: 18px; font-weight: 500; }
@@ -33,7 +33,7 @@
 
     .arrow { fill: none; stroke: #3E474B; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     .tree { fill: none; stroke: #BFCED4; stroke-width: 1.26; }
-    .folder { fill: none; stroke: #146B82; stroke-width: 1.08; }
+    .folder { fill: none; stroke: #1B5C8C; stroke-width: 1.08; }
     .rule { fill: none; stroke: #E1E9EC; stroke-width: 0.9; }
   </style>
 
