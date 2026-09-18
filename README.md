@@ -179,6 +179,16 @@ grounder doctor                                           # why isn't this worki
 
 Full flags and behavior: **[CLI reference](docs/cli-reference.md)**.
 
+## VS Code extension
+
+**[Grounder Xplorer](packages/vscode-extension)** browses a linked project's Plans,
+Notes and Handoffs as a tree in VS Code or Cursor, and lets you drag any doc into
+Cursor's or the Claude Code extension's chat panel to attach it as context. Requires
+`grounder setup` + `grounder link` already run for the project (above).
+
+Install: [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=andrej-kolic.grounder-vscode) ·
+[Open VSX](https://open-vsx.org/extension/andrej-kolic/grounder-vscode) (Cursor, VSCodium, Windsurf, and other Open VSX-based editors)
+
 ## FAQ
 
 ### How is this different from `AGENTS.md` or `CLAUDE.md`?
