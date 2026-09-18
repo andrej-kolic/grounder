@@ -1,0 +1,28 @@
+name: Feature request
+description: Suggest something Grounder doesn't do yet
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+      description: What are you trying to do that Grounder doesn't support today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would this work — from the command line, in the agent, or in the
+        Grounder Xplorer extension?
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Workarounds tried
+      description: Anything you're doing instead right now.
+    validations:
+      required: false

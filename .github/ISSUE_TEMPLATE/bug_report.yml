@@ -1,0 +1,66 @@
+name: Bug report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Commands run, in order, from a clean state if possible.
+      placeholder: |
+        1. grounder setup ...
+        2. grounder link
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: >-
+        Output of `grounder --version`, run in a terminal — the CLI is required even
+        when only using the extension. If the bug is in Grounder Xplorer itself, also
+        give its own version from VS Code's Extensions view.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options:
+        - Cursor skills
+        - Claude Code skills
+        - Both (skills)
+        - Grounder Xplorer (VS Code/Cursor extension)
+        - Neither (CLI only)
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Node version and OS
+      description: Output of `node --version`, and your OS. Grounder needs Node 22+.
+      placeholder: "e.g., Node 22.3.0, macOS 15"
+    validations:
+      required: false
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: grounder doctor output
+      description: >-
+        Paste the output if relevant — often points straight at the cause. It includes
+        local file paths (your vault location, home directory); redact anything you'd
+        rather not post publicly.
+      render: text

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 🔒 Report a security vulnerability
+    url: https://github.com/andrej-kolic/grounder/security/advisories/new
+    about: Do not report security vulnerabilities as a public issue — use private reporting instead.
+  - name: 💬 Questions and discussion
+    url: https://github.com/andrej-kolic/grounder/discussions
+    about: For anything that isn't a bug report or a specific feature request.
