@@ -1,6 +1,6 @@
 <div align="center">
 
-<img alt="Grounder logo" src="docs/assets/grounder-logo-gradient.svg" width="96">
+<img alt="Grounder logo" src="docs/assets/grounder-logo.svg" width="96">
 
 # Grounder
 
