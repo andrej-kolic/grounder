@@ -3,13 +3,17 @@ alwaysApply: true
 description: 'Git commit conventions: message format and commit granularity.'
 ---
 
-<!-- playbook:git v1 (2026-09-08) -->
+<!-- playbook:git v2 (2026-09-21) -->
 
 # Git Commit Conventions
 
 Governs commit message content and commit granularity — not git safety procedure (destructive operations, when to commit, force-push, `--no-verify`). Claude Code already enforces that; this rule fills the gap for tools that don't.
 
-Defer to this project's own established commit conventions where they exist — a `CONTRIBUTING.md`, a commitlint config, or an existing consistent history. Use the rules below only where no such convention exists.
+**Precedence — follow the first that exists:** machine-enforced config (commitlint, a `commit-msg` hook), then a convention the project states for agents (`AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`), then the defaults below.
+
+**Never infer a convention from `git log`** — a repo that states nothing has not decided. Apply the defaults to new commits and leave existing ones alone; never rewrite or amend them to match.
+
+## Defaults
 
 1. **One logical change per commit** — If you need "and" to describe what a commit does, split it. A commit should be revertible on its own without reverting an unrelated change.
 2. **Conventional format**: `type(scope): summary` — `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, etc. Scope is optional; omit it when the change isn't scoped to one area.
