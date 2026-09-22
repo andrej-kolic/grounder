@@ -38,12 +38,10 @@ describe("commands/note/list", () => {
     await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
-    const older = path.join(notesDir, "older.md");
-    const newer = path.join(notesDir, "2026-06-26-document 1.md");
+    const older = path.join(notesDir, "2026-06-25-140000-older.md");
+    const newer = path.join(notesDir, "2026-06-26-150000-document 1.md");
     await writeFile(older, "older", "utf8");
     await writeFile(newer, "newer", "utf8");
-    await touch(older, new Date("2026-06-26T14:00:00.000Z"));
-    await touch(newer, new Date("2026-06-26T15:00:00.000Z"));
 
     const { code, out } = await captureStdout(() =>
       runNoteListWithOptions({ cwd: env.repo, homeDir: env.home }),
@@ -51,7 +49,7 @@ describe("commands/note/list", () => {
 
     expect(code).toBe(0);
     expect(out).toBe(
-      `All 2 notes:\n\n1. 2026-06-26-document 1  \n  ${newer}\n\n2. older  \n  ${older}\n`,
+      `All 2 notes:\n\n1. 2026-06-26-150000-document 1  \n  ${newer}\n\n2. 2026-06-25-140000-older  \n  ${older}\n`,
     );
   });
 
@@ -106,18 +104,16 @@ describe("commands/note/list", () => {
     await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
-    const older = path.join(notesDir, "older.md");
-    const newer = path.join(notesDir, "newer.md");
+    const older = path.join(notesDir, "2026-06-26-130000-older.md");
+    const newer = path.join(notesDir, "2026-06-26-150000-newer.md");
     await writeFile(older, "a", "utf8");
     await writeFile(newer, "b", "utf8");
-    await touch(older, new Date("2026-06-26T13:00:00.000Z"));
-    await touch(newer, new Date("2026-06-26T15:00:00.000Z"));
 
     const result = runCli(["note", "list", "--limit", "1"], withGroundedHome(env.home), env.repo);
 
     expect(result.status).toBe(0);
     expect(result.stdout).toBe(
-      `Most recent 1 note (there may be more):\n\n1. newer  \n  ${newer}\n`,
+      `Most recent 1 note (there may be more):\n\n1. 2026-06-26-150000-newer  \n  ${newer}\n`,
     );
   });
 

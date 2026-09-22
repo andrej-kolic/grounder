@@ -176,9 +176,13 @@ function writeJsonOutput(buckets: readonly Bucket[]): void {
  * Resolves the linked project, gathers a per-bucket count + capped recent
  * titles across `notes/`, `logs/` (handoffs), and `plans/` — the same
  * newest-first listings `note/handoff/plan list` use, in one call. `--json`
- * items also include `mtimeMs` (the same on-disk mtime each lister already
- * fetches to rank entries; see `listNotesDetailed` / `listHandoffsDetailed` /
- * `listPlansDetailed`). Text and markdown stay title + path only.
+ * items also include `mtimeMs`, but it is informational only, not the rank
+ * signal: notes and handoffs rank by UTC filename prefix, plans by
+ * frontmatter `updated`/`created` (see `listNotesDetailed` /
+ * `listHandoffsDetailed` / `listPlansDetailed`) — none of them sort by raw
+ * mtime, since git checkout resets it and would scramble order. A consumer
+ * that wants recency order must use each bucket's `items` array order, never
+ * re-sort by `mtimeMs`. Text and markdown stay title + path only.
  * @returns Exit code (`0` on success, `1` when vault/link is missing).
  */
 export async function runOverviewWithOptions(options: OverviewOptions = {}): Promise<number> {

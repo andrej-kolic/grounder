@@ -124,6 +124,76 @@ describe("vault/list-plans", () => {
     expect(await listPlans(plansDir, { limit: -1 })).toEqual([]);
   });
 
+  it("ranks by frontmatter updated over mtime, so a git checkout can't reorder plans", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const plansDir = path.join(env.vault, "plans");
+    await mkdir(plansDir, { recursive: true });
+
+    const olderContent = path.join(plansDir, "older-content.md");
+    const newerContent = path.join(plansDir, "newer-content.md");
+    await writeFile(
+      olderContent,
+      '---\nproject: "p"\ncreated: "2026-06-01T00:00:00.000Z"\nupdated: "2026-06-01T00:00:00.000Z"\n---\n\nbody',
+      "utf8",
+    );
+    await writeFile(
+      newerContent,
+      '---\nproject: "p"\ncreated: "2026-06-01T00:00:00.000Z"\nupdated: "2026-06-26T15:00:00.000Z"\n---\n\nbody',
+      "utf8",
+    );
+    // Checkout mtime is the opposite of frontmatter recency — ranking must ignore it.
+    await touch(olderContent, new Date("2026-06-27T00:00:00.000Z"));
+    await touch(newerContent, new Date("2026-06-20T00:00:00.000Z"));
+
+    expect(await listPlans(plansDir)).toEqual([newerContent, olderContent]);
+  });
+
+  it("ranks by frontmatter created when updated is absent", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const plansDir = path.join(env.vault, "plans");
+    await mkdir(plansDir, { recursive: true });
+
+    const older = path.join(plansDir, "older.md");
+    const newer = path.join(plansDir, "newer.md");
+    await writeFile(
+      older,
+      '---\nproject: "p"\ncreated: "2026-06-01T00:00:00.000Z"\n---\n\nbody',
+      "utf8",
+    );
+    await writeFile(
+      newer,
+      '---\nproject: "p"\ncreated: "2026-06-26T15:00:00.000Z"\n---\n\nbody',
+      "utf8",
+    );
+    // Same trick: checkout mtime is reversed from `created`.
+    await touch(older, new Date("2026-06-27T00:00:00.000Z"));
+    await touch(newer, new Date("2026-06-20T00:00:00.000Z"));
+
+    expect(await listPlans(plansDir)).toEqual([newer, older]);
+  });
+
+  it("falls back to mtime for plans with no parseable frontmatter timestamp", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const plansDir = path.join(env.vault, "plans");
+    await mkdir(plansDir, { recursive: true });
+
+    const noFrontmatter = path.join(plansDir, "no-frontmatter.md");
+    const withFrontmatter = path.join(plansDir, "with-frontmatter.md");
+    await writeFile(noFrontmatter, "plain body, no frontmatter", "utf8");
+    await writeFile(
+      withFrontmatter,
+      '---\nproject: "p"\ncreated: "2026-06-01T00:00:00.000Z"\n---\n\nbody',
+      "utf8",
+    );
+    await touch(noFrontmatter, new Date("2026-06-27T00:00:00.000Z"));
+    await touch(withFrontmatter, new Date("2026-06-20T00:00:00.000Z"));
+
+    expect(await listPlans(plansDir)).toEqual([noFrontmatter, withFrontmatter]);
+  });
+
   it("includes markdown files in subfolders", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;

@@ -30,6 +30,7 @@ function unescapeYamlDoubleQuoted(value: string): string {
 export interface ParsedFrontmatter {
   title?: string;
   created?: string;
+  updated?: string;
   topics?: string[];
 }
 
@@ -52,7 +53,7 @@ function parseYamlFlowSequence(raw: string): string[] | undefined {
 }
 
 /**
- * Parse `title` / `created` / `topics` from Grounder frontmatter.
+ * Parse `title` / `created` / `updated` / `topics` from Grounder frontmatter.
  * Accepts the quoted `key: "value"` shape write commands produce, and
  * unquoted `key: value` from earlier files. Not a general YAML parser.
  * Returns `{}` on anything unexpected; never throws.
@@ -78,20 +79,20 @@ export function parseHandoffFrontmatter(content: string): ParsedFrontmatter {
         continue;
       }
 
-      const quoted = /^(title|created):\s*"(.*)"\s*$/.exec(line);
+      const quoted = /^(title|created|updated):\s*"(.*)"\s*$/.exec(line);
       if (quoted) {
-        const key = quoted[1] as "title" | "created";
+        const key = quoted[1] as "title" | "created" | "updated";
         result[key] = unescapeYamlDoubleQuoted(quoted[2] ?? "");
         continue;
       }
 
-      if (/^(title|created):\s*"/.test(line)) {
+      if (/^(title|created|updated):\s*"/.test(line)) {
         continue;
       }
 
-      const unquoted = /^(title|created):\s*(.+?)\s*$/.exec(line);
+      const unquoted = /^(title|created|updated):\s*(.+?)\s*$/.exec(line);
       if (unquoted) {
-        const key = unquoted[1] as "title" | "created";
+        const key = unquoted[1] as "title" | "created" | "updated";
         result[key] = unquoted[2] ?? "";
       }
     }

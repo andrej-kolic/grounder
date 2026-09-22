@@ -94,4 +94,13 @@ title: "after-close"
       topics: ["a", "b"],
     });
   });
+
+  it("parses quoted updated alongside created", () => {
+    const content =
+      '---\ncreated: "2026-08-01T00:00:00.000Z"\nupdated: "2026-08-02T00:00:00.000Z"\n---\n';
+    expect(parseHandoffFrontmatter(content)).toEqual({
+      created: "2026-08-01T00:00:00.000Z",
+      updated: "2026-08-02T00:00:00.000Z",
+    });
+  });
 });

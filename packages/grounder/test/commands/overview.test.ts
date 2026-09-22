@@ -94,19 +94,17 @@ describe("commands/overview", () => {
     await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
-    const older = path.join(notesDir, "older.md");
-    const newer = path.join(notesDir, "newer.md");
+    const older = path.join(notesDir, "2026-06-26-130000-older.md");
+    const newer = path.join(notesDir, "2026-06-26-150000-newer.md");
     await writeFile(older, "a", "utf8");
     await writeFile(newer, "b", "utf8");
-    await touch(older, new Date("2026-06-26T13:00:00.000Z"));
-    await touch(newer, new Date("2026-06-26T15:00:00.000Z"));
 
     const { code, out } = await captureStdout(() =>
       runOverviewWithOptions({ cwd: env.repo, homeDir: env.home, limit: 1 }),
     );
 
     expect(code).toBe(0);
-    expect(out).toContain("Most recent 1 of 2 notes:\n\n1. newer  \n");
+    expect(out).toContain("Most recent 1 of 2 notes:\n\n1. 2026-06-26-150000-newer  \n");
   });
 
   it("prints markdown link title lines with --markdown", async () => {
@@ -314,17 +312,15 @@ describe("commands/overview", () => {
     await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
     const notesDir = path.join(env.vault, "10-Projects", "my-app", "notes");
-    const older = path.join(notesDir, "older.md");
-    const newer = path.join(notesDir, "newer.md");
+    const older = path.join(notesDir, "2026-06-26-130000-older.md");
+    const newer = path.join(notesDir, "2026-06-26-150000-newer.md");
     await writeFile(older, "a", "utf8");
     await writeFile(newer, "b", "utf8");
-    await touch(older, new Date("2026-06-26T13:00:00.000Z"));
-    await touch(newer, new Date("2026-06-26T15:00:00.000Z"));
 
     const result = runCli(["overview", "--limit", "1"], withGroundedHome(env.home), env.repo);
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Most recent 1 of 2 notes:\n\n1. newer  \n");
+    expect(result.stdout).toContain("Most recent 1 of 2 notes:\n\n1. 2026-06-26-150000-newer  \n");
     expect(result.stdout).toContain("Handoffs\nNo handoffs.\n");
     expect(result.stdout).toContain("Plans\nNo plans.\n");
   });
