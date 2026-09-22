@@ -14,7 +14,7 @@ describe("vault/write-handoff", () => {
     }
   });
 
-  const fixedTime = new Date("2026-06-26T14:30:00");
+  const fixedTime = new Date("2026-06-26T14:30:00.000Z");
   const body = `# Handoff: auth
 
 ## Done
@@ -111,7 +111,7 @@ describe("vault/write-handoff", () => {
     const p2 = await writeHandoff(logsDir, body, {
       projectId: "my-app",
       topics: [],
-      now: new Date("2026-06-26T14:31:00"),
+      now: new Date("2026-06-26T14:31:00.000Z"),
     });
     expect(await readFile(p2, "utf8")).not.toContain("topics:");
   });

@@ -301,7 +301,7 @@ function pathMatchedTerms(
  */
 /**
  * Strips a leading vault timestamp prefix (`YYYY-MM-DD-HHmm[ss]`, see
- * `dateSecondPrefix`/`dateMinutePrefix` in `timestamp-slug.ts`) so a bare
+ * `dateSecondPrefix` in `timestamp-slug.ts`) so a bare
  * date/time query doesn't stem-match every handoff/log filename — hyphens
  * alone don't stop it, since each numeric segment still matches standalone
  * as a "word" via termMatchesHaystack's boundary check. Strips to empty for

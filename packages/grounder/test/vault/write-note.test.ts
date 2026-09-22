@@ -14,7 +14,7 @@ describe("vault/write-note", () => {
     }
   });
 
-  const fixedTime = new Date("2026-06-26T14:30:00");
+  const fixedTime = new Date("2026-06-26T14:30:00.000Z");
 
   it("writes a note file with timestamp and short slug", async () => {
     const env = await createTempEnv({ initGit: false });
@@ -75,7 +75,7 @@ describe("vault/write-note", () => {
 
     const p2 = await writeNote(notesDir, "empty topics", {
       topics: [],
-      now: new Date("2026-06-26T14:31:00"),
+      now: new Date("2026-06-26T14:31:00.000Z"),
     });
     expect(await readFile(p2, "utf8")).toBe("empty topics");
   });
