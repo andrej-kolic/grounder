@@ -45,13 +45,13 @@ export default {
     // Session-start hook teaser — fires unprompted, before any input.
     {
       type: "output",
-      text: `${cyan("[grounder]")} Latest handoff: "auth-middleware" (2026-08-14). Run /grounder-task to load it, or ignore if unrelated.\r\n\r\n`,
+      text: `${cyan("[grounder]")} Latest handoff: "auth-middleware" (2026-08-14). Run /grounder-recall to load it, or ignore if unrelated.\r\n\r\n`,
     },
     { type: "wait", seconds: 1.3 },
 
     // Resume the latest saved session.
     prompt(),
-    ...say("/grounder-task"),
+    ...say("/grounder-recall"),
     {
       type: "output",
       text:
@@ -90,7 +90,7 @@ export default {
 
     // Save a short session summary.
     prompt(),
-    ...say("/grounder-task-handoff"),
+    ...say("/grounder-handoff"),
     {
       type: "output",
       text: `${green("Wrote ~/vault/10-Projects/your-project/logs/2026-08-14-173000-auth-middleware.md")}\r\n\r\n`,
