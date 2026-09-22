@@ -38,8 +38,8 @@ vault/                # vault on disk
   write-plan.ts       # plan file I/O (named, updatable; --force)
   list-markdown.ts    # recursive *.md walk (shared by list + search)
   list-handoffs.ts    # list logs/**/*.md newest basename first
-  list-plans.ts       # list plans/**/*.md newest mtime first
-  list-notes.ts       # list notes/**/*.md newest mtime first
+  list-plans.ts       # list plans/**/*.md newest updated/created first (mtime fallback)
+  list-notes.ts       # list notes/**/*.md newest basename first (UTC prefix)
   find-usable-handoff.ts # newest-first, skipping empty/unreadable (peek + list --head)
   search.ts           # vault markdown scan + rank (grounder search)
 commands/             # mirrors CLI structure

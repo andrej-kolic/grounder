@@ -35,63 +35,59 @@ describe("vault/list-notes", () => {
     expect(await listNotes(notesDir)).toEqual([]);
   });
 
-  it("sorts markdown files newest-first by mtime", async () => {
+  it("sorts markdown files newest-first by filename", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
     const notesDir = path.join(env.vault, "notes");
     await mkdir(notesDir, { recursive: true });
-
-    const older = path.join(notesDir, "older.md");
-    const newer = path.join(notesDir, "document 1.md");
-    const mid = path.join(notesDir, "phase-1.md");
-    await writeFile(older, "a", "utf8");
-    await writeFile(newer, "b", "utf8");
-    await writeFile(mid, "c", "utf8");
+    await writeFile(path.join(notesDir, "2026-06-26-143000.md"), "a", "utf8");
+    await writeFile(path.join(notesDir, "2026-06-26-150000-later.md"), "b", "utf8");
+    await writeFile(path.join(notesDir, "2026-06-25-090000-old.md"), "c", "utf8");
     await writeFile(path.join(notesDir, "readme.txt"), "skip", "utf8");
 
-    await touch(older, new Date("2026-06-25T09:00:00.000Z"));
-    await touch(mid, new Date("2026-06-26T14:00:00.000Z"));
-    await touch(newer, new Date("2026-06-26T15:00:00.000Z"));
-
-    expect(await listNotes(notesDir)).toEqual([newer, mid, older]);
-  });
-
-  it("listNotesDetailed returns the same ranking with each entry's real mtime attached", async () => {
-    const env = await createTempEnv({ initGit: false });
-    cleanup = env.cleanup;
-    const notesDir = path.join(env.vault, "notes");
-    await mkdir(notesDir, { recursive: true });
-
-    const older = path.join(notesDir, "older.md");
-    const newer = path.join(notesDir, "newer.md");
-    await writeFile(older, "a", "utf8");
-    await writeFile(newer, "b", "utf8");
-    const olderMtime = new Date("2026-06-25T09:00:00.000Z");
-    const newerMtime = new Date("2026-06-26T15:00:00.000Z");
-    await touch(older, olderMtime);
-    await touch(newer, newerMtime);
-
-    expect(await listNotesDetailed(notesDir)).toEqual([
-      { path: newer, mtimeMs: newerMtime.getTime() },
-      { path: older, mtimeMs: olderMtime.getTime() },
+    expect(await listNotes(notesDir)).toEqual([
+      path.join(notesDir, "2026-06-26-150000-later.md"),
+      path.join(notesDir, "2026-06-26-143000.md"),
+      path.join(notesDir, "2026-06-25-090000-old.md"),
     ]);
   });
 
-  it("breaks mtime ties by vault-relative path descending", async () => {
+  it("listNotesDetailed returns the same filename ranking with each entry's real mtime attached", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
     const notesDir = path.join(env.vault, "notes");
     await mkdir(notesDir, { recursive: true });
+    const later = path.join(notesDir, "2026-06-26-150000-later.md");
+    const earlier = path.join(notesDir, "2026-06-26-143000.md");
+    await writeFile(later, "a", "utf8");
+    await writeFile(earlier, "b", "utf8");
+    // mtime intentionally reversed from filename order — ranking must stay
+    // filename-based, only the mtime field itself should reflect this.
+    const laterMtime = new Date("2026-06-25T09:00:00.000Z");
+    const earlierMtime = new Date("2026-06-27T09:00:00.000Z");
+    await touch(later, laterMtime);
+    await touch(earlier, earlierMtime);
 
-    const a = path.join(notesDir, "alpha.md");
-    const z = path.join(notesDir, "zeta.md");
-    await writeFile(a, "a", "utf8");
-    await writeFile(z, "z", "utf8");
-    const same = new Date("2026-06-26T14:00:00.000Z");
-    await touch(a, same);
-    await touch(z, same);
+    expect(await listNotesDetailed(notesDir)).toEqual([
+      { path: later, mtimeMs: laterMtime.getTime() },
+      { path: earlier, mtimeMs: earlierMtime.getTime() },
+    ]);
+  });
 
-    expect(await listNotes(notesDir)).toEqual([z, a]);
+  it("lists _NN collision suffixes newest-first (not the unsuffixed base)", async () => {
+    const env = await createTempEnv({ initGit: false });
+    cleanup = env.cleanup;
+    const notesDir = path.join(env.vault, "notes");
+    await mkdir(notesDir, { recursive: true });
+    await writeFile(path.join(notesDir, "2026-06-26-143000-dup.md"), "first", "utf8");
+    await writeFile(path.join(notesDir, "2026-06-26-143000-dup_02.md"), "second", "utf8");
+    await writeFile(path.join(notesDir, "2026-06-26-143000-dup_10.md"), "tenth", "utf8");
+
+    expect(await listNotes(notesDir)).toEqual([
+      path.join(notesDir, "2026-06-26-143000-dup_10.md"),
+      path.join(notesDir, "2026-06-26-143000-dup_02.md"),
+      path.join(notesDir, "2026-06-26-143000-dup.md"),
+    ]);
   });
 
   it("applies limit (newest first)", async () => {
@@ -99,18 +95,14 @@ describe("vault/list-notes", () => {
     cleanup = env.cleanup;
     const notesDir = path.join(env.vault, "notes");
     await mkdir(notesDir, { recursive: true });
+    await writeFile(path.join(notesDir, "2026-06-26-1430.md"), "a", "utf8");
+    await writeFile(path.join(notesDir, "2026-06-26-1500.md"), "b", "utf8");
+    await writeFile(path.join(notesDir, "2026-06-26-1600.md"), "c", "utf8");
 
-    const a = path.join(notesDir, "a.md");
-    const b = path.join(notesDir, "b.md");
-    const c = path.join(notesDir, "c.md");
-    await writeFile(a, "a", "utf8");
-    await writeFile(b, "b", "utf8");
-    await writeFile(c, "c", "utf8");
-    await touch(a, new Date("2026-06-26T13:00:00.000Z"));
-    await touch(b, new Date("2026-06-26T14:00:00.000Z"));
-    await touch(c, new Date("2026-06-26T15:00:00.000Z"));
-
-    expect(await listNotes(notesDir, { limit: 2 })).toEqual([c, b]);
+    expect(await listNotes(notesDir, { limit: 2 })).toEqual([
+      path.join(notesDir, "2026-06-26-1600.md"),
+      path.join(notesDir, "2026-06-26-1500.md"),
+    ]);
   });
 
   it("returns empty array when limit is zero or negative", async () => {
@@ -118,26 +110,23 @@ describe("vault/list-notes", () => {
     cleanup = env.cleanup;
     const notesDir = path.join(env.vault, "notes");
     await mkdir(notesDir, { recursive: true });
-    await writeFile(path.join(notesDir, "a.md"), "a", "utf8");
+    await writeFile(path.join(notesDir, "2026-06-26-1430.md"), "a", "utf8");
 
     expect(await listNotes(notesDir, { limit: 0 })).toEqual([]);
     expect(await listNotes(notesDir, { limit: -1 })).toEqual([]);
   });
 
-  it("includes markdown files in subfolders", async () => {
+  it("includes markdown files in subfolders, sorted by basename", async () => {
     const env = await createTempEnv({ initGit: false });
     cleanup = env.cleanup;
     const notesDir = path.join(env.vault, "notes");
     const nestedDir = path.join(notesDir, "research");
     await mkdir(nestedDir, { recursive: true });
+    const nested = path.join(nestedDir, "2026-06-26-160000-nested.md");
+    const root = path.join(notesDir, "2026-06-26-150000-root.md");
+    await writeFile(nested, "nested", "utf8");
+    await writeFile(root, "root", "utf8");
 
-    const rootNote = path.join(notesDir, "overview.md");
-    const nestedNote = path.join(nestedDir, "findings.md");
-    await writeFile(rootNote, "root", "utf8");
-    await writeFile(nestedNote, "nested", "utf8");
-    await touch(rootNote, new Date("2026-06-26T13:00:00.000Z"));
-    await touch(nestedNote, new Date("2026-06-26T15:00:00.000Z"));
-
-    expect(await listNotes(notesDir)).toEqual([nestedNote, rootNote]);
+    expect(await listNotes(notesDir)).toEqual([nested, root]);
   });
 });
