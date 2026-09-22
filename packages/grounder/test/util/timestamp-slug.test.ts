@@ -7,7 +7,7 @@ import {
 } from "../../src/util/timestamp-slug.js";
 
 describe("util/timestamp-slug", () => {
-  const fixedTime = new Date("2026-06-26T14:30:45");
+  const fixedTime = new Date("2026-06-26T14:30:45.000Z");
 
   it("slugifies first line only", () => {
     expect(slugifyText("first line\nsecond line")).toBe("first-line");
@@ -28,6 +28,23 @@ describe("util/timestamp-slug", () => {
     expect(timestampedBasename("body", { title: "Custom Title", now: fixedTime })).toBe(
       "2026-06-26-143045-custom-title",
     );
+  });
+
+  it("formats the filename prefix in UTC when the process timezone is not UTC", () => {
+    const previous = process.env.TZ;
+    process.env.TZ = "America/Los_Angeles";
+    try {
+      const instant = new Date("2026-09-22T08:00:00.000Z");
+      expect(timestampedBasename("body", { title: "later", now: instant })).toBe(
+        "2026-09-22-080000-later",
+      );
+    } finally {
+      if (previous === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = previous;
+      }
+    }
   });
 
   it("zero-pads collision suffixes so lex sort stays newest-first", () => {

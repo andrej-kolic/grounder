@@ -43,12 +43,12 @@ function applyLimit(paths: readonly string[], limit: number | undefined): string
 
 /**
  * Lists handoff markdown files under `logsDir` recursively, newest basename
- * first (timestamp-prefixed names sort correctly), with each entry's mtime
- * attached. Same basename in different subfolders ties break by
+ * first, with each entry's mtime attached. UTC `YYYY-MM-DD-HHmmss` prefixes
+ * sort as instants. Same basename in different subfolders ties break by
  * vault-relative path descending. Missing or empty dirs yield `[]`.
  *
- * Ranking never reads mtime (filenames already sort correctly), so this
- * stats only the paths a `limit` actually keeps, not the whole bucket.
+ * Ranking never reads mtime, so this stats only the paths a `limit` actually
+ * keeps, not the whole bucket.
  */
 export async function listHandoffsDetailed(
   logsDir: string,

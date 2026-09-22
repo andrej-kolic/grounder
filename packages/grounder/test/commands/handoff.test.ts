@@ -43,7 +43,7 @@ describe("commands/handoff", () => {
     await runSetupWithOptions({ vaultPath: env.vault, yes: true, homeDir: env.home });
     await runLinkWithOptions({ cwd: env.repo, yes: true, homeDir: env.home });
 
-    const fixedTime = new Date("2026-06-26T14:30:00");
+    const fixedTime = new Date("2026-06-26T14:30:00.000Z");
     const code = await runHandoffWithOptions({
       cwd: env.repo,
       text: handoffBody,

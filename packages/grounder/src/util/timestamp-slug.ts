@@ -13,37 +13,15 @@ export function slugifyText(text: string): string {
   return sanitizeProjectId(firstLine.trim().slice(0, MAX_SLUG_LENGTH));
 }
 
-function datePrefix(date: Date, includeSeconds: boolean): string {
-  const y = date.getFullYear();
-  const m = pad(date.getMonth() + 1);
-  const d = pad(date.getDate());
-  const time = `${pad(date.getHours())}${pad(date.getMinutes())}${includeSeconds ? pad(date.getSeconds()) : ""}`;
-  return `${y}-${m}-${d}-${time}`;
-}
-
-/** Local-time prefix `YYYY-MM-DD-HHmm` (legacy minute precision). */
-export function dateMinutePrefix(date: Date): string {
-  return datePrefix(date, false);
-}
-
-/** Local-time prefix `YYYY-MM-DD-HHmmss` for sortable filenames. */
+/** UTC prefix `YYYY-MM-DD-HHmmss` for sortable filenames. */
 export function dateSecondPrefix(date: Date): string {
-  return datePrefix(date, true);
-}
-
-/**
- * @deprecated Prefer {@link dateSecondPrefix} (hyphenated date + time).
- * Legacy `YYYY-MM-DD-HH-mm-ss` form.
- */
-export function timestampSlug(date = new Date()): string {
-  return [
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate()),
-    pad(date.getHours()),
-    pad(date.getMinutes()),
-    pad(date.getSeconds()),
-  ].join("-");
+  const y = date.getUTCFullYear();
+  const m = pad(date.getUTCMonth() + 1);
+  const d = pad(date.getUTCDate());
+  const hours = pad(date.getUTCHours());
+  const minutes = pad(date.getUTCMinutes());
+  const seconds = pad(date.getUTCSeconds());
+  return `${y}-${m}-${d}-${hours}${minutes}${seconds}`;
 }
 
 /**
@@ -58,16 +36,6 @@ export function timestampedBasename(
   const shortSlug = options.title ? slugifyText(options.title) : slugifyText(text);
   const prefix = dateSecondPrefix(now);
   return shortSlug ? `${prefix}-${shortSlug}` : prefix;
-}
-
-/**
- * @deprecated Alias of {@link timestampedBasename} (always second precision).
- */
-export function timestampedBasenameWithSeconds(
-  text: string,
-  options: { title?: string; now?: Date } = {},
-): string {
-  return timestampedBasename(text, options);
 }
 
 /**
