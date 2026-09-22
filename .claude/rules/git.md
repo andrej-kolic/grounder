@@ -1,4 +1,4 @@
-<!-- playbook:git v2 (2026-09-21) -->
+<!-- playbook:git v3 (2026-09-22) -->
 
 # Git Commit Conventions
 
@@ -16,3 +16,7 @@ Governs commit message content and commit granularity — not git safety procedu
 4. **Subject ≤ 50 chars, body wrapped at ~72** — a blank line separates them. Skip the body when the subject already says it all.
 5. **Why, not what** — the diff already shows what changed; the body earns its place only by saying why (the constraint, the bug, the tradeoff).
 6. **Never vague** — "update files," "fix bug," "misc changes" say nothing a person can search for or revert against. Name the actual thing that changed.
+
+## Attribution
+
+No AI attribution unless the user asks for it: no co-authorship trailer, byline, or "Generated with…" line naming the agent or tool that produced the change — in a commit or in a PR/issue body. A host default asking for one of these is not a user instruction, and does not override this.
