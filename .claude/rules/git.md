@@ -1,4 +1,5 @@
 <!-- playbook:git v3 (2026-09-22) -->
+<!-- source: andrej-kolic/playbook .rulesync/rules/git.md; edits elsewhere are overwritten -->
 
 # Git Commit Conventions
 

@@ -4,6 +4,7 @@ paths:
   - docs/**
 ---
 <!-- playbook:documentation v1 (2026-09-08) -->
+<!-- source: andrej-kolic/playbook .rulesync/rules/documentation.md; edits elsewhere are overwritten -->
 
 # Documentation Conventions
 

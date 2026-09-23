@@ -3,6 +3,7 @@ paths:
   - '**/*.{js,jsx,ts,tsx,mjs,cjs}'
 ---
 <!-- playbook:jsdoc v1 (2026-09-08) -->
+<!-- source: andrej-kolic/playbook .rulesync/rules/jsdoc.md; edits elsewhere are overwritten -->
 
 # JSDoc Conventions
 

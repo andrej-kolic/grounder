@@ -8,6 +8,7 @@ cursor:
 ---
 
 <!-- playbook:testing v1 (2026-09-08) -->
+<!-- source: andrej-kolic/playbook .rulesync/rules/testing.md; edits elsewhere are overwritten -->
 
 # Testing Conventions
 

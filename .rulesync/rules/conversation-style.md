@@ -7,7 +7,8 @@ cursor:
   alwaysApply: true
 ---
 
-<!-- playbook:conversation-style v4 (2026-09-22) -->
+<!-- playbook:conversation-style v5 (2026-09-23) -->
+<!-- source: andrej-kolic/playbook .rulesync/rules/conversation-style.md; edits elsewhere are overwritten -->
 
 # Response Guidelines
 
@@ -27,6 +28,6 @@ A question gets an answer. Only an explicit instruction — an imperative, a "ye
 
 4. **Numbered Lists** — Use numbered lists for options, choices, or itemized points within a substantive answer, so items can be referenced by number.
 
-5. **Plain Language** — Cut fancy words, conversational filler, unexplained jargon, and aphorisms. Pitch to the level the reader has stated they're at, not to a professional in the field under discussion. This applies universally, including to short answers.
+5. **Plain Language** — Clarity first: the reader must never have to decode a reply. Cut fancy words, conversational filler, jargon, and aphorisms. Pitch to the level the reader has stated they're at, not to a professional in the field under discussion. This applies universally, including to short answers.
 
 6. **Definite Closing** — End a substantive answer with a clear conclusion (a recommended course of action) or a single direct question. Skip this for short factual answers that need no follow-up.
